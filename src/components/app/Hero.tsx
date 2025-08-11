@@ -1,16 +1,11 @@
 import { Link } from "react-router-dom";
 import hero from "@/assets/hero-devota.jpg";
 import { Button } from "@/components/ui/button";
-import { SEO } from "./SEO";
+
 
 export const Hero = () => {
   return (
     <header className="relative overflow-hidden rounded-lg border bg-card">
-      <SEO
-        title="Leitura Devota — Clássicos Católicos"
-        description="Forme o hábito de leitura espiritual diária com clássicos católicos em português. Streak, metas e lembretes."
-        canonical="/"
-      />
       <div className="absolute inset-0 bg-gradient-to-r from-background/60 via-background/40 to-background/60" aria-hidden />
       <img
         src={hero}
