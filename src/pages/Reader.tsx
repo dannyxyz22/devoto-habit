@@ -1,0 +1,220 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useParams, Link } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
+import { Progress } from "@/components/ui/progress";
+import { toast } from "@/hooks/use-toast";
+import confetti from "canvas-confetti";
+import { getBookById } from "@/lib/books";
+import { SEO } from "@/components/app/SEO";
+import {
+  addReadingMinutes,
+  getProgress,
+  getStreak,
+  hasReadToday,
+  markReadToday,
+  setProgress,
+} from "@/lib/storage";
+
+// Types for the fetched JSON
+export type Paragraph = { type: string; content: string };
+export type Chapter = { chapter_title: string; content: Paragraph[] };
+export type Part = { part_title: string; chapters: Chapter[] };
+
+const Reader = () => {
+  const { bookId = "" } = useParams();
+  const meta = getBookById(bookId);
+  const [parts, setParts] = useState<Part[] | null>(null);
+  const [fontSize, setFontSize] = useState<number>(18);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [p, setP] = useState(() => getProgress(bookId));
+  const startRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!meta) return;
+    const cacheKey = `book:${meta.id}`;
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      try {
+        setParts(JSON.parse(cached));
+        return;
+      } catch {}
+    }
+    setLoading(true);
+    fetch(meta.sourceUrl)
+      .then((r) => r.json())
+      .then((json) => {
+        localStorage.setItem(cacheKey, JSON.stringify(json));
+        setParts(json as Part[]);
+      })
+      .catch(() => setErr("Falha ao carregar o livro. Tente novamente."))
+      .finally(() => setLoading(false));
+  }, [meta]);
+
+  // Track reading time
+  useEffect(() => {
+    startRef.current = Date.now();
+    return () => {
+      if (startRef.current) addReadingMinutes(Date.now() - startRef.current);
+    };
+  }, []);
+
+  const flatChapters = useMemo(() => {
+    if (!parts) return [] as { partIndex: number; chapterIndex: number; title: string }[];
+    const arr: { partIndex: number; chapterIndex: number; title: string }[] = [];
+    parts.forEach((part, pi) =>
+      part.chapters.forEach((ch, ci) => arr.push({ partIndex: pi, chapterIndex: ci, title: ch.chapter_title }))
+    );
+    return arr;
+  }, [parts]);
+
+  const currentChapter = useMemo(() => {
+    if (!parts) return null;
+    const ch = parts[p.partIndex]?.chapters[p.chapterIndex];
+    return ch || null;
+  }, [parts, p]);
+
+  const updateProgress = (np: typeof p) => {
+    setP(np);
+    setProgress(bookId, np);
+  };
+
+  const concludeChapter = () => {
+    if (!parts) return;
+    const isLast = p.partIndex === parts.length - 1 && p.chapterIndex === parts[p.partIndex].chapters.length - 1;
+    if (isLast) {
+      updateProgress({ ...p, percent: 100 });
+      celebrate("Livro concluído! Parabéns pela perseverança.");
+      return;
+    }
+    // move forward
+    let np = { ...p };
+    const nextChapterIndex = p.chapterIndex + 1;
+    if (nextChapterIndex < parts[p.partIndex].chapters.length) {
+      np.chapterIndex = nextChapterIndex;
+    } else {
+      np.partIndex += 1;
+      np.chapterIndex = 0;
+    }
+    const idx = flatChapters.findIndex(
+      (i) => i.partIndex === np.partIndex && i.chapterIndex === np.chapterIndex
+    );
+    const percent = Math.round(((idx + 1) / flatChapters.length) * 100);
+    np.percent = Math.min(100, percent);
+    updateProgress(np);
+    onReadToday();
+  };
+
+  const onReadToday = () => {
+    const before = getStreak();
+    const after = markReadToday();
+    if (after.current > before.current) {
+      celebrate("Leitura do dia registrada! Streak +1");
+    } else if (!hasReadToday()) {
+      toast({ title: "Leitura do dia", description: "Registrada com sucesso." });
+    }
+  };
+
+  const celebrate = (message: string) => {
+    toast({ title: message });
+    try { navigator.vibrate?.(150); } catch {}
+    confetti({ particleCount: 90, spread: 70, origin: { y: 0.7 } });
+  };
+
+  if (!meta) {
+    return (
+      <main className="container mx-auto py-10">
+        <h1 className="text-2xl font-bold mb-2">Livro não encontrado</h1>
+        <Button asChild>
+          <Link to="/biblioteca">Voltar à biblioteca</Link>
+        </Button>
+      </main>
+    );
+  }
+
+  return (
+    <main className="container mx-auto py-6">
+      <SEO
+        title={`${meta.title} — Leitura Devota`}
+        description={`Leia ${meta.title} de ${meta.author} em português com progresso e streak.`}
+        canonical={`/leitor/${meta.id}`}
+        jsonLd={{
+          '@context': 'https://schema.org',
+          '@type': 'Book',
+          name: meta.title,
+          author: { '@type': 'Person', name: meta.author },
+          inLanguage: 'pt-BR',
+        }}
+      />
+      <nav className="mb-4 text-sm">
+        <Link to="/biblioteca" className="text-primary underline-offset-4 hover:underline">← Biblioteca</Link>
+      </nav>
+
+      <h1 className="text-2xl font-bold">{meta.title}</h1>
+      <p className="text-muted-foreground mb-4">{meta.author}</p>
+
+      <section className="flex flex-col md:flex-row gap-6">
+        <aside className="md:w-64 shrink-0 border rounded-md p-3 h-fit">
+          <div className="mb-4">
+            <p className="text-sm font-medium mb-2">Tamanho da fonte</p>
+            <Slider
+              value={[fontSize]}
+              min={14}
+              max={24}
+              step={1}
+              onValueChange={(v) => setFontSize(v[0])}
+            />
+          </div>
+          <div className="space-y-2">
+            <Button className="w-full" onClick={onReadToday} variant="secondary">Marcar leitura de hoje</Button>
+            <Button className="w-full" onClick={concludeChapter}>Concluir capítulo</Button>
+          </div>
+        </aside>
+
+        <article className="flex-1">
+          <div className="mb-3">
+            <Progress value={p.percent} />
+            <p className="text-sm text-muted-foreground mt-1">Progresso: {p.percent}%</p>
+          </div>
+
+          {loading && <p>Carregando…</p>}
+          {err && <p className="text-destructive">{err}</p>}
+
+          {currentChapter && (
+            <div>
+              <h2 className="text-xl font-semibold mb-3">{currentChapter.chapter_title}</h2>
+              <div className="space-y-4 leading-relaxed" style={{ fontSize }}>
+                {currentChapter.content.map((blk, i) => (
+                  <p key={i}>{blk.content}</p>
+                ))}
+              </div>
+            </div>
+          )}
+        </article>
+
+        <aside className="md:w-72 shrink-0 border rounded-md p-3 h-[70vh] overflow-auto">
+          <p className="text-sm font-medium mb-2">Capítulos</p>
+          <ol className="space-y-2 text-sm">
+            {flatChapters.map((c, idx) => (
+              <li key={`${c.partIndex}-${c.chapterIndex}`}>
+                <button
+                  className={`text-left w-full rounded px-2 py-1 hover:bg-accent/30 ${
+                    c.partIndex === p.partIndex && c.chapterIndex === p.chapterIndex ? "bg-accent/40" : ""
+                  }`}
+                  onClick={() => {
+                    updateProgress({ partIndex: c.partIndex, chapterIndex: c.chapterIndex, percent: Math.round(((idx + 1) / flatChapters.length) * 100) });
+                  }}
+                >
+                  {idx + 1}. {c.title}
+                </button>
+              </li>
+            ))}
+          </ol>
+        </aside>
+      </section>
+    </main>
+  );
+};
+
+export default Reader;
