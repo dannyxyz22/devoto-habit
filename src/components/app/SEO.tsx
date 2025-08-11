@@ -1,4 +1,4 @@
-import { Helmet } from "react-helmet-async";
+import { useEffect } from "react";
 
 type SEOProps = {
   title: string;
@@ -8,20 +8,64 @@ type SEOProps = {
   jsonLd?: Record<string, any>;
 };
 
-export const SEO = ({ title, description, canonical, image, jsonLd }: SEOProps) => (
-  <Helmet>
-    <title>{title}</title>
-    {description && <meta name="description" content={description} />}
-    {canonical && <link rel="canonical" href={canonical} />}
-    <meta property="og:title" content={title} />
-    {description && <meta property="og:description" content={description} />}
-    {image && <meta property="og:image" content={image} />}
-    {jsonLd && (
-      <script type="application/ld+json">
-        {JSON.stringify(jsonLd)}
-      </script>
-    )}
-  </Helmet>
-);
+export const SEO = ({ title, description, canonical, image, jsonLd }: SEOProps) => {
+  useEffect(() => {
+    // Title
+    if (title) document.title = title;
+
+    // Description
+    if (description) {
+      let meta = document.querySelector<HTMLMetaElement>('meta[name="description"]');
+      if (!meta) {
+        meta = document.createElement('meta');
+        meta.name = 'description';
+        document.head.appendChild(meta);
+      }
+      meta.content = description;
+    }
+
+    // Canonical
+    if (canonical) {
+      let link = document.querySelector<HTMLLinkElement>('link[rel="canonical"]');
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = 'canonical';
+        document.head.appendChild(link);
+      }
+      link.href = canonical;
+    }
+
+    // Open Graph
+    const setOg = (property: string, content?: string) => {
+      if (!content) return;
+      let meta = document.querySelector<HTMLMetaElement>(`meta[property="${property}"]`);
+      if (!meta) {
+        meta = document.createElement('meta');
+        meta.setAttribute('property', property);
+        document.head.appendChild(meta);
+      }
+      meta.content = content;
+    };
+
+    setOg('og:title', title);
+    setOg('og:description', description);
+    setOg('og:image', image);
+
+    // JSON-LD structured data
+    const scriptId = 'app-jsonld';
+    const existing = document.getElementById(scriptId);
+    if (jsonLd) {
+      const script = existing instanceof HTMLScriptElement ? existing : document.createElement('script');
+      script.type = 'application/ld+json';
+      script.id = scriptId;
+      script.textContent = JSON.stringify(jsonLd);
+      if (!existing) document.head.appendChild(script);
+    } else if (existing) {
+      existing.remove();
+    }
+  }, [title, description, canonical, image, jsonLd]);
+
+  return null;
+};
 
 export default SEO;
