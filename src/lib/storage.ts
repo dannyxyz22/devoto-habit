@@ -104,3 +104,24 @@ export const hasReadToday = () => {
   const s = getStreak();
   return s.lastReadISO ? isToday(parseISO(s.lastReadISO)) : false;
 };
+
+// Reading plan per book (optional target end date)
+export type ReadingPlan = { targetDateISO: string | null };
+export const getReadingPlan = (bookId: string): ReadingPlan =>
+  storage.get<ReadingPlan>(`plan:${bookId}`, { targetDateISO: null });
+export const setReadingPlan = (bookId: string, targetDateISO: string | null) =>
+  storage.set<ReadingPlan>(`plan:${bookId}`, { targetDateISO });
+
+// Daily baseline per book (track start-of-day position for daily goal)
+export type BaselineEntry = { words: number; percent: number };
+const getBaselineMap = (bookId: string): Record<string, BaselineEntry> =>
+  storage.get<Record<string, BaselineEntry>>(`baseline:${bookId}`, {});
+export const getDailyBaseline = (bookId: string, dateISO: string): BaselineEntry | null => {
+  const map = getBaselineMap(bookId);
+  return map[dateISO] || null;
+};
+export const setDailyBaseline = (bookId: string, dateISO: string, entry: BaselineEntry) => {
+  const map = getBaselineMap(bookId);
+  map[dateISO] = entry;
+  storage.set(`baseline:${bookId}`, map);
+};

@@ -7,6 +7,7 @@ import { toast } from "@/hooks/use-toast";
 import confetti from "canvas-confetti";
 import { getBookById } from "@/lib/books";
 import { SEO } from "@/components/app/SEO";
+import { differenceInCalendarDays, formatISO, parseISO } from "date-fns";
 import {
   addReadingMinutes,
   getProgress,
@@ -14,6 +15,9 @@ import {
   hasReadToday,
   markReadToday,
   setProgress,
+  getReadingPlan,
+  getDailyBaseline,
+  setDailyBaseline,
 } from "@/lib/storage";
 
 // Types for the fetched JSON
@@ -75,11 +79,75 @@ const Reader = () => {
     return ch || null;
   }, [parts, p]);
 
+  // Word-based daily goal calculations
+  const totalWords = useMemo(() => {
+    if (!parts) return 0;
+    let count = 0;
+    parts.forEach((part) =>
+      part.chapters.forEach((ch) =>
+        ch.content.forEach((blk) => {
+          count += blk.content.trim().split(/\s+/).filter(Boolean).length;
+        })
+      )
+    );
+    return count;
+  }, [parts]);
+
+  const wordsUpToCurrent = useMemo(() => {
+    if (!parts) return 0;
+    let count = 0;
+    parts.forEach((part, pi) => {
+      part.chapters.forEach((ch, ci) => {
+        if (pi < p.partIndex || (pi === p.partIndex && ci < p.chapterIndex)) {
+          ch.content.forEach((blk) => {
+            count += blk.content.trim().split(/\s+/).filter(Boolean).length;
+          });
+        }
+      });
+    });
+    return count;
+  }, [parts, p]);
+
+  const remainingWords = Math.max(0, totalWords - wordsUpToCurrent);
+  const plan = useMemo(() => getReadingPlan(bookId), [bookId]);
+  const todayISO = formatISO(new Date(), { representation: "date" });
+  const [baselineWords, setBaselineWords] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!parts) return;
+    const base = getDailyBaseline(bookId, todayISO);
+    if (base) {
+      setBaselineWords(base.words);
+    } else {
+      const entry = { words: wordsUpToCurrent, percent: p.percent };
+      setDailyBaseline(bookId, todayISO, entry);
+      setBaselineWords(entry.words);
+    }
+  }, [parts, wordsUpToCurrent, bookId, todayISO, p.percent]);
+
+  const daysRemaining = useMemo(() => {
+    if (!plan?.targetDateISO) return null;
+    try {
+      const target = parseISO(plan.targetDateISO);
+      const diff = differenceInCalendarDays(target, new Date());
+      return Math.max(1, diff + 1);
+    } catch {
+      return null;
+    }
+  }, [plan]);
+
+  const dailyTargetWords = useMemo(() => {
+    if (!daysRemaining) return null;
+    return Math.ceil(remainingWords / daysRemaining);
+  }, [remainingWords, daysRemaining]);
+
+  const achievedWordsToday = baselineWords != null ? Math.max(0, wordsUpToCurrent - baselineWords) : 0;
+  const dailyProgressPercent = dailyTargetWords ? Math.min(100, Math.round((achievedWordsToday / dailyTargetWords) * 100)) : null;
+
   const updateProgress = (np: typeof p) => {
     setP(np);
     setProgress(bookId, np);
   };
-
   const concludeChapter = () => {
     if (!parts) return;
     const isLast = p.partIndex === parts.length - 1 && p.chapterIndex === parts[p.partIndex].chapters.length - 1;
@@ -173,9 +241,20 @@ const Reader = () => {
         </aside>
 
         <article className="flex-1">
-          <div className="mb-3">
-            <Progress value={p.percent} />
-            <p className="text-sm text-muted-foreground mt-1">Progresso: {p.percent}%</p>
+          <div className="mb-3 space-y-3">
+            <div>
+              <Progress value={p.percent} />
+              <p className="text-sm text-muted-foreground mt-1">Progresso: {p.percent}%</p>
+            </div>
+            {dailyProgressPercent != null && (
+              <div>
+                <Progress value={dailyProgressPercent} />
+                <p className="text-sm text-muted-foreground mt-1">
+                  {`Meta do dia: ${dailyProgressPercent}% — ${achievedWordsToday}/${dailyTargetWords} palavras`}
+                  {plan?.targetDateISO ? ` (até ${new Date(plan.targetDateISO).toLocaleDateString('pt-BR')})` : ""}
+                </p>
+              </div>
+            )}
           </div>
 
           {loading && <p>Carregando…</p>}
