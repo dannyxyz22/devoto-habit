@@ -6,7 +6,7 @@ import { BOOKS } from "@/lib/books";
 import { SEO } from "@/components/app/SEO";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { setReadingPlan } from "@/lib/storage";
+import { setReadingPlan, getProgress, getReadingPlan } from "@/lib/storage";
 import { toast } from "@/hooks/use-toast";
 
 const Library = () => {
@@ -18,7 +18,8 @@ const Library = () => {
 
   const onChooseBook = (bookId: string) => {
     setSelectedBook(bookId);
-    setEndDate("");
+    const plan = getReadingPlan(bookId);
+    setEndDate(plan.targetDateISO ?? "");
     setOpen(true);
   };
 
@@ -56,7 +57,10 @@ const Library = () => {
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground mb-4">{book.description}</p>
-              <Button onClick={() => onChooseBook(book.id)}>Ler agora</Button>
+              <div className="flex items-center gap-2">
+                <Button onClick={() => navigate(`/leitor/${book.id}`)}>Continuar leitura</Button>
+                <Button variant="secondary" onClick={() => onChooseBook(book.id)}>Definir meta</Button>
+              </div>
             </CardContent>
           </Card>
         ))}
