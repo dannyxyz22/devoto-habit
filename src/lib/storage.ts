@@ -105,12 +105,16 @@ export const hasReadToday = () => {
   return s.lastReadISO ? isToday(parseISO(s.lastReadISO)) : false;
 };
 
-// Reading plan per book (optional target end date)
-export type ReadingPlan = { targetDateISO: string | null };
+// Reading plan per book (optional target end date and chapter)
+export type ReadingPlan = { 
+  targetDateISO: string | null;
+  targetPartIndex?: number;
+  targetChapterIndex?: number;
+};
 export const getReadingPlan = (bookId: string): ReadingPlan =>
   storage.get<ReadingPlan>(`plan:${bookId}`, { targetDateISO: null });
-export const setReadingPlan = (bookId: string, targetDateISO: string | null) =>
-  storage.set<ReadingPlan>(`plan:${bookId}`, { targetDateISO });
+export const setReadingPlan = (bookId: string, targetDateISO: string | null, targetPartIndex?: number, targetChapterIndex?: number) =>
+  storage.set<ReadingPlan>(`plan:${bookId}`, { targetDateISO, targetPartIndex, targetChapterIndex });
 
 // Daily baseline per book (track start-of-day position for daily goal)
 export type BaselineEntry = { words: number; percent: number };

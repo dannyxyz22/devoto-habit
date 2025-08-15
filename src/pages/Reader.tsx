@@ -108,8 +108,28 @@ const Reader = () => {
     return count;
   }, [parts, p]);
 
-  const remainingWords = Math.max(0, totalWords - wordsUpToCurrent);
   const plan = useMemo(() => getReadingPlan(bookId), [bookId]);
+
+  // Calculate target words based on plan
+  const targetWords = useMemo(() => {
+    if (!parts || plan.targetPartIndex === undefined || plan.targetChapterIndex === undefined) {
+      return totalWords; // Default to end of book
+    }
+    
+    let count = 0;
+    parts.forEach((part, pi) => {
+      part.chapters.forEach((ch, ci) => {
+        if (pi < plan.targetPartIndex! || (pi === plan.targetPartIndex! && ci <= plan.targetChapterIndex!)) {
+          ch.content.forEach((blk) => {
+            count += blk.content.trim().split(/\s+/).filter(Boolean).length;
+          });
+        }
+      });
+    });
+    return count;
+  }, [parts, plan, totalWords]);
+
+  const remainingWords = Math.max(0, targetWords - wordsUpToCurrent);
   const todayISO = formatISO(new Date(), { representation: "date" });
   const [baselineWords, setBaselineWords] = useState<number | null>(null);
 
