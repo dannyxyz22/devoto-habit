@@ -146,7 +146,7 @@ const Library = () => {
             </div>
             
             <p className="text-xs text-muted-foreground">
-              Defina uma meta específica e uma data. Calcularemos uma meta diária proporcional ao restante.
+              Defina uma meta específica e uma data. Calcularemos uma meta diária a partir do seu ponto atual de leitura.
             </p>
           </div>
           <DialogFooter>
