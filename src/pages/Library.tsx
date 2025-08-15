@@ -7,10 +7,13 @@ import { SEO } from "@/components/app/SEO";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { setReadingPlan, getProgress, getReadingPlan } from "@/lib/storage";
+import { setReadingPlan, getProgress, getReadingPlan, setDailyBaseline } from "@/lib/storage";
 import { toast } from "@/hooks/use-toast";
+import { formatISO } from "date-fns";
 
-type Part = { part_title: string; chapters: { chapter_title: string }[] };
+type Paragraph = { type: string; content: string };
+type Chapter = { chapter_title: string; content: Paragraph[] };
+type Part = { part_title: string; chapters: Chapter[] };
 
 const Library = () => {
   const [open, setOpen] = useState(false);
@@ -55,7 +58,7 @@ const Library = () => {
     setOpen(true);
   };
 
-  const startReading = (withPlan: boolean) => {
+  const startReading = async (withPlan: boolean) => {
     if (!selectedBook) return;
     if (withPlan) {
       if (!endDate) {
@@ -74,6 +77,23 @@ const Library = () => {
       }
       
       setReadingPlan(selectedBook, endDate, targetPartIndex, targetChapterIndex);
+      
+      // Reset daily progress by updating baseline to current reading position
+      const currentProgress = getProgress(selectedBook);
+      if (bookParts) {
+        let wordsUpToCurrent = 0;
+        bookParts.forEach((part, pi) => {
+          part.chapters.forEach((ch, ci) => {
+            if (pi < currentProgress.partIndex || (pi === currentProgress.partIndex && ci < currentProgress.chapterIndex)) {
+              ch.content?.forEach((blk) => {
+                wordsUpToCurrent += blk.content.trim().split(/\s+/).filter(Boolean).length;
+              });
+            }
+          });
+        });
+        const todayISO = formatISO(new Date(), { representation: "date" });
+        setDailyBaseline(selectedBook, todayISO, { words: wordsUpToCurrent, percent: currentProgress.percent });
+      }
     } else {
       setReadingPlan(selectedBook, null);
     }
