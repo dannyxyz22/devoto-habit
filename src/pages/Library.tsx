@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { BOOKS } from "@/lib/books";
 import { SEO } from "@/components/app/SEO";
 import { PageHeader } from "@/components/app/PageHeader";
+import filoteiaCover from "@/assets/book-cover-filoteia.jpg";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -113,6 +114,15 @@ const Library = () => {
       <section className="grid md:grid-cols-2 gap-6">
         {BOOKS.map((book) => (
           <Card key={book.id} className="hover:shadow-lg transition-shadow">
+            {book.coverImage && (
+              <div className="aspect-[3/4] overflow-hidden rounded-t-lg">
+                <img
+                  src={book.id === "filoteia" ? filoteiaCover : book.coverImage}
+                  alt={`Capa do livro ${book.title}`}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            )}
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 <span>{book.title}</span>

@@ -4,6 +4,7 @@ export type BookMeta = {
   author: string;
   sourceUrl: string;
   description: string;
+  coverImage?: string;
 };
 
 export const BOOKS: BookMeta[] = [
@@ -15,6 +16,7 @@ export const BOOKS: BookMeta[] = [
       "https://raw.githubusercontent.com/dannyxyz22/introduction-devout-life/refs/heads/main/output/livro_pt-BR.json",
     description:
       "Clássico atemporal que ensina a viver a devoção no cotidiano, escrito por São Francisco de Sales.",
+    coverImage: "/src/assets/book-cover-filoteia.jpg",
   },
 ];
 
