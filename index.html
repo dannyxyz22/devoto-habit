@@ -3,7 +3,6 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <base href="/devoto-habit/" />
     <title>Leitura Devota — Clássicos Católicos</title>
     <meta name="description" content="Leitura devocional diária com clássicos católicos em português. Streak, metas e lembretes." />
     <meta name="author" content="Lovable" />
@@ -34,10 +33,10 @@
 
   <body>
     <div id="root"></div>
-    <!-- GitHub Pages SPA redirect handler -->
+  <!-- GitHub Pages SPA redirect handler (uses Vite %BASE_URL%) -->
     <script>
       (function() {
-        const base = document.querySelector('base')?.getAttribute('href') || '/';
+    const base = ("%BASE_URL%" || "/");
         const normalizedBase = base.endsWith('/') ? base : base + '/';
         const redirect = new URLSearchParams(window.location.search).get('p');
         if (redirect) {
@@ -46,6 +45,6 @@
         }
       })();
     </script>
-    <script type="module" src="./src/main.tsx"></script>
+  <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
