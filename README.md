@@ -1,3 +1,15 @@
+## Deploy no GitHub Pages
+
+Este projeto usa Vite + React e está configurado para publicar em GitHub Pages no caminho `/devoto-habit/` do repositório `dannyxyz22/devoto-habit`.
+
+- `vite.config.ts` define `base: "/devoto-habit/"`.
+- `BrowserRouter` usa `basename={import.meta.env.BASE_URL}`.
+- `manifest.json` e `sw.js` usam caminhos relativos.
+- `public/404.html` faz fallback para SPA.
+- Workflow `.github/workflows/deploy.yml` compila e publica `dist/`.
+
+Publicar: faça push na branch `main` e ative Pages em Settings → Pages → Source: GitHub Actions.
+
 # Welcome to your Lovable project
 
 ## Project info

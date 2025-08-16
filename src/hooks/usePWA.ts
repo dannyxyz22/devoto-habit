@@ -6,9 +6,10 @@ export const usePWA = () => {
 
   useEffect(() => {
     // Register service worker
-    if ('serviceWorker' in navigator) {
+  if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
+    const swUrl = `${import.meta.env.BASE_URL}sw.js`;
+    navigator.serviceWorker.register(swUrl)
           .then((registration) => {
             console.log('SW registered: ', registration);
           })

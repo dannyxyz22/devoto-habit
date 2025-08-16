@@ -3,20 +3,21 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <base href="/devoto-habit/" />
     <title>Leitura Devota — Clássicos Católicos</title>
     <meta name="description" content="Leitura devocional diária com clássicos católicos em português. Streak, metas e lembretes." />
     <meta name="author" content="Lovable" />
-    <link rel="canonical" href="/" />
+  <link rel="canonical" href="https://dannyxyz22.github.io/devoto-habit/" />
 
     <!-- PWA Meta Tags -->
     <meta name="theme-color" content="#2563eb" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Leitura Devota" />
-    <link rel="manifest" href="/manifest.json" />
-    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
-    <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
-    <link rel="apple-touch-icon" href="/icon-192.png" />
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png" />
+  <link rel="apple-touch-icon" href="./icon-192.png" />
 
     <meta property="og:title" content="Leitura Devota — Clássicos Católicos" />
     <meta property="og:description" content="Leitura devocional diária com clássicos católicos em português. Streak, metas e lembretes." />
@@ -33,6 +34,18 @@
 
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <!-- GitHub Pages SPA redirect handler -->
+    <script>
+      (function() {
+        const base = document.querySelector('base')?.getAttribute('href') || '/';
+        const normalizedBase = base.endsWith('/') ? base : base + '/';
+        const redirect = new URLSearchParams(window.location.search).get('p');
+        if (redirect) {
+          const target = normalizedBase + redirect.replace(/^\//, '');
+          window.history.replaceState(null, '', target + window.location.hash);
+        }
+      })();
+    </script>
+    <script type="module" src="./src/main.tsx"></script>
   </body>
 </html>
