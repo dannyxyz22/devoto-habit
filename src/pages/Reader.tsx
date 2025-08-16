@@ -18,6 +18,7 @@ import {
   getReadingPlan,
   getDailyBaseline,
   setDailyBaseline,
+  type Streak,
 } from "@/lib/storage";
 
 // Types for the fetched JSON
@@ -33,6 +34,7 @@ const Reader = () => {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [p, setP] = useState(() => getProgress(bookId));
+  const [streak, setStreak] = useState<Streak>(() => getStreak());
   const startRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -163,6 +165,17 @@ const Reader = () => {
 
   const achievedWordsToday = baselineWords != null ? Math.max(0, wordsUpToCurrent - baselineWords) : 0;
   const dailyProgressPercent = dailyTargetWords ? Math.min(100, Math.round((achievedWordsToday / dailyTargetWords) * 100)) : null;
+  
+  // Check if daily goal was just completed and auto-mark reading
+  const [wasGoalCompleted, setWasGoalCompleted] = useState(false);
+  useEffect(() => {
+    if (dailyProgressPercent === 100 && !wasGoalCompleted && !hasReadToday()) {
+      setWasGoalCompleted(true);
+      onReadToday();
+    } else if (dailyProgressPercent !== 100) {
+      setWasGoalCompleted(false);
+    }
+  }, [dailyProgressPercent, wasGoalCompleted]);
 
   const updateProgress = (np: typeof p) => {
     setP(np);
@@ -195,11 +208,22 @@ const Reader = () => {
   };
 
   const onReadToday = () => {
+    if (hasReadToday()) {
+      toast({ 
+        title: "Já marcado", 
+        description: "Você já marcou a leitura de hoje.", 
+        variant: "default" 
+      });
+      return;
+    }
+    
     const before = getStreak();
     const after = markReadToday();
+    setStreak(after);
+    
     if (after.current > before.current) {
       celebrate("Leitura do dia registrada! Streak +1");
-    } else if (!hasReadToday()) {
+    } else {
       toast({ title: "Leitura do dia", description: "Registrada com sucesso." });
     }
   };
@@ -255,8 +279,29 @@ const Reader = () => {
             />
           </div>
           <div className="space-y-2">
-            <Button className="w-full" onClick={onReadToday} variant="secondary">Marcar leitura de hoje</Button>
+            <Button 
+              className="w-full" 
+              onClick={onReadToday} 
+              variant={hasReadToday() ? "outline" : "secondary"}
+              disabled={hasReadToday()}
+            >
+              {hasReadToday() ? "✓ Leitura marcada" : "Marcar leitura de hoje"}
+            </Button>
             <Button className="w-full" onClick={concludeChapter}>Concluir capítulo</Button>
+          </div>
+          
+          {/* Streak info */}
+          <div className="mt-4 p-3 bg-muted/50 rounded-md">
+            <p className="text-sm font-medium">Sequência de Leitura</p>
+            <p className="text-lg font-bold text-primary">{streak.current} dias</p>
+            <p className="text-xs text-muted-foreground">
+              Recorde: {streak.longest} dias
+            </p>
+            {streak.freezeAvailable && (
+              <p className="text-xs text-blue-600">
+                🧊 1 congelamento disponível
+              </p>
+            )}
           </div>
         </aside>
 
