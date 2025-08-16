@@ -3,9 +3,10 @@ const urlsToCache = [
   '/',
   '/biblioteca',
   '/estatisticas',
-  '/static/js/bundle.js',
-  '/static/css/main.css',
-  '/manifest.json'
+  '/leitor',
+  '/manifest.json',
+  '/icon-192.png',
+  '/icon-512.png'
 ];
 
 // Install service worker
