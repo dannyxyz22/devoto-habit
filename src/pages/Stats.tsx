@@ -1,5 +1,6 @@
 import { getStats, getStreak } from "@/lib/storage";
 import { SEO } from "@/components/app/SEO";
+import { PageHeader } from "@/components/app/PageHeader";
 
 const totalMinutes = (m: Record<string, number>) => Object.values(m).reduce((a, b) => a + b, 0);
 
@@ -15,7 +16,7 @@ const Stats = () => {
         description="Acompanhe seu streak e o tempo total de leitura."
         canonical="/estatisticas"
       />
-      <h1 className="text-3xl font-bold mb-6">Estatísticas</h1>
+      <PageHeader title="Estatísticas" />
       <section className="grid md:grid-cols-3 gap-6">
         <div className="rounded-lg border p-4">
           <p className="text-sm text-muted-foreground">Streak atual</p>
