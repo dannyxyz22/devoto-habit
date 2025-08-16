@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { usePWA } from "@/hooks/usePWA";
+import { InstallPWA } from "@/components/app/InstallPWA";
 
 import Index from "./pages/Index";
 import Library from "./pages/Library";
@@ -31,6 +32,7 @@ const App = () => {
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
+          <InstallPWA />
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>
