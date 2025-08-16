@@ -15,7 +15,7 @@ export const Hero = () => {
       />
       <div className="absolute inset-0 flex items-center">
         <div className="p-6 md:p-10">
-          <p className="text-sm text-muted-foreground">Clássicos em domínio público</p>
+          <p className="text-sm text-muted-foreground">Clássicos católicos</p>
           <h1 className="text-3xl md:text-5xl font-bold max-w-2xl leading-tight mt-2">
             Leitura devocional diária que cria hábito e transforma a alma
           </h1>
