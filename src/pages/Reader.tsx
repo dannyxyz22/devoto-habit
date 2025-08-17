@@ -187,6 +187,8 @@ const Reader = () => {
     if (isLast) {
       updateProgress({ ...p, percent: 100 });
       celebrate("Livro concluído! Parabéns pela perseverança.");
+      // Scroll to top after concluding the last chapter
+      requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
       return;
     }
     // move forward
@@ -205,6 +207,8 @@ const Reader = () => {
     np.percent = Math.min(100, percent);
     updateProgress(np);
     onReadToday();
+    // Move viewport to the top so the next chapter starts at the beginning
+    requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
   };
 
   const onReadToday = () => {
@@ -287,7 +291,17 @@ const Reader = () => {
             >
               {hasReadToday() ? "✓ Leitura marcada" : "Marcar leitura de hoje"}
             </Button>
-            <Button className="w-full" onClick={concludeChapter}>Concluir capítulo</Button>
+            <Button
+              className="w-full"
+              onClick={() => {
+                try {
+                  confetti({ particleCount: 60, spread: 70, origin: { y: 0.7 } });
+                } catch {}
+                concludeChapter();
+              }}
+            >
+              Concluir capítulo
+            </Button>
           </div>
           
           {/* Streak info */}
@@ -335,7 +349,16 @@ const Reader = () => {
               </div>
               {/* Bottom action: conclude chapter */}
               <div className="mt-8 pt-4 border-t">
-                <Button className="w-full md:w-auto" onClick={concludeChapter}>
+                <Button
+                  className="w-full md:w-auto"
+                  onClick={() => {
+                    // Visual feedback when concluding via bottom button
+                    try {
+                      confetti({ particleCount: 60, spread: 70, origin: { y: 0.7 } });
+                    } catch {}
+                    concludeChapter();
+                  }}
+                >
                   Concluir capítulo
                 </Button>
               </div>
