@@ -333,6 +333,12 @@ const Reader = () => {
                   <p key={i}>{blk.content}</p>
                 ))}
               </div>
+              {/* Bottom action: conclude chapter */}
+              <div className="mt-8 pt-4 border-t">
+                <Button className="w-full md:w-auto" onClick={concludeChapter}>
+                  Concluir capítulo
+                </Button>
+              </div>
             </div>
           )}
         </article>
