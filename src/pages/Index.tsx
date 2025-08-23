@@ -202,10 +202,12 @@ const Index = () => {
           <h3 className="text-sm font-medium">Livro ativo</h3>
           <p className="text-muted-foreground text-sm">{activeBookId ? (BOOKS.find(b=>b.id===activeBookId)?.title || activeBookId) : "—"}</p>
         </div>
-        <div className="rounded-lg border p-4">
-          <h3 className="text-sm font-medium">Status</h3>
-          <p className="text-muted-foreground text-sm">{loading ? "Carregando dados…" : err ? err : "Pronto"}</p>
-        </div>
+        {err && (
+          <div className="rounded-lg border p-4">
+            <h3 className="text-sm font-medium">Status</h3>
+            <p className="text-muted-foreground text-sm">{err}</p>
+          </div>
+        )}
       </section>
       
     </main>
