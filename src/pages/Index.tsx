@@ -136,6 +136,7 @@ const Index = () => {
   const achievedWordsToday = baselineWords != null ? Math.max(0, wordsUpToCurrent - baselineWords) : 0;
   const dailyProgressPercent = dailyTargetWords ? Math.min(100, Math.round((achievedWordsToday / dailyTargetWords) * 100)) : null;
   const planProgressPercent = useMemo(() => parts ? Math.min(100, Math.round((wordsUpToCurrent / Math.max(1, targetWords)) * 100)) : null, [parts, wordsUpToCurrent, targetWords]);
+  const totalBookProgressPercent = useMemo(() => parts ? Math.min(100, Math.round((wordsUpToCurrent / Math.max(1, totalWords)) * 100)) : null, [parts, wordsUpToCurrent, totalWords]);
 
   const stats = useMemo(() => getStats(), []);
   const minutesToday = stats.minutesByDate[todayISO] || 0;
@@ -162,9 +163,9 @@ const Index = () => {
           )}
         </div>
 
-        {/* Progresso da meta (se houver) */}
+        {/* Meta de leitura: mostra progresso da meta (se houver) */}
         <div className="rounded-lg border p-4">
-          <h2 className="text-lg font-semibold">Progresso</h2>
+          <h2 className="text-lg font-semibold">Meta de leitura</h2>
           {used && activeBookId && plan?.targetDateISO && planProgressPercent != null ? (
             <>
               <Progress value={planProgressPercent} />
@@ -201,6 +202,12 @@ const Index = () => {
         <div className="rounded-lg border p-4">
           <h3 className="text-sm font-medium">Livro ativo</h3>
           <p className="text-muted-foreground text-sm">{activeBookId ? (BOOKS.find(b=>b.id===activeBookId)?.title || activeBookId) : "—"}</p>
+          {activeBookId && totalBookProgressPercent != null && (
+            <div className="mt-2">
+              <Progress value={totalBookProgressPercent} />
+              <p className="text-sm text-muted-foreground mt-2">Livro: {totalBookProgressPercent}%</p>
+            </div>
+          )}
         </div>
         {err && (
           <div className="rounded-lg border p-4">
