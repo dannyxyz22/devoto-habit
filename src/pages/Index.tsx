@@ -207,11 +207,7 @@ const Index = () => {
           <p className="text-muted-foreground text-sm">{loading ? "Carregando dados…" : err ? err : "Pronto"}</p>
         </div>
       </section>
-      <div className="mt-6">
-        <Button asChild variant="link">
-          <Link to="/biblioteca">Ver biblioteca completa →</Link>
-        </Button>
-      </div>
+      
     </main>
   );
 };

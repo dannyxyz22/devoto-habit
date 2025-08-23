@@ -67,7 +67,7 @@ export const Hero = () => {
               <Link to={ctaHref}>{ctaLabel}</Link>
             </Button>
             <Button asChild variant="outline" size="lg">
-              <Link to="/estatisticas">Ver estatísticas</Link>
+              <Link to="/biblioteca">Ver biblioteca</Link>
             </Button>
           </div>
         </div>
