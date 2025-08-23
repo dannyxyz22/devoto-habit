@@ -1,9 +1,48 @@
 import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
 import hero from "@/assets/hero-devota.jpg";
 import { Button } from "@/components/ui/button";
 
 
 export const Hero = () => {
+  const [ctaLabel, setCtaLabel] = useState("Começar agora");
+  const [ctaHref, setCtaHref] = useState("/biblioteca");
+
+  useEffect(() => {
+    try {
+      const ls = window.localStorage;
+      let used = false;
+      // Any saved progress or plan implies prior interaction
+      for (let i = 0; i < ls.length; i++) {
+        const key = ls.key(i) || "";
+        if (key.startsWith("progress:") || key.startsWith("plan:")) {
+          used = true;
+          break;
+        }
+      }
+      // Streak or stats also count
+      if (!used) {
+        const streak = ls.getItem("streak");
+        if (streak) {
+          const s = JSON.parse(streak || "null");
+          if (s?.lastReadISO) used = true;
+        }
+      }
+      if (!used) {
+        const stats = ls.getItem("stats");
+        if (stats) {
+          const st = JSON.parse(stats || "null");
+          if (st?.minutesByDate && Object.keys(st.minutesByDate).length > 0) used = true;
+        }
+      }
+      if (used) {
+        setCtaLabel("Continuar");
+        const last = ls.getItem('lastBookId');
+        if (last) setCtaHref(`/leitor/${last}`);
+      }
+    } catch {}
+  }, []);
+
   return (
     <header className="relative overflow-hidden rounded-lg border bg-card">
       <div className="absolute inset-0 bg-gradient-to-r from-background/60 via-background/40 to-background/60" aria-hidden />
@@ -25,7 +64,7 @@ export const Hero = () => {
           </p>
           <div className="mt-6 flex gap-3">
             <Button asChild variant="hero" size="lg">
-              <Link to="/biblioteca">Começar agora</Link>
+              <Link to={ctaHref}>{ctaLabel}</Link>
             </Button>
             <Button asChild variant="outline" size="lg">
               <Link to="/estatisticas">Ver estatísticas</Link>

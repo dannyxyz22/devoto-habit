@@ -58,6 +58,13 @@ const Reader = () => {
       .finally(() => setLoading(false));
   }, [meta]);
 
+  // Remember last opened book for quick resume from Hero CTA
+  useEffect(() => {
+    if (bookId) {
+      try { localStorage.setItem('lastBookId', bookId); } catch {}
+    }
+  }, [bookId]);
+
   // Track reading time
   useEffect(() => {
     startRef.current = Date.now();
