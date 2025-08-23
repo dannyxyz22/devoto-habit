@@ -1,11 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { BOOKS } from "@/lib/books";
 import { SEO } from "@/components/app/SEO";
 import { PageHeader } from "@/components/app/PageHeader";
-import filoteiaCover from "@/assets/book-cover-filoteia.jpg";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -18,6 +17,99 @@ type Chapter = { chapter_title: string; content: Paragraph[] };
 type Part = { part_title: string; chapters: Chapter[] };
 
 const Library = () => {
+  const Cover = ({ src, alt }: { src: string; alt: string }) => {
+    const [bg, setBg] = useState<string | undefined>(undefined);
+    const triedRef = useRef(false);
+
+    useEffect(() => {
+      if (!src || triedRef.current) return;
+      triedRef.current = true;
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.src = src;
+      img.onload = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          const ctx = canvas.getContext("2d");
+          if (!ctx) return;
+          const w = 32, h = 32;
+          canvas.width = w;
+          canvas.height = h;
+          ctx.drawImage(img, 0, 0, w, h);
+          const { data } = ctx.getImageData(0, 0, w, h);
+          let r = 0, g = 0, b = 0, count = 0;
+          for (let i = 0; i < data.length; i += 4) {
+            const a = data[i + 3];
+            if (a < 128) continue; // ignore mostly transparent
+            r += data[i];
+            g += data[i + 1];
+            b += data[i + 2];
+            count++;
+          }
+          if (count) {
+            r = Math.round(r / count);
+            g = Math.round(g / count);
+            b = Math.round(b / count);
+            // Convert to HSL and darken lightness slightly
+            const toHsl = (R: number, G: number, B: number) => {
+              const r1 = R / 255, g1 = G / 255, b1 = B / 255;
+              const max = Math.max(r1, g1, b1), min = Math.min(r1, g1, b1);
+              let h = 0, s = 0;
+              const l = (max + min) / 2;
+              const d = max - min;
+              if (d !== 0) {
+                s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+                switch (max) {
+                  case r1: h = (g1 - b1) / d + (g1 < b1 ? 6 : 0); break;
+                  case g1: h = (b1 - r1) / d + 2; break;
+                  case b1: h = (r1 - g1) / d + 4; break;
+                }
+                h /= 6;
+              }
+              return { h, s, l };
+            };
+            const fromHsl = (h: number, s: number, l: number) => {
+              const hue2rgb = (p: number, q: number, t: number) => {
+                if (t < 0) t += 1;
+                if (t > 1) t -= 1;
+                if (t < 1/6) return p + (q - p) * 6 * t;
+                if (t < 1/2) return q;
+                if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+                return p;
+              };
+              let r2: number, g2: number, b2: number;
+              if (s === 0) {
+                r2 = g2 = b2 = l; // achromatic
+              } else {
+                const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+                const p = 2 * l - q;
+                r2 = hue2rgb(p, q, h + 1/3);
+                g2 = hue2rgb(p, q, h);
+                b2 = hue2rgb(p, q, h - 1/3);
+              }
+              return {
+                r: Math.round(r2 * 255),
+                g: Math.round(g2 * 255),
+                b: Math.round(b2 * 255)
+              };
+            };
+            const { h, s, l } = toHsl(r, g, b);
+            const newL = Math.max(0.15, l - 0.07); // slightly darker
+            const rgb = fromHsl(h, s, newL);
+            setBg(`rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`);
+          }
+        } catch {
+          // Ignore CORS/canvas errors; fallback to default bg
+        }
+      };
+    }, [src]);
+
+    return (
+      <div className="overflow-hidden rounded-t-lg h-56 md:h-64 lg:h-72 bg-muted" style={bg ? { background: bg } : undefined}>
+        <img src={src} alt={alt} className="w-full h-full object-contain object-center" loading="lazy" />
+      </div>
+    );
+  };
   const [open, setOpen] = useState(false);
   const [selectedBook, setSelectedBook] = useState<string | null>(null);
   const [endDate, setEndDate] = useState<string>("");
@@ -115,13 +207,10 @@ const Library = () => {
         {BOOKS.map((book) => (
           <Card key={book.id} className="hover:shadow-lg transition-shadow">
             {book.coverImage && (
-              <div className="aspect-[3/4] overflow-hidden rounded-t-lg">
-                <img
-                  src={book.id === "filoteia" ? filoteiaCover : book.coverImage}
-                  alt={`Capa do livro ${book.title}`}
-                  className="w-full h-full object-cover"
-                />
-              </div>
+              <Cover
+                src={book.coverImage}
+                alt={`Capa do livro ${book.title}`}
+              />
             )}
             <CardHeader>
               <CardTitle className="flex items-center justify-between">

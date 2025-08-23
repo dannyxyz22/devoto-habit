@@ -7,6 +7,10 @@ export type BookMeta = {
   coverImage?: string;
 };
 
+// Import asset via Vite so the URL is correctly handled in build
+// Note: keep using JPG that exists in src/assets. If you switch to PNG, ensure the file exists.
+import filoteiaCover from "@/assets/book-cover-filoteia.jpg";
+
 export const BOOKS: BookMeta[] = [
   {
     id: "filoteia",
@@ -16,7 +20,7 @@ export const BOOKS: BookMeta[] = [
       "https://raw.githubusercontent.com/dannyxyz22/introduction-devout-life/refs/heads/main/output/livro_pt-BR.json",
     description:
       "Clássico atemporal que ensina a viver a devoção no cotidiano, escrito por São Francisco de Sales.",
-    coverImage: "/src/assets/book-cover-filoteia.jpg",
+    coverImage: filoteiaCover,
   },
 ];
 
