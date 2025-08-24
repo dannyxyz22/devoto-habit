@@ -150,16 +150,18 @@ const Index = () => {
       />
       <Hero />
       <section className="mt-8 grid md:grid-cols-3 gap-6">
-        {/* Streak */}
+        {/* Meta diária (se houver) */}
         <div className="rounded-lg border p-4">
-          <h2 className="text-lg font-semibold">Streak diário</h2>
-          {used ? (
+          <h2 className="text-lg font-semibold">Meta diária</h2>
+          {used && activeBookId && dailyProgressPercent != null ? (
             <>
-              <p className="text-3xl font-bold text-primary">{streak.current} dias</p>
-              <p className="text-xs text-muted-foreground">Recorde: {streak.longest} • {streak.lastReadISO ? "Atualizado" : "Ainda não iniciado"}</p>
+              <Progress value={dailyProgressPercent} />
+              <p className="text-sm text-muted-foreground mt-2">
+                {dailyProgressPercent}% — {achievedWordsToday}/{dailyTargetWords} palavras
+              </p>
             </>
           ) : (
-            <p className="text-muted-foreground">Ganhe consistência com sua leitura devocional.</p>
+            <p className="text-muted-foreground">Se tiver uma meta, mostraremos seu progresso diário aqui.</p>
           )}
         </div>
 
@@ -178,32 +180,7 @@ const Index = () => {
           )}
         </div>
 
-        {/* Meta diária (se houver) */}
-        <div className="rounded-lg border p-4">
-          <h2 className="text-lg font-semibold">Meta diária</h2>
-          {used && activeBookId && dailyProgressPercent != null ? (
-            <>
-              <Progress value={dailyProgressPercent} />
-              <p className="text-sm text-muted-foreground mt-2">
-                {dailyProgressPercent}% — {achievedWordsToday}/{dailyTargetWords} palavras
-              </p>
-            </>
-          ) : (
-            <p className="text-muted-foreground">Se tiver uma meta, mostramos seu progresso diário aqui.</p>
-          )}
-        </div>
-      </section>
-      <section className="mt-6 grid md:grid-cols-3 gap-6">
-        <div className="rounded-lg border p-4">
-          <h3 className="text-sm font-medium">Minutos hoje</h3>
-          {used ? (
-            <p className="text-2xl font-bold">{minutesToday} min</p>
-          ) : (
-            <Button asChild variant="link">
-              <Link to="/biblioteca">Contabilize seu tempo de leitura</Link>
-            </Button>
-          )}
-        </div>
+        {/* Livro ativo */}
         <div className="rounded-lg border p-4">
           <h3 className="text-sm font-medium">Livro ativo</h3>
           {used ? (
@@ -219,6 +196,31 @@ const Index = () => {
           ) : (
             <Button asChild variant="link">
               <Link to="/biblioteca">Escolha um livro na biblioteca</Link>
+            </Button>
+          )}
+        </div>
+      </section>
+      <section className="mt-6 grid md:grid-cols-3 gap-6">
+        {/* Streak diário */}
+        <div className="rounded-lg border p-4">
+          <h2 className="text-lg font-semibold">Streak diário</h2>
+          {used ? (
+            <>
+              <p className="text-3xl font-bold text-primary">{streak.current} dias</p>
+              <p className="text-xs text-muted-foreground">Recorde: {streak.longest} • {streak.lastReadISO ? "Atualizado" : "Ainda não iniciado"}</p>
+            </>
+          ) : (
+            <p className="text-muted-foreground">Ganhe consistência com sua leitura devocional.</p>
+          )}
+        </div>
+        {/* Minutos hoje */}
+        <div className="rounded-lg border p-4">
+          <h3 className="text-sm font-medium">Minutos hoje</h3>
+          {used ? (
+            <p className="text-2xl font-bold">{minutesToday} min</p>
+          ) : (
+            <Button asChild variant="link">
+              <Link to="/biblioteca">Contabilize seu tempo de leitura</Link>
             </Button>
           )}
         </div>
