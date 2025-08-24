@@ -165,7 +165,7 @@ const Index = () => {
       <section className="mt-8 grid md:grid-cols-3 gap-6">
         {/* Meta diária (se houver) */}
         <div className="rounded-lg border p-4">
-          <h2 className="text-lg font-semibold">Meta diária</h2>
+          <h3 className="text-lg font-semibold">Meta diária</h3>
           {used && activeBookId && dailyProgressPercent != null ? (
             <>
               <Progress value={dailyProgressPercent} />
@@ -180,7 +180,7 @@ const Index = () => {
 
         {/* Meta de leitura: mostra progresso da meta (se houver) */}
         <div className="rounded-lg border p-4">
-          <h2 className="text-lg font-semibold">Meta de leitura</h2>
+          <h3 className="text-lg font-semibold">Meta de leitura</h3>
           {used && activeBookId && plan?.targetDateISO && planProgressPercent != null ? (
             <>
               <Progress value={planProgressPercent} />
@@ -195,7 +195,7 @@ const Index = () => {
 
         {/* Livro ativo */}
         <div className="rounded-lg border p-4">
-          <h3 className="text-sm font-medium">Livro ativo</h3>
+          <h3 className="text-lg font-semibold">Livro ativo</h3>
           {used ? (
             <>
               <p className="text-muted-foreground text-sm">{activeBookId ? (BOOKS.find(b=>b.id===activeBookId)?.title || activeBookId) : "—"}</p>
@@ -216,7 +216,7 @@ const Index = () => {
       <section className="mt-6 grid md:grid-cols-3 gap-6">
         {/* Marcador do livro (posição atual) */}
         <div className="rounded-lg border p-4">
-          <h3 className="text-sm font-medium">Marcador do livro</h3>
+          <h3 className="text-lg font-semibold">Marcador do livro</h3>
           {used && activeBookId ? (
             parts ? (
               <>
@@ -239,11 +239,14 @@ const Index = () => {
         </div>
         {/* Streak diário */}
         <div className="rounded-lg border p-4">
-          <h2 className="text-lg font-semibold">Streak diário</h2>
+          <h3 className="text-lg font-semibold">Streak diário</h3>
           {used ? (
             <>
               <p className="text-3xl font-bold text-primary">{streak.current} dias</p>
               <p className="text-xs text-muted-foreground">Recorde: {streak.longest} • {streak.lastReadISO ? "Atualizado" : "Ainda não iniciado"}</p>
+              {streak.freezeAvailable && (
+                <p className="text-xs text-blue-600">🧊 1 congelamento disponível</p>
+              )}
             </>
           ) : (
             <p className="text-muted-foreground">Ganhe consistência com sua leitura devocional.</p>
@@ -251,7 +254,7 @@ const Index = () => {
         </div>
         {/* Minutos hoje */}
         <div className="rounded-lg border p-4">
-          <h3 className="text-sm font-medium">Minutos hoje</h3>
+          <h3 className="text-lg font-semibold">Minutos hoje</h3>
           {used ? (
             <p className="text-2xl font-bold">{minutesToday} min</p>
           ) : (
@@ -263,7 +266,7 @@ const Index = () => {
       </section>
       {err && (
         <div className="mt-4 rounded-lg border p-4">
-          <h3 className="text-sm font-medium">Status</h3>
+          <h3 className="text-lg font-semibold">Status</h3>
           <p className="text-muted-foreground text-sm">{err}</p>
         </div>
       )}
