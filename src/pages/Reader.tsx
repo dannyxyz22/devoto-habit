@@ -49,6 +49,13 @@ const Reader = () => {
   const [streak, setStreak] = useState<Streak>(() => getStreak());
   const startRef = useRef<number | null>(null);
   const { theme, setTheme } = useTheme();
+  const [lineSpacing, setLineSpacing] = useState<"compact" | "normal" | "relaxed">(() => {
+    try {
+      return (localStorage.getItem("lineSpacing") as any) || "compact";
+    } catch {
+      return "compact";
+    }
+  });
   const [textAlign, setTextAlign] = useState<"left" | "justify">(() => {
     try {
       return (localStorage.getItem("textAlign") as "left" | "justify") || "justify";
@@ -59,6 +66,9 @@ const Reader = () => {
   useEffect(() => {
     try { localStorage.setItem("textAlign", textAlign); } catch {}
   }, [textAlign]);
+  useEffect(() => {
+    try { localStorage.setItem("lineSpacing", lineSpacing); } catch {}
+  }, [lineSpacing]);
   const [settingsOpen, setSettingsOpen] = useState<boolean>(() => {
     try {
       const raw = localStorage.getItem("readerSettingsOpen");
@@ -119,6 +129,17 @@ const Reader = () => {
     const ch = parts[p.partIndex]?.chapters[p.chapterIndex];
     return ch || null;
   }, [parts, p]);
+
+  const lineHeight = useMemo(() => {
+    switch (lineSpacing) {
+      case "compact":
+        return 1.2;
+      case "normal":
+        return 1.5;
+      default:
+        return 1.75;
+    }
+  }, [lineSpacing]);
 
   // Word-based daily goal calculations
   const totalWords = useMemo(() => computeTotalWords(parts), [parts]);
@@ -321,6 +342,14 @@ const Reader = () => {
                   />
                 </div>
                 <div>
+                  <p className="text-sm font-medium mb-2">Espaçamento entre linhas</p>
+                  <ToggleGroup type="single" value={lineSpacing} onValueChange={(v)=> v && setLineSpacing(v as any)}>
+                    <ToggleGroupItem value="compact" aria-label="Espaçamento compacto" title="Compacto">1.2×</ToggleGroupItem>
+                    <ToggleGroupItem value="normal" aria-label="Espaçamento normal" title="Normal">1.5×</ToggleGroupItem>
+                    <ToggleGroupItem value="relaxed" aria-label="Espaçamento relaxado" title="Relaxado">1.75×</ToggleGroupItem>
+                  </ToggleGroup>
+                </div>
+                <div>
                   <p className="text-sm font-medium mb-2">Alinhamento do texto</p>
                   <ToggleGroup type="single" value={textAlign} onValueChange={(v)=> v && setTextAlign(v as any)}>
                     <ToggleGroupItem value="justify" aria-label="Justificado" title="Justificado">
@@ -351,7 +380,7 @@ const Reader = () => {
           {currentChapter && (
             <div>
               <h2 className="text-xl font-semibold mb-3">{currentChapter.chapter_title}</h2>
-              <div className={`space-y-4 leading-relaxed ${textAlign === "justify" ? "text-justify" : "text-left"}`} style={{ fontSize }}>
+              <div className={`space-y-4 ${textAlign === "justify" ? "text-justify" : "text-left"}`} style={{ fontSize, lineHeight }}>
                 {currentChapter.content.map((blk, i) => (
                   <p key={i}>{blk.content}</p>
                 ))}
