@@ -352,20 +352,6 @@ const Reader = () => {
               Concluir capítulo
             </Button>
           </div>
-          
-          {/* Streak info */}
-          <div className="mt-4 p-3 bg-muted/50 rounded-md">
-            <p className="text-sm font-medium">Sequência de Leitura</p>
-            <p className="text-lg font-bold text-primary">{streak.current} dias</p>
-            <p className="text-xs text-muted-foreground">
-              Recorde: {streak.longest} dias
-            </p>
-            {streak.freezeAvailable && (
-              <p className="text-xs text-blue-600">
-                🧊 1 congelamento disponível
-              </p>
-            )}
-          </div>
         </aside>
 
         <article className="flex-1">
