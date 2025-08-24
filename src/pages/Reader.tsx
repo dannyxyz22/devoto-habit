@@ -26,6 +26,10 @@ import {
   computeWordsUpToPosition,
   computeWordsUpToInclusiveTarget,
   computePlanProgressPercent,
+  computeDaysRemaining,
+  computeDailyTargetWords,
+  computeAchievedWordsToday,
+  computeDailyProgressPercent,
 } from "@/lib/reading";
 
 // Types now shared via lib/reading
@@ -116,7 +120,6 @@ const Reader = () => {
     }
   }, [bookId]);
 
-  const remainingWords = Math.max(0, targetWords - wordsUpToCurrent);
   const todayISO = formatISO(new Date(), { representation: "date" });
   const [baselineWords, setBaselineWords] = useState<number | null>(null);
 
@@ -132,24 +135,19 @@ const Reader = () => {
     }
   }, [parts, wordsUpToCurrent, bookId, todayISO, p.percent]);
 
-  const daysRemaining = useMemo(() => {
-    if (!plan?.targetDateISO) return null;
-    try {
-      const target = parseISO(plan.targetDateISO);
-      const diff = differenceInCalendarDays(target, new Date());
-      return Math.max(1, diff + 1);
-    } catch {
-      return null;
-    }
-  }, [plan]);
-
-  const dailyTargetWords = useMemo(() => {
-    if (!daysRemaining) return null;
-    return Math.ceil(remainingWords / daysRemaining);
-  }, [remainingWords, daysRemaining]);
-
-  const achievedWordsToday = baselineWords != null ? Math.max(0, wordsUpToCurrent - baselineWords) : 0;
-  const dailyProgressPercent = dailyTargetWords ? Math.min(100, Math.round((achievedWordsToday / dailyTargetWords) * 100)) : null;
+  const daysRemaining = useMemo(() => computeDaysRemaining(plan?.targetDateISO), [plan]);
+  const dailyTargetWords = useMemo(
+    () => computeDailyTargetWords(targetWords, baselineWords, daysRemaining),
+    [targetWords, baselineWords, daysRemaining]
+  );
+  const achievedWordsToday = useMemo(
+    () => computeAchievedWordsToday(wordsUpToCurrent, baselineWords),
+    [wordsUpToCurrent, baselineWords]
+  );
+  const dailyProgressPercent = useMemo(
+    () => computeDailyProgressPercent(achievedWordsToday, dailyTargetWords),
+    [achievedWordsToday, dailyTargetWords]
+  );
   // Progress of the reading plan from selected start to target
   const planProgressPercent = useMemo(
     () => computePlanProgressPercent(parts, wordsUpToCurrent, targetWords, planStart),
@@ -328,7 +326,6 @@ const Reader = () => {
                 <Progress value={dailyProgressPercent} />
                 <p className="text-sm text-muted-foreground mt-1">
                   {`Meta do dia: ${dailyProgressPercent}% — ${achievedWordsToday}/${dailyTargetWords} palavras`}
-                  {plan?.targetDateISO ? ` (até ${new Date(plan.targetDateISO).toLocaleDateString('pt-BR')})` : ""}
                 </p>
               </div>
             )}

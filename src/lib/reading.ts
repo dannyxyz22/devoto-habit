@@ -1,3 +1,4 @@
+import { differenceInCalendarDays, parseISO } from "date-fns";
 // Shared book structure types and utilities for word counting and plan progress
 
 export type Paragraph = { type: string; content: string };
@@ -82,3 +83,33 @@ export const computePlanProgressPercent = (
   const num = Math.max(0, wordsUpToCurrent - startWords);
   return Math.min(100, Math.round((num / denom) * 100));
 };
+
+// Daily goal helpers
+export const computeDaysRemaining = (targetDateISO: string | null | undefined): number | null => {
+  if (!targetDateISO) return null;
+  try {
+    const target = parseISO(targetDateISO);
+    const diff = differenceInCalendarDays(target, new Date());
+    return Math.max(1, diff + 1);
+  } catch {
+    return null;
+  }
+};
+
+export const computeDailyTargetWords = (
+  targetWords: number,
+  baselineWords: number | null,
+  daysRemaining: number | null
+): number | null => {
+  if (!daysRemaining || baselineWords == null) return null;
+  const remainingFromStartOfDay = Math.max(0, targetWords - baselineWords);
+  return Math.ceil(remainingFromStartOfDay / daysRemaining);
+};
+
+export const computeAchievedWordsToday = (wordsUpToCurrent: number, baselineWords: number | null): number =>
+  baselineWords != null ? Math.max(0, wordsUpToCurrent - baselineWords) : 0;
+
+export const computeDailyProgressPercent = (
+  achievedWordsToday: number,
+  dailyTargetWords: number | null
+): number | null => (dailyTargetWords ? Math.min(100, Math.round((achievedWordsToday / dailyTargetWords) * 100)) : null);

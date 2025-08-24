@@ -13,6 +13,10 @@ import {
   computeWordsUpToPosition,
   computeWordsUpToInclusiveTarget,
   computePlanProgressPercent,
+  computeDaysRemaining,
+  computeDailyTargetWords,
+  computeAchievedWordsToday,
+  computeDailyProgressPercent,
 } from "@/lib/reading";
 
 // Types now shared via lib/reading
@@ -118,17 +122,19 @@ const Index = () => {
     }
   }, [activeBookId, parts, wordsUpToCurrent, p.percent, todayISO]);
 
-  const daysRemaining = useMemo(() => {
-    if (!plan?.targetDateISO) return null;
-    try {
-      const target = parseISO(plan.targetDateISO);
-      const diff = differenceInCalendarDays(target, new Date());
-      return Math.max(1, diff + 1);
-    } catch { return null; }
-  }, [plan]);
-  const dailyTargetWords = useMemo(() => daysRemaining ? Math.ceil(remainingWords / daysRemaining) : null, [remainingWords, daysRemaining]);
-  const achievedWordsToday = baselineWords != null ? Math.max(0, wordsUpToCurrent - baselineWords) : 0;
-  const dailyProgressPercent = dailyTargetWords ? Math.min(100, Math.round((achievedWordsToday / dailyTargetWords) * 100)) : null;
+  const daysRemaining = useMemo(() => computeDaysRemaining(plan?.targetDateISO), [plan]);
+  const dailyTargetWords = useMemo(
+    () => computeDailyTargetWords(targetWords, baselineWords, daysRemaining),
+    [targetWords, baselineWords, daysRemaining]
+  );
+  const achievedWordsToday = useMemo(
+    () => computeAchievedWordsToday(wordsUpToCurrent, baselineWords),
+    [wordsUpToCurrent, baselineWords]
+  );
+  const dailyProgressPercent = useMemo(
+    () => computeDailyProgressPercent(achievedWordsToday, dailyTargetWords),
+    [achievedWordsToday, dailyTargetWords]
+  );
   const planProgressPercent = useMemo(
     () => computePlanProgressPercent(parts, wordsUpToCurrent, targetWords, planStart),
     [parts, wordsUpToCurrent, targetWords, planStart]
