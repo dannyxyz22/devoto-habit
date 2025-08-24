@@ -335,18 +335,6 @@ const Reader = () => {
             </Collapsible>
           </div>
           <div className="mb-3 space-y-3">
-            <div>
-              <Progress value={p.percent} />
-              <p className="text-sm text-muted-foreground mt-1">Progresso: {p.percent}%</p>
-            </div>
-            {plan?.targetDateISO && planProgressPercent != null && (
-              <div>
-                <Progress value={planProgressPercent} />
-                <p className="text-sm text-muted-foreground mt-1">
-                  Meta de leitura: {planProgressPercent}%{daysRemaining ? ` — ${daysRemaining} dia(s) restantes` : ""}
-                </p>
-              </div>
-            )}
             {dailyProgressPercent != null && (
               <div>
                 <Progress value={dailyProgressPercent} />
