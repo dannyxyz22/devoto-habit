@@ -186,7 +186,6 @@ const Index = () => {
               <Progress value={dailyProgressPercent} />
               <p className="text-sm text-muted-foreground mt-2">
                 {dailyProgressPercent}% — {achievedWordsToday}/{dailyTargetWords} palavras
-                {plan?.targetDateISO ? ` (até ${new Date(plan.targetDateISO).toLocaleDateString('pt-BR')})` : ""}
               </p>
             </>
           ) : (
