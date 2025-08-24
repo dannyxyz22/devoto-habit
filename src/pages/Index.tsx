@@ -196,16 +196,30 @@ const Index = () => {
       <section className="mt-6 grid md:grid-cols-3 gap-6">
         <div className="rounded-lg border p-4">
           <h3 className="text-sm font-medium">Minutos hoje</h3>
-          <p className="text-2xl font-bold">{minutesToday} min</p>
+          {used ? (
+            <p className="text-2xl font-bold">{minutesToday} min</p>
+          ) : (
+            <Button asChild variant="link">
+              <Link to="/biblioteca">Contabilize seu tempo de leitura</Link>
+            </Button>
+          )}
         </div>
         <div className="rounded-lg border p-4">
           <h3 className="text-sm font-medium">Livro ativo</h3>
-          <p className="text-muted-foreground text-sm">{activeBookId ? (BOOKS.find(b=>b.id===activeBookId)?.title || activeBookId) : "—"}</p>
-          {activeBookId && totalBookProgressPercent != null && (
-            <div className="mt-2">
-              <Progress value={totalBookProgressPercent} />
-              <p className="text-sm text-muted-foreground mt-2">Livro: {totalBookProgressPercent}%</p>
-            </div>
+          {used ? (
+            <>
+              <p className="text-muted-foreground text-sm">{activeBookId ? (BOOKS.find(b=>b.id===activeBookId)?.title || activeBookId) : "—"}</p>
+              {activeBookId && totalBookProgressPercent != null && (
+                <div className="mt-2">
+                  <Progress value={totalBookProgressPercent} />
+                  <p className="text-sm text-muted-foreground mt-2">Livro: {totalBookProgressPercent}%</p>
+                </div>
+              )}
+            </>
+          ) : (
+            <Button asChild variant="link">
+              <Link to="/biblioteca">Escolha um livro na biblioteca</Link>
+            </Button>
           )}
         </div>
         {err && (
