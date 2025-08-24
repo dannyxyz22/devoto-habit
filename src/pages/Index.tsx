@@ -138,6 +138,19 @@ const Index = () => {
   const planProgressPercent = useMemo(() => parts ? Math.min(100, Math.round((wordsUpToCurrent / Math.max(1, targetWords)) * 100)) : null, [parts, wordsUpToCurrent, targetWords]);
   const totalBookProgressPercent = useMemo(() => parts ? Math.min(100, Math.round((wordsUpToCurrent / Math.max(1, totalWords)) * 100)) : null, [parts, wordsUpToCurrent, totalWords]);
 
+  // Current reading position labels
+  const currentPartTitle = useMemo(() => {
+    if (!parts) return null;
+    const part = parts[p.partIndex];
+    return part?.part_title ?? null;
+  }, [parts, p.partIndex]);
+  const currentChapterTitle = useMemo(() => {
+    if (!parts) return null;
+    const part = parts[p.partIndex];
+    const ch = part?.chapters?.[p.chapterIndex];
+    return ch?.chapter_title ?? null;
+  }, [parts, p.partIndex, p.chapterIndex]);
+
   const stats = useMemo(() => getStats(), []);
   const minutesToday = stats.minutesByDate[todayISO] || 0;
 
@@ -201,6 +214,29 @@ const Index = () => {
         </div>
       </section>
       <section className="mt-6 grid md:grid-cols-3 gap-6">
+        {/* Marcador do livro (posição atual) */}
+        <div className="rounded-lg border p-4">
+          <h3 className="text-sm font-medium">Marcador do livro</h3>
+          {used && activeBookId ? (
+            parts ? (
+              <>
+                <p className="text-sm text-muted-foreground">Parte {p.partIndex + 1}{currentPartTitle ? ` — ${currentPartTitle}` : ""}</p>
+                <p className="text-sm text-muted-foreground">Capítulo {p.chapterIndex + 1}{currentChapterTitle ? ` — ${currentChapterTitle}` : ""}</p>
+                <div className="mt-2">
+                  <Button asChild variant="link">
+                    <Link to={`/leitor/${activeBookId}`}>Continuar leitura</Link>
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <p className="text-muted-foreground text-sm">Carregando marcador…</p>
+            )
+          ) : (
+            <Button asChild variant="link">
+              <Link to="/biblioteca">Escolha um livro na biblioteca</Link>
+            </Button>
+          )}
+        </div>
         {/* Streak diário */}
         <div className="rounded-lg border p-4">
           <h2 className="text-lg font-semibold">Streak diário</h2>
@@ -224,13 +260,13 @@ const Index = () => {
             </Button>
           )}
         </div>
-        {err && (
-          <div className="rounded-lg border p-4">
-            <h3 className="text-sm font-medium">Status</h3>
-            <p className="text-muted-foreground text-sm">{err}</p>
-          </div>
-        )}
       </section>
+      {err && (
+        <div className="mt-4 rounded-lg border p-4">
+          <h3 className="text-sm font-medium">Status</h3>
+          <p className="text-muted-foreground text-sm">{err}</p>
+        </div>
+      )}
       
     </main>
   );
