@@ -332,14 +332,6 @@ const Reader = () => {
             </CollapsibleContent>
           </Collapsible>
           <div className="space-y-2">
-            <Button 
-              className="w-full" 
-              onClick={onReadToday} 
-              variant={hasReadToday() ? "outline" : "secondary"}
-              disabled={hasReadToday()}
-            >
-              {hasReadToday() ? "✓ Leitura marcada" : "Marcar leitura de hoje"}
-            </Button>
             <Button
               className="w-full"
               onClick={() => {
@@ -391,18 +383,34 @@ const Reader = () => {
               </div>
               {/* Bottom action: conclude chapter */}
               <div className="mt-8 pt-4 border-t">
-                <Button
-                  className="w-full md:w-auto"
-                  onClick={() => {
-                    // Visual feedback when concluding via bottom button
-                    try {
-                      confetti({ particleCount: 60, spread: 70, origin: { y: 0.7 } });
-                    } catch {}
-                    concludeChapter();
-                  }}
-                >
-                  Concluir capítulo
-                </Button>
+                <div className="flex flex-col md:flex-row gap-2">
+                  <Button
+                    className="w-full md:w-auto"
+                    onClick={() => {
+                      // Visual feedback when concluding via bottom button
+                      try {
+                        confetti({ particleCount: 60, spread: 70, origin: { y: 0.7 } });
+                      } catch {}
+                      concludeChapter();
+                    }}
+                  >
+                    Concluir capítulo
+                  </Button>
+                  {(!hasReadToday() && (dailyProgressPercent == null || dailyProgressPercent < 100)) && (
+                    <Button 
+                      className="w-full md:w-auto" 
+                      onClick={onReadToday} 
+                      variant="secondary"
+                    >
+                      Marcar leitura de hoje
+                    </Button>
+                  )}
+                  {(hasReadToday() || (dailyProgressPercent != null && dailyProgressPercent >= 100)) && (
+                    <p className="text-xs text-muted-foreground self-center">
+                      Leitura do dia já contabilizada
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           )}
