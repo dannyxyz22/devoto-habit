@@ -283,70 +283,57 @@ const Reader = () => {
       <p className="text-muted-foreground mb-4">{meta.author}</p>
 
       <section className="flex flex-col md:flex-row gap-6">
-        <aside className="md:w-64 shrink-0 border rounded-md p-3 h-fit">
-          <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen}>
-            <div className="mb-2 flex items-center justify-between">
-              <p className="text-sm font-medium">Opções de leitura</p>
-              <CollapsibleTrigger asChild>
-                <Button variant="ghost" size="icon" aria-label={settingsOpen ? "Recolher opções" : "Expandir opções"}>
-                  <Settings className="h-4 w-4" />
-                </Button>
-              </CollapsibleTrigger>
-            </div>
-            <CollapsibleContent className="space-y-4">
-              <div>
-                <p className="text-sm font-medium mb-2">Aparência</p>
-                <ToggleGroup type="single" value={theme || "system"} onValueChange={(v)=> v && setTheme(v)}>
-                  <ToggleGroupItem value="system" aria-label="Usar tema do sistema" title="Sistema">
-                    <Monitor className="h-4 w-4" />
-                  </ToggleGroupItem>
-                  <ToggleGroupItem value="light" aria-label="Usar tema claro" title="Claro">
-                    <Sun className="h-4 w-4" />
-                  </ToggleGroupItem>
-                  <ToggleGroupItem value="dark" aria-label="Usar tema escuro" title="Escuro">
-                    <Moon className="h-4 w-4" />
-                  </ToggleGroupItem>
-                </ToggleGroup>
-              </div>
-              <div>
-                <p className="text-sm font-medium mb-2">Tamanho da fonte</p>
-                <Slider
-                  value={[fontSize]}
-                  min={14}
-                  max={24}
-                  step={1}
-                  onValueChange={(v) => setFontSize(v[0])}
-                />
-              </div>
-              <div>
-                <p className="text-sm font-medium mb-2">Alinhamento do texto</p>
-                <ToggleGroup type="single" value={textAlign} onValueChange={(v)=> v && setTextAlign(v as any)}>
-                  <ToggleGroupItem value="justify" aria-label="Justificado" title="Justificado">
-                    <AlignJustify className="h-4 w-4" />
-                  </ToggleGroupItem>
-                  <ToggleGroupItem value="left" aria-label="Alinhado à esquerda" title="Esquerda">
-                    <AlignLeft className="h-4 w-4" />
-                  </ToggleGroupItem>
-                </ToggleGroup>
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-          <div className="space-y-2">
-            <Button
-              className="w-full"
-              onClick={() => {
-                try {
-                  confetti({ particleCount: 60, spread: 70, origin: { y: 0.7 } });
-                } catch {}
-                concludeChapter();
-              }}
-            >
-              Concluir capítulo
-            </Button>
-          </div>
-        </aside>
-
         <article className="flex-1">
+          {/* Opções de leitura: agora acima dos progressos */}
+          <div className="border rounded-md p-3 mb-4">
+            <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen}>
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-sm font-medium">Opções de leitura</p>
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" size="icon" aria-label={settingsOpen ? "Recolher opções" : "Expandir opções"}>
+                    <Settings className="h-4 w-4" />
+                  </Button>
+                </CollapsibleTrigger>
+              </div>
+              <CollapsibleContent className="space-y-4">
+                <div>
+                  <p className="text-sm font-medium mb-2">Aparência</p>
+                  <ToggleGroup type="single" value={theme || "system"} onValueChange={(v)=> v && setTheme(v)}>
+                    <ToggleGroupItem value="system" aria-label="Usar tema do sistema" title="Sistema">
+                      <Monitor className="h-4 w-4" />
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="light" aria-label="Usar tema claro" title="Claro">
+                      <Sun className="h-4 w-4" />
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="dark" aria-label="Usar tema escuro" title="Escuro">
+                      <Moon className="h-4 w-4" />
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+                </div>
+                <div>
+                  <p className="text-sm font-medium mb-2">Tamanho da fonte</p>
+                  <Slider
+                    value={[fontSize]}
+                    min={14}
+                    max={24}
+                    step={1}
+                    onValueChange={(v) => setFontSize(v[0])}
+                  />
+                </div>
+                <div>
+                  <p className="text-sm font-medium mb-2">Alinhamento do texto</p>
+                  <ToggleGroup type="single" value={textAlign} onValueChange={(v)=> v && setTextAlign(v as any)}>
+                    <ToggleGroupItem value="justify" aria-label="Justificado" title="Justificado">
+                      <AlignJustify className="h-4 w-4" />
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="left" aria-label="Alinhado à esquerda" title="Esquerda">
+                      <AlignLeft className="h-4 w-4" />
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          </div>
           <div className="mb-3 space-y-3">
             <div>
               <Progress value={p.percent} />
