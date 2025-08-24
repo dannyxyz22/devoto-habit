@@ -8,6 +8,9 @@ import confetti from "canvas-confetti";
 import { getBookById } from "@/lib/books";
 import { SEO } from "@/components/app/SEO";
 import { differenceInCalendarDays, formatISO, parseISO } from "date-fns";
+import { useTheme } from "next-themes";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Sun, Moon, Monitor } from "lucide-react";
 import {
   addReadingMinutes,
   getProgress,
@@ -44,6 +47,7 @@ const Reader = () => {
   const [p, setP] = useState(() => getProgress(bookId));
   const [streak, setStreak] = useState<Streak>(() => getStreak());
   const startRef = useRef<number | null>(null);
+  const { theme, setTheme } = useTheme();
 
   useEffect(() => {
     if (!meta) return;
@@ -260,6 +264,20 @@ const Reader = () => {
 
       <section className="flex flex-col md:flex-row gap-6">
         <aside className="md:w-64 shrink-0 border rounded-md p-3 h-fit">
+          <div className="mb-4">
+            <p className="text-sm font-medium mb-2">Aparência</p>
+            <ToggleGroup type="single" value={theme || "system"} onValueChange={(v)=> v && setTheme(v)}>
+              <ToggleGroupItem value="system" aria-label="Usar tema do sistema" title="Sistema">
+                <Monitor className="h-4 w-4" />
+              </ToggleGroupItem>
+              <ToggleGroupItem value="light" aria-label="Usar tema claro" title="Claro">
+                <Sun className="h-4 w-4" />
+              </ToggleGroupItem>
+              <ToggleGroupItem value="dark" aria-label="Usar tema escuro" title="Escuro">
+                <Moon className="h-4 w-4" />
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </div>
           <div className="mb-4">
             <p className="text-sm font-medium mb-2">Tamanho da fonte</p>
             <Slider

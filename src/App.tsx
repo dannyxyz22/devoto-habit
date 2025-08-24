@@ -11,6 +11,7 @@ import Library from "./pages/Library";
 import Reader from "./pages/Reader";
 import Stats from "./pages/Stats";
 import NotFound from "./pages/NotFound";
+import { ThemeProvider } from "next-themes";
 
 const queryClient = new QueryClient();
 
@@ -23,6 +24,7 @@ const App = () => {
       <TooltipProvider>
         <Toaster />
         <Sonner />
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
   <BrowserRouter basename={import.meta.env.BASE_URL}>
           <Routes>
             <Route path="/" element={<Index />} />
@@ -34,6 +36,7 @@ const App = () => {
           </Routes>
           <InstallPWA />
         </BrowserRouter>
+    </ThemeProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );
