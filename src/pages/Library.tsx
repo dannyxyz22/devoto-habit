@@ -8,7 +8,7 @@ import { PageHeader } from "@/components/app/PageHeader";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { setReadingPlan, getProgress, getReadingPlan, setDailyBaseline } from "@/lib/storage";
+import { setReadingPlan, getProgress, getReadingPlan, setDailyBaseline, setProgress } from "@/lib/storage";
 import { toast } from "@/hooks/use-toast";
 import { formatISO } from "date-fns";
 
@@ -113,6 +113,7 @@ const Library = () => {
   const [open, setOpen] = useState(false);
   const [selectedBook, setSelectedBook] = useState<string | null>(null);
   const [endDate, setEndDate] = useState<string>("");
+  const [currentPosition, setCurrentPosition] = useState<string>("0-0");
   const [targetChapter, setTargetChapter] = useState<string>("end");
   const [bookParts, setBookParts] = useState<Part[] | null>(null);
   const navigate = useNavigate();
@@ -122,6 +123,9 @@ const Library = () => {
     setSelectedBook(bookId);
     const plan = getReadingPlan(bookId);
     setEndDate(plan.targetDateISO ?? "");
+  // Default current position from saved progress or start
+  const prog = getProgress(bookId);
+  setCurrentPosition(`${prog.partIndex}-${prog.chapterIndex}`);
     
     // Set target chapter from plan
     if (plan.targetPartIndex !== undefined && plan.targetChapterIndex !== undefined) {
@@ -154,6 +158,14 @@ const Library = () => {
 
   const startReading = async (withPlan: boolean) => {
     if (!selectedBook) return;
+    // Parse current position from selection
+    let curPartIndex = 0;
+    let curChapterIndex = 0;
+    if (currentPosition && currentPosition.includes("-")) {
+      const [pStr, cStr] = currentPosition.split("-");
+      curPartIndex = Number(pStr) || 0;
+      curChapterIndex = Number(cStr) || 0;
+    }
     if (withPlan) {
       if (!endDate) {
         toast({ title: "Selecione uma data", description: "Escolha uma data de término ou comece sem meta." });
@@ -171,14 +183,20 @@ const Library = () => {
       }
       
       setReadingPlan(selectedBook, endDate, targetPartIndex, targetChapterIndex);
-      
-      // Reset daily progress by updating baseline to current reading position
-      const currentProgress = getProgress(selectedBook);
+
+      // Set progress to chosen current position and reset daily baseline accordingly
       if (bookParts) {
+        // Compute percent based on flat chapters
+        const flat: Array<{ pi: number; ci: number }> = [];
+        bookParts.forEach((part, pi) => part.chapters.forEach((_, ci) => flat.push({ pi, ci })));
+        const idx = flat.findIndex((x) => x.pi === curPartIndex && x.ci === curChapterIndex);
+        const percent = idx >= 0 ? Math.round(((idx + 1) / flat.length) * 100) : 0;
+        setProgress(selectedBook, { partIndex: curPartIndex, chapterIndex: curChapterIndex, percent });
+        // Compute baseline words up to current position
         let wordsUpToCurrent = 0;
         bookParts.forEach((part, pi) => {
           part.chapters.forEach((ch, ci) => {
-            if (pi < currentProgress.partIndex || (pi === currentProgress.partIndex && ci < currentProgress.chapterIndex)) {
+            if (pi < curPartIndex || (pi === curPartIndex && ci < curChapterIndex)) {
               ch.content?.forEach((blk) => {
                 wordsUpToCurrent += blk.content.trim().split(/\s+/).filter(Boolean).length;
               });
@@ -186,10 +204,37 @@ const Library = () => {
           });
         });
         const todayISO = formatISO(new Date(), { representation: "date" });
-        setDailyBaseline(selectedBook, todayISO, { words: wordsUpToCurrent, percent: currentProgress.percent });
+        setDailyBaseline(selectedBook, todayISO, { words: wordsUpToCurrent, percent });
+        // Persist plan start for plan progress calculations (start indexes and words)
+        try {
+          localStorage.setItem(
+            `planStart:${selectedBook}`,
+            JSON.stringify({ startPartIndex: curPartIndex, startChapterIndex: curChapterIndex, startWords: wordsUpToCurrent })
+          );
+        } catch {}
       }
     } else {
       setReadingPlan(selectedBook, null);
+      // Also set progress to chosen current position when starting without plan
+      if (bookParts) {
+        const flat: Array<{ pi: number; ci: number }> = [];
+        bookParts.forEach((part, pi) => part.chapters.forEach((_, ci) => flat.push({ pi, ci })));
+        const idx = flat.findIndex((x) => x.pi === curPartIndex && x.ci === curChapterIndex);
+        const percent = idx >= 0 ? Math.round(((idx + 1) / flat.length) * 100) : 0;
+        setProgress(selectedBook, { partIndex: curPartIndex, chapterIndex: curChapterIndex, percent });
+        let wordsUpToCurrent = 0;
+        bookParts.forEach((part, pi) => {
+          part.chapters.forEach((ch, ci) => {
+            if (pi < curPartIndex || (pi === curPartIndex && ci < curChapterIndex)) {
+              ch.content?.forEach((blk) => {
+                wordsUpToCurrent += blk.content.trim().split(/\s+/).filter(Boolean).length;
+              });
+            }
+          });
+        });
+        const todayISO = formatISO(new Date(), { representation: "date" });
+        setDailyBaseline(selectedBook, todayISO, { words: wordsUpToCurrent, percent });
+      }
     }
     setOpen(false);
     navigate(`/leitor/${selectedBook}`);
@@ -235,6 +280,23 @@ const Library = () => {
             <DialogTitle>Definir meta de término (opcional)</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            <div>
+              <label htmlFor="currentPosition" className="text-sm font-medium">Posição atual</label>
+              <Select value={currentPosition} onValueChange={setCurrentPosition}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione seu ponto atual" />
+                </SelectTrigger>
+                <SelectContent>
+                  {bookParts?.map((part, partIndex) =>
+                    part.chapters.map((chapter, chapterIndex) => (
+                      <SelectItem key={`cur-${partIndex}-${chapterIndex}`} value={`${partIndex}-${chapterIndex}`}>
+                        {part.part_title} - {chapter.chapter_title}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
             <div>
               <label htmlFor="targetChapter" className="text-sm font-medium">Meta de leitura</label>
               <Select value={targetChapter} onValueChange={setTargetChapter}>

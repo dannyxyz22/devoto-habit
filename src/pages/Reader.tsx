@@ -20,11 +20,15 @@ import {
   setDailyBaseline,
   type Streak,
 } from "@/lib/storage";
+import {
+  type Part,
+  computeTotalWords,
+  computeWordsUpToPosition,
+  computeWordsUpToInclusiveTarget,
+  computePlanProgressPercent,
+} from "@/lib/reading";
 
-// Types for the fetched JSON
-export type Paragraph = { type: string; content: string };
-export type Chapter = { chapter_title: string; content: Paragraph[] };
-export type Part = { part_title: string; chapters: Chapter[] };
+// Types now shared via lib/reading
 
 const Reader = () => {
   const { bookId = "" } = useParams();
@@ -89,54 +93,28 @@ const Reader = () => {
   }, [parts, p]);
 
   // Word-based daily goal calculations
-  const totalWords = useMemo(() => {
-    if (!parts) return 0;
-    let count = 0;
-    parts.forEach((part) =>
-      part.chapters.forEach((ch) =>
-        ch.content.forEach((blk) => {
-          count += blk.content.trim().split(/\s+/).filter(Boolean).length;
-        })
-      )
-    );
-    return count;
-  }, [parts]);
+  const totalWords = useMemo(() => computeTotalWords(parts), [parts]);
 
-  const wordsUpToCurrent = useMemo(() => {
-    if (!parts) return 0;
-    let count = 0;
-    parts.forEach((part, pi) => {
-      part.chapters.forEach((ch, ci) => {
-        if (pi < p.partIndex || (pi === p.partIndex && ci < p.chapterIndex)) {
-          ch.content.forEach((blk) => {
-            count += blk.content.trim().split(/\s+/).filter(Boolean).length;
-          });
-        }
-      });
-    });
-    return count;
-  }, [parts, p]);
+  const wordsUpToCurrent = useMemo(() => computeWordsUpToPosition(parts, { partIndex: p.partIndex, chapterIndex: p.chapterIndex }), [parts, p]);
 
   const plan = useMemo(() => getReadingPlan(bookId), [bookId]);
 
   // Calculate target words based on plan
-  const targetWords = useMemo(() => {
-    if (!parts || plan.targetPartIndex === undefined || plan.targetChapterIndex === undefined) {
-      return totalWords; // Default to end of book
+  const targetWords = useMemo(
+    () => computeWordsUpToInclusiveTarget(parts, { targetPartIndex: plan.targetPartIndex, targetChapterIndex: plan.targetChapterIndex }, totalWords),
+    [parts, plan, totalWords]
+  );
+
+  // Load plan start (position where the user chose to begin the plan)
+  const planStart = useMemo(() => {
+    if (!bookId) return null as null | { startPartIndex: number; startChapterIndex: number; startWords?: number };
+    try {
+      const raw = localStorage.getItem(`planStart:${bookId}`);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
     }
-    
-    let count = 0;
-    parts.forEach((part, pi) => {
-      part.chapters.forEach((ch, ci) => {
-        if (pi < plan.targetPartIndex! || (pi === plan.targetPartIndex! && ci <= plan.targetChapterIndex!)) {
-          ch.content.forEach((blk) => {
-            count += blk.content.trim().split(/\s+/).filter(Boolean).length;
-          });
-        }
-      });
-    });
-    return count;
-  }, [parts, plan, totalWords]);
+  }, [bookId]);
 
   const remainingWords = Math.max(0, targetWords - wordsUpToCurrent);
   const todayISO = formatISO(new Date(), { representation: "date" });
@@ -172,6 +150,11 @@ const Reader = () => {
 
   const achievedWordsToday = baselineWords != null ? Math.max(0, wordsUpToCurrent - baselineWords) : 0;
   const dailyProgressPercent = dailyTargetWords ? Math.min(100, Math.round((achievedWordsToday / dailyTargetWords) * 100)) : null;
+  // Progress of the reading plan from selected start to target
+  const planProgressPercent = useMemo(
+    () => computePlanProgressPercent(parts, wordsUpToCurrent, targetWords, planStart),
+    [parts, wordsUpToCurrent, targetWords, planStart]
+  );
   
   // Check if daily goal was just completed and auto-mark reading
   const [wasGoalCompleted, setWasGoalCompleted] = useState(false);
@@ -332,6 +315,14 @@ const Reader = () => {
               <Progress value={p.percent} />
               <p className="text-sm text-muted-foreground mt-1">Progresso: {p.percent}%</p>
             </div>
+            {plan?.targetDateISO && planProgressPercent != null && (
+              <div>
+                <Progress value={planProgressPercent} />
+                <p className="text-sm text-muted-foreground mt-1">
+                  Meta de leitura: {planProgressPercent}%{daysRemaining ? ` — ${daysRemaining} dia(s) restantes` : ""}
+                </p>
+              </div>
+            )}
             {dailyProgressPercent != null && (
               <div>
                 <Progress value={dailyProgressPercent} />

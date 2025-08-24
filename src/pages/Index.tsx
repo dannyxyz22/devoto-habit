@@ -7,11 +7,15 @@ import { Progress } from "@/components/ui/progress";
 import { BOOKS } from "@/lib/books";
 import { differenceInCalendarDays, formatISO, parseISO } from "date-fns";
 import { getStreak, getReadingPlan, getProgress, getDailyBaseline, setDailyBaseline, getStats, type Streak } from "@/lib/storage";
+import {
+  type Part,
+  computeTotalWords,
+  computeWordsUpToPosition,
+  computeWordsUpToInclusiveTarget,
+  computePlanProgressPercent,
+} from "@/lib/reading";
 
-// Mirror types used in Reader for counting words
-type Paragraph = { type: string; content: string };
-type Chapter = { chapter_title: string; content: Paragraph[] };
-type Part = { part_title: string; chapters: Chapter[] };
+// Types now shared via lib/reading
 
 const Index = () => {
   const [streak, setStreak] = useState<Streak>(() => getStreak());
@@ -80,34 +84,24 @@ const Index = () => {
   // Compute plan progress and daily goal similar to Reader
   const plan = useMemo(() => activeBookId ? getReadingPlan(activeBookId) : { targetDateISO: null }, [activeBookId]);
   const p = useMemo(() => activeBookId ? getProgress(activeBookId) : { partIndex: 0, chapterIndex: 0, percent: 0 }, [activeBookId]);
-  const totalWords = useMemo(() => {
-    if (!parts) return 0;
-    let count = 0;
-    parts.forEach(part => part.chapters.forEach(ch => ch.content.forEach(blk => {
-      count += blk.content.trim().split(/\s+/).filter(Boolean).length;
-    })));
-    return count;
-  }, [parts]);
-  const wordsUpToCurrent = useMemo(() => {
-    if (!parts) return 0;
-    let count = 0;
-    parts.forEach((part, pi) => part.chapters.forEach((ch, ci) => {
-      if (pi < p.partIndex || (pi === p.partIndex && ci < p.chapterIndex)) {
-        ch.content.forEach(blk => { count += blk.content.trim().split(/\s+/).filter(Boolean).length; });
-      }
-    }));
-    return count;
-  }, [parts, p]);
-  const targetWords = useMemo(() => {
-    if (!parts || plan.targetPartIndex === undefined || plan.targetChapterIndex === undefined) return totalWords;
-    let count = 0;
-    parts.forEach((part, pi) => part.chapters.forEach((ch, ci) => {
-      if (pi < plan.targetPartIndex! || (pi === plan.targetPartIndex! && ci <= plan.targetChapterIndex!)) {
-        ch.content.forEach(blk => { count += blk.content.trim().split(/\s+/).filter(Boolean).length; });
-      }
-    }));
-    return count;
-  }, [parts, plan, totalWords]);
+  const totalWords = useMemo(() => computeTotalWords(parts), [parts]);
+  const wordsUpToCurrent = useMemo(
+    () => computeWordsUpToPosition(parts, { partIndex: p.partIndex, chapterIndex: p.chapterIndex }),
+    [parts, p]
+  );
+  const targetWords = useMemo(
+    () => computeWordsUpToInclusiveTarget(parts, { targetPartIndex: plan.targetPartIndex, targetChapterIndex: plan.targetChapterIndex }, totalWords),
+    [parts, plan, totalWords]
+  );
+
+  // Load plan start to compute progress from start to target
+  const planStart = useMemo(() => {
+    if (!activeBookId) return null as null | { startPartIndex: number; startChapterIndex: number; startWords?: number };
+    try {
+      const raw = localStorage.getItem(`planStart:${activeBookId}`);
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  }, [activeBookId]);
 
   const remainingWords = Math.max(0, targetWords - wordsUpToCurrent);
   const todayISO = formatISO(new Date(), { representation: "date" });
@@ -135,7 +129,10 @@ const Index = () => {
   const dailyTargetWords = useMemo(() => daysRemaining ? Math.ceil(remainingWords / daysRemaining) : null, [remainingWords, daysRemaining]);
   const achievedWordsToday = baselineWords != null ? Math.max(0, wordsUpToCurrent - baselineWords) : 0;
   const dailyProgressPercent = dailyTargetWords ? Math.min(100, Math.round((achievedWordsToday / dailyTargetWords) * 100)) : null;
-  const planProgressPercent = useMemo(() => parts ? Math.min(100, Math.round((wordsUpToCurrent / Math.max(1, targetWords)) * 100)) : null, [parts, wordsUpToCurrent, targetWords]);
+  const planProgressPercent = useMemo(
+    () => computePlanProgressPercent(parts, wordsUpToCurrent, targetWords, planStart),
+    [parts, wordsUpToCurrent, targetWords, planStart]
+  );
   const totalBookProgressPercent = useMemo(() => parts ? Math.min(100, Math.round((wordsUpToCurrent / Math.max(1, totalWords)) * 100)) : null, [parts, wordsUpToCurrent, totalWords]);
 
   // Current reading position labels
