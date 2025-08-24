@@ -10,7 +10,7 @@ import { SEO } from "@/components/app/SEO";
 import { differenceInCalendarDays, formatISO, parseISO } from "date-fns";
 import { useTheme } from "next-themes";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Sun, Moon, Monitor } from "lucide-react";
+import { Sun, Moon, Monitor, AlignLeft, AlignJustify } from "lucide-react";
 import {
   addReadingMinutes,
   getProgress,
@@ -48,6 +48,16 @@ const Reader = () => {
   const [streak, setStreak] = useState<Streak>(() => getStreak());
   const startRef = useRef<number | null>(null);
   const { theme, setTheme } = useTheme();
+  const [textAlign, setTextAlign] = useState<"left" | "justify">(() => {
+    try {
+      return (localStorage.getItem("textAlign") as "left" | "justify") || "justify";
+    } catch {
+      return "justify";
+    }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("textAlign", textAlign); } catch {}
+  }, [textAlign]);
 
   useEffect(() => {
     if (!meta) return;
@@ -288,6 +298,17 @@ const Reader = () => {
               onValueChange={(v) => setFontSize(v[0])}
             />
           </div>
+          <div className="mb-4">
+            <p className="text-sm font-medium mb-2">Alinhamento do texto</p>
+            <ToggleGroup type="single" value={textAlign} onValueChange={(v)=> v && setTextAlign(v as any)}>
+              <ToggleGroupItem value="justify" aria-label="Justificado" title="Justificado">
+                <AlignJustify className="h-4 w-4" />
+              </ToggleGroupItem>
+              <ToggleGroupItem value="left" aria-label="Alinhado à esquerda" title="Esquerda">
+                <AlignLeft className="h-4 w-4" />
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </div>
           <div className="space-y-2">
             <Button 
               className="w-full" 
@@ -355,7 +376,7 @@ const Reader = () => {
           {currentChapter && (
             <div>
               <h2 className="text-xl font-semibold mb-3">{currentChapter.chapter_title}</h2>
-              <div className="space-y-4 leading-relaxed" style={{ fontSize }}>
+              <div className={`space-y-4 leading-relaxed ${textAlign === "justify" ? "text-justify" : "text-left"}`} style={{ fontSize }}>
                 {currentChapter.content.map((blk, i) => (
                   <p key={i}>{blk.content}</p>
                 ))}
