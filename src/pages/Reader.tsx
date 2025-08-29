@@ -34,6 +34,7 @@ import {
   computeDailyTargetWords,
   computeAchievedWordsToday,
   computeDailyProgressPercent,
+  countWordsInChapter,
 } from "@/lib/reading";
 
 // Types now shared via lib/reading
@@ -129,6 +130,10 @@ const Reader = () => {
     const ch = parts[p.partIndex]?.chapters[p.chapterIndex];
     return ch || null;
   }, [parts, p]);
+
+  const currentChapterWords = useMemo(() => {
+    return currentChapter ? countWordsInChapter(currentChapter as any) : 0;
+  }, [currentChapter]);
 
   const lineHeight = useMemo(() => {
     switch (lineSpacing) {
@@ -370,6 +375,11 @@ const Reader = () => {
                 <p className="text-sm text-muted-foreground mt-1">
                   {`Meta do dia: ${dailyProgressPercent}% — ${achievedWordsToday}/${dailyTargetWords} palavras`}
                 </p>
+                {currentChapter && (
+                  <p className="text-xs font-medium text-primary mt-1">
+                    {`Capítulo atual: ${currentChapterWords} palavras`}
+                  </p>
+                )}
               </div>
             )}
           </div>
