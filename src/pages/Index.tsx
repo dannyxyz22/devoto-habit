@@ -154,6 +154,18 @@ const Index = () => {
     return ch?.chapter_title ?? null;
   }, [parts, p.partIndex, p.chapterIndex]);
 
+  // Target labels for the reading plan
+  const targetPartTitle = useMemo(() => {
+    if (!parts || plan?.targetPartIndex == null) return null;
+    const part = parts[plan.targetPartIndex];
+    return part?.part_title ?? null;
+  }, [parts, plan]);
+  const targetChapterTitle = useMemo(() => {
+    if (!parts || plan?.targetPartIndex == null || plan?.targetChapterIndex == null) return null;
+    const ch = parts[plan.targetPartIndex]?.chapters?.[plan.targetChapterIndex];
+    return ch?.chapter_title ?? null;
+  }, [parts, plan]);
+
   const stats = useMemo(() => getStats(), []);
   const minutesToday = stats.minutesByDate[todayISO] || 0;
 
@@ -190,6 +202,13 @@ const Index = () => {
               <p className="text-sm text-muted-foreground mt-2">Meta: {planProgressPercent}%
                 {daysRemaining ? ` • ${daysRemaining} dia(s) restantes` : ""}
               </p>
+              {parts && plan?.targetPartIndex != null && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  {`${targetPartTitle ? `${targetPartTitle}` : ""}`}
+                  <br />
+                  {plan.targetChapterIndex != null ? `${targetChapterTitle ? `${targetChapterTitle}` : ""}` : ""}
+                </p>
+              )}
             </>
           ) : (
             <p className="text-muted-foreground">Defina uma meta e acompanhe seu avanço.</p>
@@ -223,8 +242,11 @@ const Index = () => {
           {used && activeBookId ? (
             parts ? (
               <>
-                <p className="text-sm text-muted-foreground">Parte {p.partIndex + 1}{currentPartTitle ? ` — ${currentPartTitle}` : ""}</p>
-                <p className="text-sm text-muted-foreground">Capítulo {p.chapterIndex + 1}{currentChapterTitle ? ` — ${currentChapterTitle}` : ""}</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {`${currentPartTitle ? `${currentPartTitle}` : ""}`}
+                  <br />
+                  {`${currentChapterTitle ? `${currentChapterTitle}` : ""}`}
+                </p>
                 <div className="mt-2">
                   <Button asChild variant="link">
                     <Link to={`/leitor/${activeBookId}`}>Continuar leitura</Link>
