@@ -12,6 +12,7 @@ import Reader from "./pages/Reader";
 import Stats from "./pages/Stats";
 import NotFound from "./pages/NotFound";
 import { ThemeProvider } from "next-themes";
+import { Capacitor } from "@capacitor/core";
 
 const queryClient = new QueryClient();
 
@@ -19,13 +20,16 @@ const App = () => {
   // Initialize PWA functionality
   usePWA();
   
+  const isNative = (Capacitor.isNativePlatform?.() ?? (Capacitor.getPlatform?.() !== 'web')) as boolean;
+  const baseName = isNative ? "/" : import.meta.env.BASE_URL;
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
         <Sonner />
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-  <BrowserRouter basename={import.meta.env.BASE_URL}>
+  <BrowserRouter basename={baseName}>
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/biblioteca" element={<Library />} />

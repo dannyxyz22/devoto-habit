@@ -5,8 +5,8 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
-  // Base path for GitHub Pages project site: https://dannyxyz22.github.io/devoto-habit/
-  base: "/devoto-habit/",
+  // Use root base for native builds (CAP_NATIVE=1), otherwise GitHub Pages base
+  base: process.env.CAP_NATIVE ? "/" : "/devoto-habit/",
   server: {
     host: "::",
     port: 8080,

@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 
 export const usePWA = () => {
   const [isInstallable, setIsInstallable] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
   useEffect(() => {
-    // Register service worker
-  if ('serviceWorker' in navigator) {
+    // Avoid SW on native (Capacitor) to prevent loading issues
+    const isNative = Capacitor.isNativePlatform?.() ?? (Capacitor.getPlatform?.() !== 'web');
+    if (!isNative && 'serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-    const swUrl = `${import.meta.env.BASE_URL}sw.js`;
-    navigator.serviceWorker.register(swUrl)
+        const swUrl = `${import.meta.env.BASE_URL}sw.js`;
+        navigator.serviceWorker.register(swUrl)
           .then((registration) => {
             console.log('SW registered: ', registration);
           })
@@ -26,10 +28,14 @@ export const usePWA = () => {
       setIsInstallable(true);
     };
 
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    if (!isNative) {
+      window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    }
 
     return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      if (!isNative) {
+        window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      }
     };
   }, []);
 
