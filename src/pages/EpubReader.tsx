@@ -77,6 +77,51 @@ const EpubReader = () => {
                 if (!base) setDailyBaseline(epubId, todayISO, { words: 0, percent });
               } catch {}
             });
+            // Attach swipe gestures to each rendered section (inside iframe)
+            const attachSwipe = (contents: any) => {
+              try {
+                const doc = contents?.document as Document | undefined;
+                if (!doc) return;
+                let startX = 0, startY = 0, startT = 0;
+                const threshold = 50; // px
+                const restraintY = 40; // px vertical tolerance
+                const maxTime = 800; // ms
+                const onTouchStart = (e: TouchEvent) => {
+                  const t = e.changedTouches?.[0];
+                  if (!t) return;
+                  startX = t.clientX;
+                  startY = t.clientY;
+                  startT = Date.now();
+                };
+                const onTouchEnd = (e: TouchEvent) => {
+                  const t = e.changedTouches?.[0];
+                  if (!t) return;
+                  const dx = t.clientX - startX;
+                  const dy = t.clientY - startY;
+                  const dt = Date.now() - startT;
+                  if (dt <= maxTime && Math.abs(dy) <= restraintY && Math.abs(dx) >= threshold) {
+                    if (dx < 0) rendition.next(); else rendition.prev();
+                  }
+                };
+                doc.addEventListener('touchstart', onTouchStart, { passive: true });
+                doc.addEventListener('touchend', onTouchEnd, { passive: true });
+                // Clean up when section is unloaded
+                contents?.window?.addEventListener('unload', () => {
+                  try {
+                    doc.removeEventListener('touchstart', onTouchStart as any);
+                    doc.removeEventListener('touchend', onTouchEnd as any);
+                  } catch {}
+                });
+              } catch {}
+            };
+            // On each section render, attach swipe
+            rendition.on('rendered', (_section: any, contents: any) => attachSwipe(contents));
+            // Also attach to any currently loaded contents
+            try {
+              const current = (rendition as any).getContents?.();
+              const list = Array.isArray(current) ? current : (current ? [current] : []);
+              list.forEach((c: any) => attachSwipe(c));
+            } catch {}
             // Display immediately (saved CFI if available)
             let saved: string | null = null;
             try { saved = localStorage.getItem(`epubLoc:${epubId}`); } catch {}
