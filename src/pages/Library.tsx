@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,105 +11,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { setReadingPlan, getProgress, getReadingPlan, setDailyBaseline, setProgress, getDailyBaseline } from "@/lib/storage";
 import { toast } from "@/hooks/use-toast";
 import { formatISO } from "date-fns";
+import { resolveEpubSource } from "@/lib/utils";
+import ePub from "epubjs";
 
 type Paragraph = { type: string; content: string };
 type Chapter = { chapter_title: string; content: Paragraph[] };
 type Part = { part_title: string; chapters: Chapter[] };
 
 const Library = () => {
-  const Cover = ({ src, alt }: { src: string; alt: string }) => {
-    const [bg, setBg] = useState<string | undefined>(undefined);
-    const triedRef = useRef(false);
-
-    useEffect(() => {
-      if (!src || triedRef.current) return;
-      triedRef.current = true;
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.src = src;
-      img.onload = () => {
-        try {
-          const canvas = document.createElement("canvas");
-          const ctx = canvas.getContext("2d");
-          if (!ctx) return;
-          const w = 32, h = 32;
-          canvas.width = w;
-          canvas.height = h;
-          ctx.drawImage(img, 0, 0, w, h);
-          const { data } = ctx.getImageData(0, 0, w, h);
-          let r = 0, g = 0, b = 0, count = 0;
-          for (let i = 0; i < data.length; i += 4) {
-            const a = data[i + 3];
-            if (a < 128) continue; // ignore mostly transparent
-            r += data[i];
-            g += data[i + 1];
-            b += data[i + 2];
-            count++;
-          }
-          if (count) {
-            r = Math.round(r / count);
-            g = Math.round(g / count);
-            b = Math.round(b / count);
-            // Convert to HSL and darken lightness slightly
-            const toHsl = (R: number, G: number, B: number) => {
-              const r1 = R / 255, g1 = G / 255, b1 = B / 255;
-              const max = Math.max(r1, g1, b1), min = Math.min(r1, g1, b1);
-              let h = 0, s = 0;
-              const l = (max + min) / 2;
-              const d = max - min;
-              if (d !== 0) {
-                s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-                switch (max) {
-                  case r1: h = (g1 - b1) / d + (g1 < b1 ? 6 : 0); break;
-                  case g1: h = (b1 - r1) / d + 2; break;
-                  case b1: h = (r1 - g1) / d + 4; break;
-                }
-                h /= 6;
-              }
-              return { h, s, l };
-            };
-            const fromHsl = (h: number, s: number, l: number) => {
-              const hue2rgb = (p: number, q: number, t: number) => {
-                if (t < 0) t += 1;
-                if (t > 1) t -= 1;
-                if (t < 1/6) return p + (q - p) * 6 * t;
-                if (t < 1/2) return q;
-                if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
-                return p;
-              };
-              let r2: number, g2: number, b2: number;
-              if (s === 0) {
-                r2 = g2 = b2 = l; // achromatic
-              } else {
-                const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-                const p = 2 * l - q;
-                r2 = hue2rgb(p, q, h + 1/3);
-                g2 = hue2rgb(p, q, h);
-                b2 = hue2rgb(p, q, h - 1/3);
-              }
-              return {
-                r: Math.round(r2 * 255),
-                g: Math.round(g2 * 255),
-                b: Math.round(b2 * 255)
-              };
-            };
-            const { h, s, l } = toHsl(r, g, b);
-            const newL = Math.max(0.15, l - 0.07); // slightly darker
-            const rgb = fromHsl(h, s, newL);
-            setBg(`rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`);
-          }
-        } catch {
-          // Ignore CORS/canvas errors; fallback to default bg
-        }
-      };
-    }, [src]);
-
-    return (
-      <div className="overflow-hidden rounded-t-lg h-56 md:h-64 lg:h-72 bg-muted" style={bg ? { background: bg } : undefined}>
-        <img src={src} alt={alt} className="w-full h-full object-contain object-center" loading="lazy" />
-      </div>
-    );
-  };
+  const Cover = ({ src, alt }: { src: string; alt: string }) => (
+    <div className="overflow-hidden rounded-t-lg h-56 md:h-64 lg:h-72 bg-muted">
+      <img src={src} alt={alt} className="w-full h-full object-contain object-center" loading="lazy" />
+    </div>
+  );
   const [open, setOpen] = useState(false);
   const [selectedBook, setSelectedBook] = useState<string | null>(null);
   const [endDate, setEndDate] = useState<string>("");
@@ -119,6 +33,103 @@ const Library = () => {
   const [selectedIsEpub, setSelectedIsEpub] = useState<boolean>(false);
   const navigate = useNavigate();
   const today = new Date().toISOString().slice(0, 10);
+
+  // Lazy EPUB cover loader: extracts the cover image from the EPUB and caches as data URL
+  const EpubCoverLoader = ({ id, title, sourceUrl }: { id: string; title: string; sourceUrl: string }) => {
+    const [src, setSrc] = useState<string | null>(null);
+
+    useEffect(() => {
+      let cancelled = false;
+      const run = async () => {
+        try {
+          // Check localStorage cache first
+          const cached = localStorage.getItem(`epubCover:${id}`);
+          if (cached) { setSrc(cached); return; }
+
+          const url = resolveEpubSource(sourceUrl);
+          let ab: ArrayBuffer | null = null;
+          // Try Cache Storage for the EPUB file
+          try {
+            if ('caches' in window) {
+              const cache = await caches.open('epub-cache-v1');
+              const match = await cache.match(url);
+              if (match && match.ok) ab = await match.arrayBuffer();
+            }
+          } catch {}
+          if (!ab) {
+            const resp = await fetch(url);
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            try {
+              if ('caches' in window) {
+                const cache = await caches.open('epub-cache-v1');
+                await cache.put(url, resp.clone());
+              }
+            } catch {}
+            ab = await resp.arrayBuffer();
+          }
+          if (cancelled || !ab) return;
+          const book = ePub(ab);
+          await book.ready;
+          // Try epub.js coverUrl API first
+          let coverUrl: string | null = null;
+          try { coverUrl = await (book as any).coverUrl?.(); } catch {}
+          // Fallback: derive from metadata/manifest and extract blob
+          if (!coverUrl) {
+            let href: string | null = null;
+            try {
+              const metadata = await (book as any).loaded?.metadata;
+              href = metadata?.cover || null;
+            } catch {}
+            if (!href) {
+              try {
+                const manifest = await (book as any).loaded?.manifest;
+                if (manifest) {
+                  const items: any[] = Object.values(manifest);
+                  const item = items.find((it) => it?.properties?.includes?.('cover-image'))
+                    || items.find((it) => (it?.id || '').toLowerCase() === 'cover')
+                    || items.find((it) => (it?.href || '').toLowerCase().includes('cover'));
+                  href = item?.href || null;
+                }
+              } catch {}
+            }
+            if (href) {
+              try {
+                const blob = await (book as any).archive?.getBlob?.(href);
+                if (blob) coverUrl = URL.createObjectURL(blob);
+              } catch {}
+            }
+          }
+          // Convert to persistent data URL for reuse
+          if (coverUrl) {
+            try {
+              const blob = await (await fetch(coverUrl)).blob();
+              const reader = new FileReader();
+              reader.onloadend = () => {
+                const dataUrl = String(reader.result || '');
+                try { localStorage.setItem(`epubCover:${id}`, dataUrl); } catch {}
+                if (!cancelled) setSrc(dataUrl);
+                try { URL.revokeObjectURL(coverUrl!); } catch {}
+              };
+              reader.readAsDataURL(blob);
+            } catch {
+              if (!cancelled) setSrc(null);
+            }
+          }
+        } catch {
+          // Ignore failures; fallback to placeholder
+        }
+      };
+      run();
+      return () => { cancelled = true; };
+    }, [id, sourceUrl]);
+
+    return (
+      <Cover
+        src={src || "/placeholder.svg"}
+        alt={`Capa do livro ${title}`}
+      />
+    );
+  };
 
   const onChooseBook = async (bookId: string) => {
     setSelectedBook(bookId);
@@ -291,12 +302,14 @@ const Library = () => {
       <section className="grid md:grid-cols-2 gap-6">
         {BOOKS.map((book) => (
           <Card key={book.id} className="hover:shadow-lg transition-shadow">
-            {book.coverImage && (
-              <Cover
-                src={book.coverImage}
-                alt={`Capa do livro ${book.title}`}
-              />
-            )}
+            {book.type === 'epub'
+              ? (<EpubCoverLoader id={book.id} title={book.title} sourceUrl={book.sourceUrl} />)
+              : (book.coverImage && (
+                  <Cover
+                    src={book.coverImage}
+                    alt={`Capa do livro ${book.title}`}
+                  />
+                ))}
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 <span>{book.title}</span>
