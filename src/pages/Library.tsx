@@ -8,7 +8,7 @@ import { PageHeader } from "@/components/app/PageHeader";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { setReadingPlan, getProgress, getReadingPlan, setDailyBaseline, setProgress } from "@/lib/storage";
+import { setReadingPlan, getProgress, getReadingPlan, setDailyBaseline, setProgress, getDailyBaseline } from "@/lib/storage";
 import { toast } from "@/hooks/use-toast";
 import { formatISO } from "date-fns";
 
@@ -116,6 +116,7 @@ const Library = () => {
   const [currentPosition, setCurrentPosition] = useState<string>("0-0");
   const [targetChapter, setTargetChapter] = useState<string>("end");
   const [bookParts, setBookParts] = useState<Part[] | null>(null);
+  const [selectedIsEpub, setSelectedIsEpub] = useState<boolean>(false);
   const navigate = useNavigate();
   const today = new Date().toISOString().slice(0, 10);
 
@@ -136,20 +137,28 @@ const Library = () => {
     
     // Load book structure for chapter selection
     const book = BOOKS.find(b => b.id === bookId);
+    setSelectedIsEpub(book?.type === 'epub');
     if (book) {
-      try {
-        const cacheKey = `book:${bookId}`;
-        const cached = localStorage.getItem(cacheKey);
-        if (cached) {
-          setBookParts(JSON.parse(cached));
-        } else {
-          const response = await fetch(book.sourceUrl);
-          const data = await response.json();
-          setBookParts(data);
-          localStorage.setItem(cacheKey, JSON.stringify(data));
+      if (book.type === 'epub') {
+        // EPUB: no JSON structure; skip fetch and open dialog with date only
+        setBookParts(null);
+        setOpen(true);
+        return;
+      } else {
+        try {
+          const cacheKey = `book:${bookId}`;
+          const cached = localStorage.getItem(cacheKey);
+          if (cached) {
+            setBookParts(JSON.parse(cached));
+          } else {
+            const response = await fetch(book.sourceUrl);
+            const data = await response.json();
+            setBookParts(data);
+            localStorage.setItem(cacheKey, JSON.stringify(data));
+          }
+        } catch (error) {
+          console.error("Failed to load book:", error);
         }
-      } catch (error) {
-        console.error("Failed to load book:", error);
       }
     }
     
@@ -158,6 +167,37 @@ const Library = () => {
 
   const startReading = async (withPlan: boolean) => {
     if (!selectedBook) return;
+    const meta = BOOKS.find(b => b.id === selectedBook);
+    if (meta?.type === 'epub') {
+      if (withPlan) {
+        if (!endDate) {
+          toast({ title: "Selecione uma data", description: "Escolha uma data de término ou comece sem meta." });
+          return;
+        }
+        setReadingPlan(selectedBook, endDate);
+        // Persist plan start percent from current saved progress
+        try {
+          const prog = getProgress(selectedBook);
+          localStorage.setItem(
+            `planStart:${selectedBook}`,
+            JSON.stringify({ startPercent: prog?.percent || 0 })
+          );
+        } catch {}
+      } else {
+        setReadingPlan(selectedBook, null);
+        // Initialize baseline from current percent if missing
+        try {
+          const prog = getProgress(selectedBook);
+          const todayISO = formatISO(new Date(), { representation: "date" });
+          const existing = getDailyBaseline(selectedBook, todayISO);
+          if (!existing) setDailyBaseline(selectedBook, todayISO, { words: 0, percent: prog?.percent || 0 });
+        } catch {}
+      }
+      // For EPUBs, just navigate to the EPUB reader
+      setOpen(false);
+      navigate(`/epub/${selectedBook}`);
+      return;
+    }
     // Parse current position from selection
     let curPartIndex = 0;
     let curChapterIndex = 0;
@@ -266,7 +306,9 @@ const Library = () => {
             <CardContent>
               <p className="text-muted-foreground mb-4">{book.description}</p>
               <div className="flex items-center gap-2">
-                <Button onClick={() => navigate(`/leitor/${book.id}`)}>Continuar leitura</Button>
+                <Button onClick={() => navigate(book.type === 'epub' ? `/epub/${book.id}` : `/leitor/${book.id}`)}>
+                  Continuar leitura
+                </Button>
                 <Button variant="secondary" onClick={() => onChooseBook(book.id)}>Definir meta</Button>
               </div>
             </CardContent>
@@ -280,42 +322,46 @@ const Library = () => {
             <DialogTitle>Definir meta de término (opcional)</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div>
-              <label htmlFor="currentPosition" className="text-sm font-medium">Posição atual</label>
-              <Select value={currentPosition} onValueChange={setCurrentPosition}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione seu ponto atual" />
-                </SelectTrigger>
-                <SelectContent>
-                  {bookParts?.map((part, partIndex) =>
-                    part.chapters.map((chapter, chapterIndex) => (
-                      <SelectItem key={`cur-${partIndex}-${chapterIndex}`} value={`${partIndex}-${chapterIndex}`}>
-                        {part.part_title} - {chapter.chapter_title}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label htmlFor="targetChapter" className="text-sm font-medium">Meta de leitura</label>
-              <Select value={targetChapter} onValueChange={setTargetChapter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione até onde quer ler" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="end">Final do livro</SelectItem>
-                  {bookParts?.map((part, partIndex) =>
-                    part.chapters.map((chapter, chapterIndex) => (
-                      <SelectItem key={`${partIndex}-${chapterIndex}`} value={`${partIndex}-${chapterIndex}`}>
-                        {part.part_title} - {chapter.chapter_title}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-            
+            {!selectedIsEpub && (
+              <>
+                <div>
+                  <label htmlFor="currentPosition" className="text-sm font-medium">Posição atual</label>
+                  <Select value={currentPosition} onValueChange={setCurrentPosition}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione seu ponto atual" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {bookParts?.map((part, partIndex) =>
+                        part.chapters.map((chapter, chapterIndex) => (
+                          <SelectItem key={`cur-${partIndex}-${chapterIndex}`} value={`${partIndex}-${chapterIndex}`}>
+                            {part.part_title} - {chapter.chapter_title}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label htmlFor="targetChapter" className="text-sm font-medium">Meta de leitura</label>
+                  <Select value={targetChapter} onValueChange={setTargetChapter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione até onde quer ler" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="end">Final do livro</SelectItem>
+                      {bookParts?.map((part, partIndex) =>
+                        part.chapters.map((chapter, chapterIndex) => (
+                          <SelectItem key={`${partIndex}-${chapterIndex}`} value={`${partIndex}-${chapterIndex}`}>
+                            {part.part_title} - {chapter.chapter_title}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
+
             <div>
               <label htmlFor="endDate" className="text-sm font-medium">Data para concluir a leitura</label>
               <Input
@@ -328,7 +374,9 @@ const Library = () => {
             </div>
             
             <p className="text-xs text-muted-foreground">
-              Defina uma meta específica e uma data. Calcularemos uma meta diária a partir do seu ponto atual de leitura.
+              {selectedIsEpub
+                ? "Defina uma data para concluir o EPUB. Calcularemos metas diárias em porcentagem lida."
+                : "Defina uma meta específica e uma data. Calcularemos uma meta diária a partir do seu ponto atual de leitura."}
             </p>
           </div>
           <DialogFooter>

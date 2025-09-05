@@ -5,6 +5,7 @@ export type BookMeta = {
   sourceUrl: string;
   description: string;
   coverImage?: string;
+  type?: 'json' | 'epub';
 };
 
 // Import asset via Vite so the URL is correctly handled in build
@@ -21,7 +22,45 @@ export const BOOKS: BookMeta[] = [
     description:
       "Clássico atemporal que ensina a viver a devoção no cotidiano, escrito por São Francisco de Sales.",
     coverImage: filoteiaCover,
+    type: 'json',
   },
+  {
+    id: "imitacao-cristo",
+    title: "Imitação de Cristo",
+    author: "Tomás de Kempis",
+    sourceUrl: "/epubs/imitacao-cristo.epub",
+    description: "Um dos livros devocionais mais influentes do cristianismo.",
+    type: 'epub',
+  },
+  {
+    id: "confissoes-agostinho",
+    title: "Confissões",
+    author: "Santo Agostinho",
+    sourceUrl: "/epubs/confissoes-agostinho.epub",
+    description: "A jornada espiritual e intelectual de Santo Agostinho.",
+    type: 'epub',
+  },
+  // Exemplo de EPUB externo (Gutenberg). Em desenvolvimento, passamos por /proxy para evitar CORS.
+  // Em produção, prefira copiar o arquivo para /public/epubs e referenciar via path relativo.
+  // {
+  //   id: "gutenberg-1653",
+  //   title: "Exemplo Gutenberg 1653",
+  //   author: "Gutenberg",
+  //   sourceUrl: "https://www.gutenberg.org/ebooks/1653.epub3.images",
+  //   description: "Exemplo de EPUB servido externamente.",
+  //   type: 'epub',
+  // },
+  {
+    id: "imitacao-cristo-English",
+    title: "Imitation of Christ",
+    author: "Tomás de Kempis",
+    sourceUrl: "https://www.gutenberg.org/ebooks/1653.epub3.images",
+    description: "Um dos livros devocionais mais influentes do cristianismo.",
+    type: 'epub',
+  },
+
+
+  
 ];
 
 export const getBookById = (id: string) => BOOKS.find((b) => b.id === id);

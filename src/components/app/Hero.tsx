@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import hero from "@/assets/hero-devota.jpg";
 import { Button } from "@/components/ui/button";
+import { BOOKS } from "@/lib/books";
 
 
 export const Hero = () => {
@@ -38,7 +39,10 @@ export const Hero = () => {
       if (used) {
         setCtaLabel("Continuar");
         const last = ls.getItem('lastBookId');
-        if (last) setCtaHref(`/leitor/${last}`);
+        if (last) {
+          const meta = BOOKS.find(b => b.id === last);
+          setCtaHref(meta?.type === 'epub' ? `/epub/${last}` : `/leitor/${last}`);
+        }
       }
     } catch {}
   }, []);

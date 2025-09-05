@@ -26,6 +26,7 @@ const Index = () => {
   const [used, setUsed] = useState(false);
   const [activeBookId, setActiveBookId] = useState<string | null>(null);
   const [parts, setParts] = useState<Part[] | null>(null);
+  const [activeIsEpub, setActiveIsEpub] = useState(false);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -69,20 +70,26 @@ const Index = () => {
     if (!activeBookId) return;
     const meta = BOOKS.find(b => b.id === activeBookId);
     if (!meta) return;
-    const cacheKey = `book:${meta.id}`;
-    const cached = localStorage.getItem(cacheKey);
-    if (cached) {
-      try { setParts(JSON.parse(cached)); return; } catch {}
+    setActiveIsEpub(meta.type === 'epub');
+    if (meta.type === 'epub') {
+      setParts(null);
+      return;
+    } else {
+      const cacheKey = `book:${meta.id}`;
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        try { setParts(JSON.parse(cached)); return; } catch {}
+      }
+      setLoading(true);
+      fetch(meta.sourceUrl)
+        .then(r => r.json())
+        .then(json => {
+          localStorage.setItem(cacheKey, JSON.stringify(json));
+          setParts(json as Part[]);
+        })
+        .catch(() => setErr("Falha ao carregar o livro para estatísticas."))
+        .finally(() => setLoading(false));
     }
-    setLoading(true);
-    fetch(meta.sourceUrl)
-      .then(r => r.json())
-      .then(json => {
-        localStorage.setItem(cacheKey, JSON.stringify(json));
-        setParts(json as Part[]);
-      })
-      .catch(() => setErr("Falha ao carregar o livro para estatísticas."))
-      .finally(() => setLoading(false));
   }, [activeBookId]);
 
   // Compute plan progress and daily goal similar to Reader
@@ -90,12 +97,12 @@ const Index = () => {
   const p = useMemo(() => activeBookId ? getProgress(activeBookId) : { partIndex: 0, chapterIndex: 0, percent: 0 }, [activeBookId]);
   const totalWords = useMemo(() => computeTotalWords(parts), [parts]);
   const wordsUpToCurrent = useMemo(
-    () => computeWordsUpToPosition(parts, { partIndex: p.partIndex, chapterIndex: p.chapterIndex }),
-    [parts, p]
+    () => activeIsEpub ? 0 : computeWordsUpToPosition(parts, { partIndex: p.partIndex, chapterIndex: p.chapterIndex }),
+    [activeIsEpub, parts, p]
   );
   const targetWords = useMemo(
-    () => computeWordsUpToInclusiveTarget(parts, { targetPartIndex: plan.targetPartIndex, targetChapterIndex: plan.targetChapterIndex }, totalWords),
-    [parts, plan, totalWords]
+    () => activeIsEpub ? 0 : computeWordsUpToInclusiveTarget(parts, { targetPartIndex: plan.targetPartIndex, targetChapterIndex: plan.targetChapterIndex }, totalWords),
+    [activeIsEpub, parts, plan, totalWords]
   );
 
   // Load plan start to compute progress from start to target
@@ -111,35 +118,43 @@ const Index = () => {
   const todayISO = formatISO(new Date(), { representation: "date" });
   const [baselineWords, setBaselineWords] = useState<number | null>(null);
   useEffect(() => {
-    if (!activeBookId || !parts) return;
+    if (!activeBookId) return;
     const base = getDailyBaseline(activeBookId, todayISO);
     if (base) {
-      setBaselineWords(base.words);
+      setBaselineWords(activeIsEpub ? base.percent : base.words);
     } else {
       const entry = { words: wordsUpToCurrent, percent: p.percent };
       setDailyBaseline(activeBookId, todayISO, entry);
-      setBaselineWords(entry.words);
+      setBaselineWords(activeIsEpub ? entry.percent : entry.words);
     }
-  }, [activeBookId, parts, wordsUpToCurrent, p.percent, todayISO]);
+  }, [activeBookId, activeIsEpub, parts, wordsUpToCurrent, p.percent, todayISO]);
 
   const daysRemaining = useMemo(() => computeDaysRemaining(plan?.targetDateISO), [plan]);
+  // EPUB daily target uses percentage instead of words
   const dailyTargetWords = useMemo(
-    () => computeDailyTargetWords(targetWords, baselineWords, daysRemaining),
-    [targetWords, baselineWords, daysRemaining]
+    () => activeIsEpub ? (daysRemaining ? Math.ceil(Math.max(0, 100 - (baselineWords || 0)) / daysRemaining) : null) : computeDailyTargetWords(targetWords, baselineWords, daysRemaining),
+    [activeIsEpub, targetWords, baselineWords, daysRemaining]
   );
   const achievedWordsToday = useMemo(
-    () => computeAchievedWordsToday(wordsUpToCurrent, baselineWords),
-    [wordsUpToCurrent, baselineWords]
+    () => activeIsEpub ? Math.max(0, (p.percent || 0) - (baselineWords || 0)) : computeAchievedWordsToday(wordsUpToCurrent, baselineWords),
+    [activeIsEpub, p.percent, baselineWords, wordsUpToCurrent]
   );
   const dailyProgressPercent = useMemo(
     () => computeDailyProgressPercent(achievedWordsToday, dailyTargetWords),
     [achievedWordsToday, dailyTargetWords]
   );
-  const planProgressPercent = useMemo(
-    () => computePlanProgressPercent(parts, wordsUpToCurrent, targetWords, planStart),
-    [parts, wordsUpToCurrent, targetWords, planStart]
-  );
-  const totalBookProgressPercent = useMemo(() => parts ? Math.min(100, Math.round((wordsUpToCurrent / Math.max(1, totalWords)) * 100)) : null, [parts, wordsUpToCurrent, totalWords]);
+  const planProgressPercent = useMemo(() => {
+    if (activeIsEpub) {
+      // From plan start percent to 100% target
+      const rawStart = planStart?.startWords != null ? planStart.startWords : null; // for type narrowing only
+      const startPercent = (() => { try { const raw = localStorage.getItem(`planStart:${activeBookId}`); const j = raw ? JSON.parse(raw) : null; return j?.startPercent ?? 0; } catch { return 0; } })();
+      const denom = Math.max(1, 100 - startPercent);
+      const num = Math.max(0, (p.percent || 0) - startPercent);
+      return Math.min(100, Math.round((num / denom) * 100));
+    }
+    return computePlanProgressPercent(parts, wordsUpToCurrent, targetWords, planStart);
+  }, [activeIsEpub, parts, wordsUpToCurrent, targetWords, planStart, p.percent, activeBookId]);
+  const totalBookProgressPercent = useMemo(() => activeIsEpub ? (p.percent || 0) : (parts ? Math.min(100, Math.round((wordsUpToCurrent / Math.max(1, totalWords)) * 100)) : null), [activeIsEpub, parts, wordsUpToCurrent, totalWords, p.percent]);
 
   // Current reading position labels
   const currentPartTitle = useMemo(() => {
@@ -181,11 +196,11 @@ const Index = () => {
         {/* Meta diária (se houver) */}
         <div className="rounded-lg border p-4">
           <h3 className="text-lg font-semibold">Meta diária</h3>
-          {used && activeBookId && dailyProgressPercent != null ? (
+      {used && activeBookId && dailyProgressPercent != null ? (
             <>
               <Progress value={dailyProgressPercent} />
               <p className="text-sm text-muted-foreground mt-2">
-                {dailyProgressPercent}% — {achievedWordsToday}/{dailyTargetWords} palavras
+        {dailyProgressPercent}% — {achievedWordsToday}/{dailyTargetWords} {activeIsEpub ? "%" : "palavras"}
               </p>
             </>
           ) : (
@@ -196,13 +211,13 @@ const Index = () => {
         {/* Meta de leitura: mostra progresso da meta (se houver) */}
         <div className="rounded-lg border p-4">
           <h3 className="text-lg font-semibold">Meta de leitura</h3>
-          {used && activeBookId && plan?.targetDateISO && planProgressPercent != null ? (
+      {used && activeBookId && plan?.targetDateISO && planProgressPercent != null ? (
             <>
               <Progress value={planProgressPercent} />
               <p className="text-sm text-muted-foreground mt-2">Meta: {planProgressPercent}%
                 {daysRemaining ? ` • ${daysRemaining} dia(s) restantes` : ""}
               </p>
-              {parts && plan?.targetPartIndex != null && (
+        {!activeIsEpub && parts && plan?.targetPartIndex != null && (
                 <p className="text-sm text-muted-foreground mt-1">
                   {`${targetPartTitle ? `${targetPartTitle}` : ""}`}
                   <br />
@@ -221,10 +236,10 @@ const Index = () => {
           {used ? (
             <>
               <p className="text-muted-foreground text-sm">{activeBookId ? (BOOKS.find(b=>b.id===activeBookId)?.title || activeBookId) : "—"}</p>
-              {activeBookId && totalBookProgressPercent != null && (
+        {activeBookId && totalBookProgressPercent != null && (
                 <div className="mt-2">
                   <Progress value={totalBookProgressPercent} />
-                  <p className="text-sm text-muted-foreground mt-2">Livro: {totalBookProgressPercent}%</p>
+          <p className="text-sm text-muted-foreground mt-2">Livro: {totalBookProgressPercent}%</p>
                 </div>
               )}
             </>
@@ -240,7 +255,16 @@ const Index = () => {
         <div className="rounded-lg border p-4">
           <h3 className="text-lg font-semibold">Marcador do livro</h3>
           {used && activeBookId ? (
-            parts ? (
+            activeIsEpub ? (
+              <>
+                <p className="text-sm text-muted-foreground mt-1">{p.percent || 0}% lido</p>
+                <div className="mt-2">
+                  <Button asChild variant="link">
+                    <Link to={`/epub/${activeBookId}`}>Continuar leitura</Link>
+                  </Button>
+                </div>
+              </>
+            ) : parts ? (
               <>
                 <p className="text-sm text-muted-foreground mt-1">
                   {`${currentPartTitle ? `${currentPartTitle}` : ""}`}

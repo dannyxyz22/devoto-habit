@@ -9,6 +9,7 @@ import { InstallPWA } from "@/components/app/InstallPWA";
 import Index from "./pages/Index";
 import Library from "./pages/Library";
 import Reader from "./pages/Reader";
+import EpubReader from "./pages/EpubReader";
 import Stats from "./pages/Stats";
 import NotFound from "./pages/NotFound";
 import { ThemeProvider } from "next-themes";
@@ -34,6 +35,7 @@ const App = () => {
             <Route path="/" element={<Index />} />
             <Route path="/biblioteca" element={<Library />} />
             <Route path="/leitor/:bookId" element={<Reader />} />
+            <Route path="/epub/:epubId" element={<EpubReader />} />
             <Route path="/estatisticas" element={<Stats />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
