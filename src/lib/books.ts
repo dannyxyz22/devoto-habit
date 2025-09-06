@@ -40,6 +40,14 @@ export const BOOKS: BookMeta[] = [
     description: "A jornada espiritual e intelectual de Santo Agostinho.",
     type: 'epub',
   },
+  {
+    id: "compendio-cic",
+    title: "Compêndio do Catecismo da Igreja Católica",
+    author: "Igreja Católica",
+    sourceUrl: "/epubs/compendio-cic-pt20210324-114206.epub",
+    description: "Síntese oficial da fé católica em formato de perguntas e respostas.",
+    type: 'epub',
+  },
   // Exemplo de EPUB externo (Gutenberg). Em desenvolvimento, passamos por /proxy para evitar CORS.
   // Em produção, prefira copiar o arquivo para /public/epubs e referenciar via path relativo.
   // {
