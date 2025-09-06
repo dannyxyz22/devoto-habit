@@ -17,6 +17,45 @@ const EpubReader = () => {
   useEffect(() => {
     const container = viewerRef.current;
     if (!container || !epubId) return;
+    const getVar = (name: string, fallback: string) => {
+      try {
+        const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+        return v ? `hsl(${v})` : fallback;
+      } catch { return fallback; }
+    };
+    const isDarkMode = () => {
+      try {
+        return document.documentElement.classList.contains('dark') || window.matchMedia?.('(prefers-color-scheme: dark)')?.matches;
+      } catch { return false; }
+    };
+    const applyEpubTheme = () => {
+      try {
+        const rend = renditionRef.current as any;
+        if (!rend) return;
+        const themes = rend.themes;
+        const bgLight = getVar('--background', '#ffffff');
+        const fgLight = getVar('--foreground', '#111111');
+        const linkLight = getVar('--primary', '#1d4ed8');
+        const bgDark = getVar('--background', '#0b0b0b');
+        const fgDark = getVar('--foreground', '#f5f5f5');
+        const linkDark = getVar('--primary', '#60a5fa');
+        themes.register('light', {
+          'html, body': { background: bgLight + ' !important', color: fgLight + ' !important' },
+          'a, a:visited': { color: linkLight + ' !important' },
+          'p, div, span, li': { color: fgLight + ' !important' },
+        });
+        themes.register('dark', {
+          'html, body': { background: bgDark + ' !important', color: fgDark + ' !important' },
+          'a, a:visited': { color: linkDark + ' !important' },
+          'p, div, span, li': { color: fgDark + ' !important' },
+          'img': { filter: 'none' },
+        });
+        const dark = isDarkMode();
+        themes.select(dark ? 'dark' : 'light');
+        // Match container bg too
+        try { container.style.background = (dark ? bgDark : bgLight); } catch {}
+      } catch {}
+    };
     try { localStorage.setItem('lastBookId', epubId); } catch {}
     const meta = BOOKS.find(b => b.id === epubId);
     const src = meta?.sourceUrl || `/epubs/${epubId}.epub`;
@@ -51,8 +90,11 @@ const EpubReader = () => {
         }
         if (cancelled) return;
         const book = ePub(ab);
-        const rendition = book.renderTo(container, { width: "100%", height: "100%", spread: "none" });
+  const rendition = book.renderTo(container, { width: "100%", height: "100%", spread: "none" });
         renditionRef.current = rendition;
+  // Apply theme initially and on each render
+  applyEpubTheme();
+  rendition.on('rendered', () => applyEpubTheme());
         const todayISO = formatISO(new Date(), { representation: "date" });
     book.ready
   .then(async () => {
@@ -161,6 +203,27 @@ const EpubReader = () => {
 
     return () => { cancelled = true; try { renditionRef.current?.destroy(); } catch {} };
   }, [epubId]);
+
+  // Watch for dark mode changes and re-apply theme
+  useEffect(() => {
+    const target = document.documentElement;
+    let mo: MutationObserver | null = null;
+    try {
+      mo = new MutationObserver(() => {
+        try { (renditionRef.current as any)?.themes && (renditionRef.current as any).themes.select(target.classList.contains('dark') ? 'dark' : 'light'); } catch {}
+      });
+      mo.observe(target, { attributes: true, attributeFilter: ['class'] });
+    } catch {}
+    const mq = window.matchMedia?.('(prefers-color-scheme: dark)');
+    const onMq = () => {
+      try { (renditionRef.current as any)?.themes && (renditionRef.current as any).themes.select(target.classList.contains('dark') || mq.matches ? 'dark' : 'light'); } catch {}
+    };
+    try { mq?.addEventListener?.('change', onMq); } catch {}
+    return () => {
+      try { mo?.disconnect(); } catch {}
+      try { mq?.removeEventListener?.('change', onMq); } catch {}
+    };
+  }, []);
 
   return (
     <main className="container mx-auto py-4">
