@@ -54,30 +54,45 @@ const EpubReader = () => {
         const rendition = book.renderTo(container, { width: "100%", height: "100%", spread: "none" });
         renditionRef.current = rendition;
         const todayISO = formatISO(new Date(), { representation: "date" });
-        book.ready
-          .then(async () => {
-            // Attach relocation listener immediately
-            rendition.on("relocated", (location: any) => {
-              try {
-                const cfi = location?.start?.cfi;
-                if (cfi) {
-                  try { localStorage.setItem(`epubLoc:${epubId}`, cfi); } catch {}
-                }
-                let percent = 0;
-                try {
-                  const p = book.locations.percentageFromCfi(cfi);
-                  if (typeof p === "number" && !isNaN(p)) percent = Math.round(p * 100);
-                } catch {}
-                if (!percent) {
-                  const p2 = location?.start?.displayed?.percentage;
-                  if (typeof p2 === "number" && !isNaN(p2)) percent = Math.round(p2 * 100);
-                }
-                setProgress(epubId, { partIndex: 0, chapterIndex: 0, percent });
-                const base = getDailyBaseline(epubId, todayISO);
-                if (!base) setDailyBaseline(epubId, todayISO, { words: 0, percent });
-              } catch {}
-            });
-            // Attach swipe gestures to each rendered section (inside iframe)
+    book.ready
+  .then(async () => {
+    // Listener de mudança de posição
+    rendition.on("relocated", (location: any) => {
+      try {
+        const cfi = location?.start?.cfi;
+        if (cfi) {
+          try { localStorage.setItem(`epubLoc:${epubId}`, cfi); } catch {}
+        }
+
+        let percent = 0;
+
+        // Tenta pelas locations (se já existirem)
+        try {
+          if (book.locations.length) {
+            const p = book.locations.percentageFromCfi(cfi);
+            if (typeof p === "number" && !isNaN(p)) {
+              percent = Math.round(p * 100);
+            }
+          }
+        } catch {}
+
+        // Fallback: usa displayed.percentage até que locations fiquem prontas
+        if (!percent) {
+          const p2 = location?.start?.displayed?.percentage;
+          if (typeof p2 === "number" && !isNaN(p2)) {
+            percent = Math.round(p2 * 100);
+          }
+        }
+
+        setProgress(epubId, { partIndex: 0, chapterIndex: 0, percent });
+
+        const base = getDailyBaseline(epubId, todayISO);
+        if (!base) {
+          setDailyBaseline(epubId, todayISO, { words: 0, percent });
+        }
+      } catch {}
+    });
+    // Attach swipe gestures to each rendered section (inside iframe)
             const attachSwipe = (contents: any) => {
               try {
                 const doc = contents?.document as Document | undefined;
@@ -114,24 +129,30 @@ const EpubReader = () => {
                 });
               } catch {}
             };
-            // On each section render, attach swipe
-            rendition.on('rendered', (_section: any, contents: any) => attachSwipe(contents));
-            // Also attach to any currently loaded contents
-            try {
-              const current = (rendition as any).getContents?.();
-              const list = Array.isArray(current) ? current : (current ? [current] : []);
-              list.forEach((c: any) => attachSwipe(c));
-            } catch {}
-            // Display immediately (saved CFI if available)
-            let saved: string | null = null;
-            try { saved = localStorage.getItem(`epubLoc:${epubId}`); } catch {}
-            try { if (saved) return rendition.display(saved); } catch {}
-            const disp = rendition.display();
-            // Generate locations in background with lower granularity for speed
-            try { void book.locations.generate(500); } catch {}
-            return disp;
-          })
-          .catch(() => setErr("Falha ao carregar o EPUB."));
+
+    // Ativa swipe gestures normalmente
+    rendition.on('rendered', (_section: any, contents: any) => attachSwipe(contents));
+    try {
+      const current = (rendition as any).getContents?.();
+      const list = Array.isArray(current) ? current : (current ? [current] : []);
+      list.forEach((c: any) => attachSwipe(c));
+    } catch {}
+
+    // Exibe a posição salva (ou início)
+    let saved: string | null = null;
+    try { saved = localStorage.getItem(`epubLoc:${epubId}`); } catch {}
+    rendition.display(saved || undefined);
+
+    // ⚡ Gera locations em segundo plano (não trava exibição inicial)
+    try {
+      book.locations.generate(500).then(() => {
+        // força um relocated para recalcular percentuais com base nas novas locations
+        try { rendition.currentLocation() && rendition.emit("relocated", rendition.currentLocation()); } catch {}
+      });
+    } catch {}
+  })
+  .catch(() => setErr("Falha ao carregar o EPUB."));
+
       } catch (e) {
         if (!cancelled) setErr("Falha ao baixar o EPUB pelo proxy.");
       }
