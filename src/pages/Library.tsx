@@ -13,6 +13,7 @@ import { toast } from "@/hooks/use-toast";
 import { formatISO } from "date-fns";
 import { resolveEpubSource } from "@/lib/utils";
 import ePub from "epubjs";
+import { getCoverObjectUrl, saveCoverBlob } from "@/lib/coverCache";
 
 type Paragraph = { type: string; content: string };
 type Chapter = { chapter_title: string; content: Paragraph[] };
@@ -34,7 +35,7 @@ const Library = () => {
   const navigate = useNavigate();
   const today = new Date().toISOString().slice(0, 10);
 
-  // Lazy EPUB cover loader: extracts the cover image from the EPUB and caches as data URL
+  // Lazy EPUB cover loader: extracts the cover image from the EPUB and caches as Blob in Cache Storage
   const EpubCoverLoader = ({ id, title, sourceUrl }: { id: string; title: string; sourceUrl: string }) => {
     const [src, setSrc] = useState<string | null>(null);
 
@@ -42,9 +43,9 @@ const Library = () => {
       let cancelled = false;
       const run = async () => {
         try {
-          // Check localStorage cache first
-          const cached = localStorage.getItem(`epubCover:${id}`);
-          if (cached) { setSrc(cached); return; }
+          // Try Cache Storage first
+          const cachedUrl = await getCoverObjectUrl(id);
+          if (cachedUrl) { setSrc(cachedUrl); return; }
 
           const url = resolveEpubSource(sourceUrl);
           let ab: ArrayBuffer | null = null;
@@ -99,18 +100,16 @@ const Library = () => {
               } catch {}
             }
           }
-          // Convert to persistent data URL for reuse
+          // Cache the cover blob for reuse
           if (coverUrl) {
             try {
               const blob = await (await fetch(coverUrl)).blob();
-              const reader = new FileReader();
-              reader.onloadend = () => {
-                const dataUrl = String(reader.result || '');
-                try { localStorage.setItem(`epubCover:${id}`, dataUrl); } catch {}
-                if (!cancelled) setSrc(dataUrl);
-                try { URL.revokeObjectURL(coverUrl!); } catch {}
-              };
-              reader.readAsDataURL(blob);
+              await saveCoverBlob(id, blob);
+              if (!cancelled) {
+                const objUrl = URL.createObjectURL(blob);
+                setSrc(objUrl);
+              }
+              try { URL.revokeObjectURL(coverUrl!); } catch {}
             } catch {
               if (!cancelled) setSrc(null);
             }
