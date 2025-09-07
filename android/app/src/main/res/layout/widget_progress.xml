@@ -3,39 +3,87 @@
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/progress_widget"
-    android:padding="8dp">
+    android:padding="0dp">
 
-    <TextView
-        android:id="@+id/widget_title"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Meta diária"
-        android:textStyle="bold"
-        android:textColor="#FFFFFF"
-        android:textSize="12sp"
-        android:layout_alignParentTop="true"
-        android:layout_alignParentStart="true"/>
-
-    <ProgressBar
-        style="@android:style/Widget.ProgressBar.Horizontal"
-        android:id="@+id/widget_progress_bar"
+    <!-- Background image layer (populated from assets via RemoteViews) -->
+    <ImageView
+        android:id="@+id/widget_bg"
         android:layout_width="match_parent"
-        android:layout_height="10dp"
-        android:layout_centerInParent="true"
-        android:max="100"
-        android:progress="0"
-        android:progressDrawable="@android:drawable/progress_horizontal"
-        android:indeterminate="false"/>
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:contentDescription="@string/app_name"
+        android:alpha="0.98" />
 
-    <TextView
-        android:id="@+id/widget_progress_text"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:textColor="#FFFFFF"
-        android:textSize="12sp"
-        android:text="0%"
-        android:layout_alignParentBottom="true"
-        android:layout_alignParentEnd="true"/>
+    <!-- Foreground content container with padding -->
+    <RelativeLayout
+        android:id="@+id/widget_content"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:padding="8dp">
+
+        <!-- Anchor at the exact center to align other views relative to it (use allowed class) -->
+        <FrameLayout
+            android:id="@+id/center_anchor"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_centerInParent="true" />
+
+        <TextView
+            android:id="@+id/widget_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Meta diária"
+            android:textStyle="bold"
+            android:textColor="#C78D26"
+            android:textSize="12sp"
+            android:layout_alignParentTop="true"
+            android:layout_centerHorizontal="true"/>
+
+    <!-- Progress container; top padding set from code to place bar at 75% height -->
+        <RelativeLayout
+            android:id="@+id/progress_container"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <ProgressBar
+                style="@android:style/Widget.ProgressBar.Horizontal"
+                android:id="@+id/widget_progress_bar"
+                android:layout_width="match_parent"
+                android:layout_height="10dp"
+                android:layout_alignParentTop="true"
+                android:max="100"
+                android:progress="0"
+                android:progressDrawable="@android:drawable/progress_horizontal"
+                android:indeterminate="false"/>
+        </RelativeLayout>
+
+        <!-- Container to allow programmatic positioning (percent-based) of the progress text -->
+        <RelativeLayout
+            android:id="@+id/progress_text_container"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <TextView
+                android:id="@+id/widget_progress_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#C78D26"
+                android:textSize="28sp"
+                android:text="0%"
+                android:layout_alignParentTop="true"
+                android:layout_alignParentStart="true"/>
+        </RelativeLayout>
+
+        <!-- Centered text shown only when there's no goal defined -->
+        <TextView
+            android:id="@+id/widget_progress_text_center"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#000000"
+            android:textSize="24sp"
+            android:text="Sem meta"
+            android:layout_centerInParent="true"
+            android:visibility="gone"/>
+    </RelativeLayout>
 
 </RelativeLayout>
