@@ -1,4 +1,7 @@
 import Hero from "@/components/app/Hero";
+import { updateDailyProgressWidget } from "@/main";
+import { Capacitor } from "@capacitor/core";
+import { WidgetUpdater, canUseNative } from "@/lib/widgetUpdater";
 import { SEO } from "@/components/app/SEO";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -183,6 +186,20 @@ const Index = () => {
 
   const stats = useMemo(() => getStats(), []);
   const minutesToday = stats.minutesByDate[todayISO] || 0;
+
+  // Push widget update when progress/goal changes (native only)
+  useEffect(() => {
+  const isNative = canUseNative();
+  if (!isNative) return;
+    const percent = Math.max(0, Math.min(100, Math.round(dailyProgressPercent || 0)));
+    const hasGoal = dailyTargetWords != null && dailyTargetWords > 0;
+    (async () => {
+      try {
+        await updateDailyProgressWidget(percent, hasGoal);
+    await WidgetUpdater.update?.();
+      } catch {}
+    })();
+  }, [dailyProgressPercent, dailyTargetWords]);
 
   return (
     <main>

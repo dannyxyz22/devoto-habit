@@ -8,6 +8,9 @@ import confetti from "canvas-confetti";
 import { getBookById } from "@/lib/books";
 import { SEO } from "@/components/app/SEO";
 import { differenceInCalendarDays, formatISO, parseISO } from "date-fns";
+import { Capacitor } from "@capacitor/core";
+import { updateDailyProgressWidget } from "@/main";
+import { WidgetUpdater, canUseNative } from "@/lib/widgetUpdater";
 import { useTheme } from "next-themes";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Sun, Moon, Monitor, AlignLeft, AlignJustify, Settings } from "lucide-react";
@@ -203,6 +206,29 @@ const Reader = () => {
     () => computePlanProgressPercent(parts, wordsUpToCurrent, targetWords, planStart),
     [parts, wordsUpToCurrent, targetWords, planStart]
   );
+
+  // Update Android widget when daily progress changes
+  useEffect(() => {
+    const isNative = canUseNative();
+    if (!isNative) return;
+    const percent = Math.max(0, Math.min(100, Math.round(dailyProgressPercent || 0)));
+    const hasGoal = dailyTargetWords != null && dailyTargetWords > 0;
+
+    console.log("[Widget] preparando update:", { percent, hasGoal });
+
+    (async () => {
+      try {
+        await updateDailyProgressWidget(percent, hasGoal);
+         console.log("[Widget] Preferences set OK");
+        // Trigger native refresh
+  await WidgetUpdater.update?.();
+   console.log("[Widget] Plugin update invoked");
+      } catch (err) {
+      console.error("[Widget] erro ao atualizar widget:", err);
+    }
+    })();
+
+  }, [dailyProgressPercent, dailyTargetWords]);
   
   // Check if daily goal was just completed and auto-mark reading
   const [wasGoalCompleted, setWasGoalCompleted] = useState(false);

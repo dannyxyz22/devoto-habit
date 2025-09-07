@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/progress_widget"
+    android:padding="8dp">
+
+    <TextView
+        android:id="@+id/widget_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Meta diária"
+        android:textStyle="bold"
+        android:textColor="#FFFFFF"
+        android:textSize="12sp"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentStart="true"/>
+
+    <ProgressBar
+        style="@android:style/Widget.ProgressBar.Horizontal"
+        android:id="@+id/widget_progress_bar"
+        android:layout_width="match_parent"
+        android:layout_height="10dp"
+        android:layout_centerInParent="true"
+        android:max="100"
+        android:progress="0"
+        android:progressDrawable="@android:drawable/progress_horizontal"
+        android:indeterminate="false"/>
+
+    <TextView
+        android:id="@+id/widget_progress_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="#FFFFFF"
+        android:textSize="12sp"
+        android:text="0%"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentEnd="true"/>
+
+</RelativeLayout>

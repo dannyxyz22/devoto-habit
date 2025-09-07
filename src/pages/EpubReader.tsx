@@ -6,6 +6,8 @@ import ePub, { Rendition } from "epubjs";
 import { BOOKS } from "@/lib/books";
 import { resolveEpubSource } from "@/lib/utils";
 import { getDailyBaseline, setDailyBaseline, setProgress } from "@/lib/storage";
+import { updateDailyProgressWidget } from "@/main";
+import { WidgetUpdater, canUseNative } from "@/lib/widgetUpdater";
 import { formatISO } from "date-fns";
 
 const EpubReader = () => {
@@ -127,6 +129,15 @@ const EpubReader = () => {
         }
 
         setProgress(epubId, { partIndex: 0, chapterIndex: 0, percent });
+        // Update widget if on native
+        (async () => {
+          try {
+            if (canUseNative()) {
+              await updateDailyProgressWidget(percent, true);
+              await WidgetUpdater.update?.();
+            }
+          } catch {}
+        })();
 
         const base = getDailyBaseline(epubId, todayISO);
         if (!base) {
