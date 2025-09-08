@@ -119,28 +119,33 @@ const Index = () => {
 
   const remainingWords = Math.max(0, targetWords - wordsUpToCurrent);
   const todayISO = formatISO(new Date(), { representation: "date" });
-  const [baselineWords, setBaselineWords] = useState<number | null>(null);
+  // Derive today's baseline synchronously to avoid transient old percent after day change
+  const baselineForToday = useMemo(() => {
+    if (!activeBookId) return activeIsEpub ? (p.percent || 0) : wordsUpToCurrent;
+    const base = getDailyBaseline(activeBookId, todayISO);
+    if (base) return activeIsEpub ? base.percent : base.words;
+    return activeIsEpub ? (p.percent || 0) : wordsUpToCurrent;
+  }, [activeBookId, activeIsEpub, todayISO, wordsUpToCurrent, p.percent]);
+  // Persist baseline if missing
   useEffect(() => {
     if (!activeBookId) return;
     const base = getDailyBaseline(activeBookId, todayISO);
-    if (base) {
-      setBaselineWords(activeIsEpub ? base.percent : base.words);
-    } else {
-      const entry = { words: wordsUpToCurrent, percent: p.percent };
-      setDailyBaseline(activeBookId, todayISO, entry);
-      setBaselineWords(activeIsEpub ? entry.percent : entry.words);
+    if (!base) {
+      setDailyBaseline(activeBookId, todayISO, { words: wordsUpToCurrent, percent: p.percent });
     }
-  }, [activeBookId, activeIsEpub, parts, wordsUpToCurrent, p.percent, todayISO]);
+  }, [activeBookId, todayISO, wordsUpToCurrent, p.percent]);
 
   const daysRemaining = useMemo(() => computeDaysRemaining(plan?.targetDateISO), [plan]);
   // EPUB daily target uses percentage instead of words
   const dailyTargetWords = useMemo(
-    () => activeIsEpub ? (daysRemaining ? Math.ceil(Math.max(0, 100 - (baselineWords || 0)) / daysRemaining) : null) : computeDailyTargetWords(targetWords, baselineWords, daysRemaining),
-    [activeIsEpub, targetWords, baselineWords, daysRemaining]
+    () => activeIsEpub
+      ? (daysRemaining ? Math.ceil(Math.max(0, 100 - (baselineForToday || 0)) / daysRemaining) : null)
+      : computeDailyTargetWords(targetWords, baselineForToday, daysRemaining),
+    [activeIsEpub, targetWords, baselineForToday, daysRemaining]
   );
   const achievedWordsToday = useMemo(
-    () => activeIsEpub ? Math.max(0, (p.percent || 0) - (baselineWords || 0)) : computeAchievedWordsToday(wordsUpToCurrent, baselineWords),
-    [activeIsEpub, p.percent, baselineWords, wordsUpToCurrent]
+    () => activeIsEpub ? Math.max(0, (p.percent || 0) - (baselineForToday || 0)) : computeAchievedWordsToday(wordsUpToCurrent, baselineForToday),
+    [activeIsEpub, p.percent, baselineForToday, wordsUpToCurrent]
   );
   const dailyProgressPercent = useMemo(
     () => computeDailyProgressPercent(achievedWordsToday, dailyTargetWords),

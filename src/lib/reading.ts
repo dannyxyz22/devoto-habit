@@ -113,3 +113,24 @@ export const computeDailyProgressPercent = (
   achievedWordsToday: number,
   dailyTargetWords: number | null
 ): number | null => (dailyTargetWords ? Math.min(100, Math.round((achievedWordsToday / dailyTargetWords) * 100)) : null);
+
+// Helpers to derive today's baseline synchronously (useful for rollover tests)
+export const deriveBaselineWords = (baseline: { words: number } | null, wordsUpToCurrent: number): number =>
+  baseline ? baseline.words : wordsUpToCurrent;
+
+export const deriveBaselinePercent = (baseline: { percent: number } | null, currentPercent: number): number =>
+  baseline ? baseline.percent : currentPercent;
+
+// EPUB daily helpers (percent-based)
+export const computeEpubDailyTargetPercent = (
+  baselinePercent: number | null,
+  daysRemaining: number | null
+): number | null => {
+  if (baselinePercent == null || daysRemaining == null) return null;
+  return Math.ceil(Math.max(0, 100 - baselinePercent) / daysRemaining);
+};
+
+export const computeEpubAchievedPercentToday = (
+  currentPercent: number,
+  baselinePercent: number | null
+): number => (baselinePercent != null ? Math.max(0, currentPercent - baselinePercent) : 0);

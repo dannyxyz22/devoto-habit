@@ -5,10 +5,11 @@ import { SEO } from "@/components/app/SEO";
 import ePub, { Rendition } from "epubjs";
 import { BOOKS } from "@/lib/books";
 import { resolveEpubSource } from "@/lib/utils";
-import { getDailyBaseline, setDailyBaseline, setProgress } from "@/lib/storage";
+import { getDailyBaseline, setDailyBaseline, setProgress, getReadingPlan } from "@/lib/storage";
 import { updateDailyProgressWidget } from "@/main";
 import { WidgetUpdater, canUseNative } from "@/lib/widgetUpdater";
 import { formatISO } from "date-fns";
+import { computeDaysRemaining, computeDailyProgressPercent } from "@/lib/reading";
 
 const EpubReader = () => {
   const { epubId = "" } = useParams();
@@ -129,20 +130,31 @@ const EpubReader = () => {
         }
 
         setProgress(epubId, { partIndex: 0, chapterIndex: 0, percent });
-        // Update widget if on native
+
+        // Ensure today's baseline exists (based on percent) and compute daily goal percent
+        const base = getDailyBaseline(epubId, todayISO);
+        const baselinePercent = base ? base.percent : percent;
+        if (!base) {
+          setDailyBaseline(epubId, todayISO, { words: 0, percent: baselinePercent });
+        }
+
+        // Compute days remaining from the EPUB reading plan (if any)
+        const plan = getReadingPlan(epubId);
+        const daysRemaining = computeDaysRemaining(plan?.targetDateISO);
+        const dailyTargetPercent = daysRemaining ? Math.ceil(Math.max(0, 100 - baselinePercent) / daysRemaining) : null;
+        const achievedPercentToday = Math.max(0, percent - baselinePercent);
+        const dailyProgressPercent = computeDailyProgressPercent(achievedPercentToday, dailyTargetPercent) ?? 0;
+
+        // Update widget if on native, using DAILY percent (not book percent)
         (async () => {
           try {
             if (canUseNative()) {
-              await updateDailyProgressWidget(percent, true);
+              const hasGoal = dailyTargetPercent != null && dailyTargetPercent > 0;
+              await updateDailyProgressWidget(dailyProgressPercent, hasGoal);
               await WidgetUpdater.update?.();
             }
           } catch {}
         })();
-
-        const base = getDailyBaseline(epubId, todayISO);
-        if (!base) {
-          setDailyBaseline(epubId, todayISO, { words: 0, percent });
-        }
       } catch {}
     });
     // Attach swipe gestures to each rendered section (inside iframe)

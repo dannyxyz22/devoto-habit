@@ -174,28 +174,27 @@ const Reader = () => {
   }, [bookId]);
 
   const todayISO = formatISO(new Date(), { representation: "date" });
-  const [baselineWords, setBaselineWords] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (!parts) return;
+  // Derive today's baseline synchronously to prevent a transient stale percent after day change
+  const baselineForToday = useMemo(() => {
     const base = getDailyBaseline(bookId, todayISO);
-    if (base) {
-      setBaselineWords(base.words);
-    } else {
-      const entry = { words: wordsUpToCurrent, percent: p.percent };
-      setDailyBaseline(bookId, todayISO, entry);
-      setBaselineWords(entry.words);
+    return base ? base.words : wordsUpToCurrent;
+  }, [bookId, todayISO, wordsUpToCurrent]);
+  // Persist baseline if missing (side-effect, no UI dependency)
+  useEffect(() => {
+    const base = getDailyBaseline(bookId, todayISO);
+    if (!base) {
+      setDailyBaseline(bookId, todayISO, { words: wordsUpToCurrent, percent: p.percent });
     }
-  }, [parts, wordsUpToCurrent, bookId, todayISO, p.percent]);
+  }, [bookId, todayISO, wordsUpToCurrent, p.percent]);
 
   const daysRemaining = useMemo(() => computeDaysRemaining(plan?.targetDateISO), [plan]);
   const dailyTargetWords = useMemo(
-    () => computeDailyTargetWords(targetWords, baselineWords, daysRemaining),
-    [targetWords, baselineWords, daysRemaining]
+    () => computeDailyTargetWords(targetWords, baselineForToday, daysRemaining),
+    [targetWords, baselineForToday, daysRemaining]
   );
   const achievedWordsToday = useMemo(
-    () => computeAchievedWordsToday(wordsUpToCurrent, baselineWords),
-    [wordsUpToCurrent, baselineWords]
+    () => computeAchievedWordsToday(wordsUpToCurrent, baselineForToday),
+    [wordsUpToCurrent, baselineForToday]
   );
   const dailyProgressPercent = useMemo(
     () => computeDailyProgressPercent(achievedWordsToday, dailyTargetWords),
