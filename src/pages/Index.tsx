@@ -9,6 +9,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Progress } from "@/components/ui/progress";
 import { BOOKS } from "@/lib/books";
 import { differenceInCalendarDays, formatISO, parseISO } from "date-fns";
+import { useTodayISO } from "@/hooks/use-today";
 import { getStreak, getReadingPlan, getProgress, getDailyBaseline, setDailyBaseline, getStats, type Streak } from "@/lib/storage";
 import {
   type Part,
@@ -118,7 +119,7 @@ const Index = () => {
   }, [activeBookId]);
 
   const remainingWords = Math.max(0, targetWords - wordsUpToCurrent);
-  const todayISO = formatISO(new Date(), { representation: "date" });
+  const todayISO = useTodayISO();
   // Derive today's baseline synchronously to avoid transient old percent after day change
   const baselineForToday = useMemo(() => {
     if (!activeBookId) return activeIsEpub ? (p.percent || 0) : wordsUpToCurrent;

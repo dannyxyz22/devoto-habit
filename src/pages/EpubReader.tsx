@@ -8,7 +8,7 @@ import { resolveEpubSource } from "@/lib/utils";
 import { getDailyBaseline, setDailyBaseline, setProgress, getReadingPlan } from "@/lib/storage";
 import { updateDailyProgressWidget } from "@/main";
 import { WidgetUpdater, canUseNative } from "@/lib/widgetUpdater";
-import { formatISO } from "date-fns";
+import { format } from "date-fns";
 import { computeDaysRemaining, computeDailyProgressPercent } from "@/lib/reading";
 
 const EpubReader = () => {
@@ -98,12 +98,13 @@ const EpubReader = () => {
   // Apply theme initially and on each render
   applyEpubTheme();
   rendition.on('rendered', () => applyEpubTheme());
-        const todayISO = formatISO(new Date(), { representation: "date" });
     book.ready
   .then(async () => {
     // Listener de mudança de posição
     rendition.on("relocated", (location: any) => {
       try {
+  // Compute today's local date on each relocation to catch system date changes
+  const todayISO = format(new Date(), 'yyyy-MM-dd');
         const cfi = location?.start?.cfi;
         if (cfi) {
           try { localStorage.setItem(`epubLoc:${epubId}`, cfi); } catch {}

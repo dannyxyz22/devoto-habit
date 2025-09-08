@@ -7,7 +7,8 @@ import { toast } from "@/hooks/use-toast";
 import confetti from "canvas-confetti";
 import { getBookById } from "@/lib/books";
 import { SEO } from "@/components/app/SEO";
-import { differenceInCalendarDays, formatISO, parseISO } from "date-fns";
+import { differenceInCalendarDays, format, parseISO } from "date-fns";
+import { useTodayISO } from "@/hooks/use-today";
 import { Capacitor } from "@capacitor/core";
 import { updateDailyProgressWidget } from "@/main";
 import { WidgetUpdater, canUseNative } from "@/lib/widgetUpdater";
@@ -173,7 +174,7 @@ const Reader = () => {
     }
   }, [bookId]);
 
-  const todayISO = formatISO(new Date(), { representation: "date" });
+  const todayISO = useTodayISO();
   // Derive today's baseline synchronously to prevent a transient stale percent after day change
   const baselineForToday = useMemo(() => {
     const base = getDailyBaseline(bookId, todayISO);
