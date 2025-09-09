@@ -38,17 +38,16 @@ public class ProgressWidgetProvider extends AppWidgetProvider {
     updateAppWidget(context, appWidgetManager, appWidgetId);
   }
 
-  public static void triggerUpdate(Context context) {
+  public static void triggerUpdate(Context context) { triggerUpdate(context, "unknown"); }
+  public static void triggerUpdate(Context context, String origin) {
     AppWidgetManager manager = AppWidgetManager.getInstance(context);
     int[] ids = manager.getAppWidgetIds(new ComponentName(context, ProgressWidgetProvider.class));
-    
-     Log.d("ProgressWidgetProvider", "triggerUpdate chamado, ids=" + Arrays.toString(ids));
+    Log.d("ProgressWidgetProvider", "triggerUpdate origem="+origin+" ids=" + Arrays.toString(ids));
     if (ids != null && ids.length > 0) {
-       
       for (int id : ids) {
-            Log.d("ProgressWidgetProvider", "Atualizando widget id=" + id);
-            updateAppWidget(context, manager, id);
-      } 
+        Log.d("ProgressWidgetProvider", "Atualizando widget id=" + id + " origin="+origin);
+        updateAppWidget(context, manager, id);
+      }
     }
   }
 

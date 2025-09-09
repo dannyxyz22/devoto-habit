@@ -16,7 +16,8 @@ export async function updateDailyProgressWidget(percent: number, hasGoal: boolea
   try {
     const isNative = Capacitor.isNativePlatform?.() ?? (Capacitor.getPlatform?.() !== 'web')
     if (!isNative) return
-    const payload = { percent: Math.max(0, Math.min(100, Math.round(percent || 0))), hasGoal: !!hasGoal, ts: Date.now() }
+  const today = new Date().toISOString().slice(0,10)
+  const payload = { percent: Math.max(0, Math.min(100, Math.round(percent || 0))), hasGoal: !!hasGoal, ts: Date.now(), day: today }
     await Preferences.set({ key: 'widget:dailyProgress', value: JSON.stringify(payload) })
   } catch {}
 }
