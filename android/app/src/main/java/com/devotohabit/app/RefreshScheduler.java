@@ -142,13 +142,17 @@ public class RefreshScheduler {
       long delayMs = nextMidnight - now;
       if (delayMs < 0) delayMs = TimeUnit.MINUTES.toMillis(5);
       if (delayMs >= TimeUnit.HOURS.toMillis(24)) delayMs = TimeUnit.HOURS.toMillis(23);
-      Log.d("RefreshScheduler","ensureDailyWork periodic initialDelayMs="+delayMs);
+  Log.d("RefreshScheduler","ensureDailyWork periodic initialDelayMs="+delayMs);
       PeriodicWorkRequest req = new PeriodicWorkRequest.Builder(RefreshWorker.class, 24, TimeUnit.HOURS)
         .setInitialDelay(delayMs, TimeUnit.MILLISECONDS)
         .addTag("daily_refresh_periodic")
         .build();
-      // UPDATE para substituir caso parâmetros mudem.
-      WorkManager.getInstance(ctx).enqueueUniquePeriodicWork(UNIQUE_WORK, ExistingPeriodicWorkPolicy.REPLACE, req);
+  // Em debug, forçar REPLACE; em release, usar UPDATE para realinhar sem perder histórico
+  boolean isDebug = false;
+  try { isDebug = (0 != (ctx.getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE)); } catch (Throwable ignored) {}
+  ExistingPeriodicWorkPolicy policy = isDebug ? ExistingPeriodicWorkPolicy.REPLACE : ExistingPeriodicWorkPolicy.UPDATE;
+  Log.d("RefreshScheduler","ensureDailyWork enqueue policy="+policy);
+  WorkManager.getInstance(ctx).enqueueUniquePeriodicWork(UNIQUE_WORK, policy, req);
     } catch (Throwable t) { Log.e("RefreshScheduler","Erro ensureDailyWork periodic", t); }
   }
 
