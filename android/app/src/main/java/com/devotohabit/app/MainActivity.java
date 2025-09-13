@@ -2,11 +2,17 @@ package com.devotohabit.app;
 
 import android.os.Bundle;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.util.Log;
 import androidx.core.view.WindowCompat;
 import com.getcapacitor.BridgeActivity;
 import com.devotohabit.app.WidgetUpdater;
 import com.devotohabit.app.RefreshScheduler;
 public class MainActivity extends BridgeActivity {
+	private BroadcastReceiver userPresentReceiver;
+
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
 		// Register plugin before bridge initialization to ensure availability
@@ -29,4 +35,23 @@ public class MainActivity extends BridgeActivity {
 			}, 600);
 		}
 	}
+
+	@Override
+	public void onResume() {
+		super.onResume();
+		if (userPresentReceiver == null) {
+			userPresentReceiver = new BroadcastReceiver() {
+				@Override public void onReceive(Context context, Intent intent) {
+					if (Intent.ACTION_USER_PRESENT.equals(intent.getAction())) {
+						Log.d("MainActivity","Dynamic USER_PRESENT recebido");
+						try { RefreshScheduler.performDailyRefresh(getApplicationContext(), "user_present_dynamic"); } catch (Throwable ignored) {}
+					}
+				}
+			};
+			IntentFilter f = new IntentFilter(Intent.ACTION_USER_PRESENT);
+			try { registerReceiver(userPresentReceiver, f); Log.d("MainActivity","USER_PRESENT dynamic receiver registrado"); } catch (Throwable t) { Log.e("MainActivity","Falha registrar USER_PRESENT dynamic", t);} 
+		}
+	}
+
+
 }

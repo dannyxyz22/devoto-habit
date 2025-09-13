@@ -26,14 +26,12 @@ public class RefreshScheduler {
 
   public static void performDailyRefresh(Context ctx, String cause) {
     try {
-      String key = "widget:dailyProgress";
-      String[] files = new String[]{"CapacitorStorage","CapacitorStorageNative","com.capacitorjs.preferences","Preferences"};
-      String found = null; String fileFound = null;
-      for (String f: files) {
-        try { String cur = ctx.getSharedPreferences(f, Context.MODE_PRIVATE).getString(key, null); if (cur != null) { found = cur; fileFound = f; break; } } catch (Throwable ignored) {}
-      }
+  String key = "widget:dailyProgress";
+  String prefsFile = "CapacitorStorage";
+  String found = null;
+  try { found = ctx.getSharedPreferences(prefsFile, Context.MODE_PRIVATE).getString(key, null); } catch (Throwable ignored) {}
       String today = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(new java.util.Date());
-      Log.d("RefreshScheduler","performDailyRefresh cause="+cause+" file="+fileFound+" rawPayload="+found);
+  Log.d("RefreshScheduler","performDailyRefresh cause="+cause+" file="+prefsFile+" rawPayload="+found);
       boolean needsReset = false;
       boolean prevHasGoal = false;
       if (found == null) {
@@ -99,7 +97,7 @@ public class RefreshScheduler {
       long triggerAt = cal.getTimeInMillis();
       AlarmManager am = (AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
       // Use explicit intent to avoid any implicit broadcast restrictions
-      Intent midnightIntent = new Intent(ctx, DateChangeReceiver.class);
+  Intent midnightIntent = new Intent(ctx, DailyEventsReceiver.class);
       midnightIntent.setAction(ACTION_MIDNIGHT_ALARM);
       PendingIntent pi = PendingIntent.getBroadcast(ctx, 1010, midnightIntent, PendingIntent.FLAG_IMMUTABLE|PendingIntent.FLAG_UPDATE_CURRENT);
       if (am != null) {
@@ -109,7 +107,7 @@ public class RefreshScheduler {
     am.setWindow(AlarmManager.RTC_WAKEUP, triggerAt, windowLength, pi);
     // Fallback +60s (também window) somente como redundância leve
         long fallbackAt = triggerAt + 60_000L;
-        Intent fallbackIntent = new Intent(ctx, DateChangeReceiver.class);
+  Intent fallbackIntent = new Intent(ctx, DailyEventsReceiver.class);
         fallbackIntent.setAction(ACTION_MIDNIGHT_ALARM);
         fallbackIntent.putExtra("fallback", true);
         PendingIntent fallbackPi = PendingIntent.getBroadcast(ctx, 1011, fallbackIntent, PendingIntent.FLAG_IMMUTABLE|PendingIntent.FLAG_UPDATE_CURRENT);

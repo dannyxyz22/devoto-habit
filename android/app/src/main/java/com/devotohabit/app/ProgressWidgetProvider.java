@@ -17,17 +17,13 @@ import android.widget.RemoteViews;
 import org.json.JSONObject;
 
 public class ProgressWidgetProvider extends AppWidgetProvider {
-  // Try multiple SharedPreferences files that Capacitor Preferences may use across versions/packages
-  private static final String[] PREF_FILES = new String[] {
-    "CapacitorStorage",                 // common
-    "CapacitorStorageNative",          // some versions
-    "com.capacitorjs.preferences",     // hypothetical alt
-    "Preferences"                       // generic
-  };
-  private static final String KEY = "widget:dailyProgress";   // JSON string { percent, hasGoal, ts }
+  // Único arquivo oficial após refactor
+  private static final String PREF_FILE = "CapacitorStorage";
+  private static final String KEY = "widget:dailyProgress";   // JSON string { percent, hasGoal, ts, day }
 
   @Override
   public void onUpdate(Context context, AppWidgetManager appWidgetManager, int[] appWidgetIds) {
+  Log.d("ProgressWidgetProvider","onUpdate periodic/explicit size="+ (appWidgetIds==null?0:appWidgetIds.length));
     for (int appWidgetId : appWidgetIds) {
       updateAppWidget(context, appWidgetManager, appWidgetId);
     }
@@ -91,15 +87,8 @@ public class ProgressWidgetProvider extends AppWidgetProvider {
     int percent = 0;
     boolean hasGoal = false;
     try {
-      String json = null;
-      String fileFound = null;
-      for (String file : PREF_FILES) {
-        try {
-          SharedPreferences prefs = context.getSharedPreferences(file, Context.MODE_PRIVATE);
-          json = prefs.getString(KEY, null);
-          if (json != null) { fileFound = file; break; }
-        } catch (Throwable ignored) {}
-      }
+      SharedPreferences prefs = context.getSharedPreferences(PREF_FILE, Context.MODE_PRIVATE);
+      String json = prefs.getString(KEY, null);
       String today = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(new java.util.Date());
       boolean stale = false;
       boolean prevHasGoal = false;
@@ -113,24 +102,17 @@ public class ProgressWidgetProvider extends AppWidgetProvider {
           if (day == null || !today.equals(day)) stale = true;
         } catch (Throwable ignored) { stale = true; }
       } else {
-        stale = true; // sem payload: considere stale e mostre 0%
+        stale = true; // sem payload -> considerar desatualizado
       }
 
       if (stale) {
         try {
           long now = System.currentTimeMillis();
           String optimistic = "{\"percent\":0,\"hasGoal\":"+prevHasGoal+",\"ts\":"+now+",\"day\":\""+today+"\"}";
-          // Persistir no arquivo padrão (CapacitorStorage) para unificar
-          context.getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE)
-            .edit().putString(KEY, optimistic).apply();
+          prefs.edit().putString(KEY, optimistic).apply();
           percent = 0;
           hasGoal = prevHasGoal;
-          Log.d(
-            "ProgressWidgetProvider",
-            "Lazy stale detect: payload corrigido para dia=" + today +
-            " prevHasGoal=" + prevHasGoal +
-            " fileWas=" + fileFound
-          );
+          Log.d("ProgressWidgetProvider","Lazy stale detect: corrigido dia="+today+" prevHasGoal="+prevHasGoal);
         } catch (Throwable t) { Log.e("ProgressWidgetProvider","Falha ao corrigir stale payload", t); }
       }
     } catch (Throwable ignored) {}

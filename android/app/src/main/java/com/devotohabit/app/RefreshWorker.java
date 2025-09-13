@@ -18,13 +18,8 @@ public class RefreshWorker extends Worker {
   long start = System.currentTimeMillis();
   Log.d("RefreshWorker","Iniciando doWork ts="+start);
       // Captura payload antes
-      String before = null; String after = null; String key = "widget:dailyProgress";
-      String[] prefFiles = new String[]{"CapacitorStorage","CapacitorStorageNative","com.capacitorjs.preferences","Preferences"};
-      try {
-        for (String f: prefFiles) {
-          try { String cur = getApplicationContext().getSharedPreferences(f, Context.MODE_PRIVATE).getString(key, null); if (cur != null) { before = cur; break; } } catch (Throwable ignored) {}
-        }
-      } catch (Throwable ignored) {}
+  String before = null; String after = null; String key = "widget:dailyProgress"; String prefsFile = "CapacitorStorage";
+  try { before = getApplicationContext().getSharedPreferences(prefsFile, Context.MODE_PRIVATE).getString(key, null); } catch (Throwable ignored) {}
       Log.d("RefreshWorker","PayloadBefore="+before);
 
       RefreshScheduler.performDailyRefresh(getApplicationContext(), "work_manager");
@@ -34,11 +29,7 @@ public class RefreshWorker extends Worker {
       } catch (Throwable t) { Log.e("RefreshWorker","Falha triggerUpdate", t); }
 
       // Captura payload depois
-      try {
-        for (String f: prefFiles) {
-          try { String cur = getApplicationContext().getSharedPreferences(f, Context.MODE_PRIVATE).getString(key, null); if (cur != null) { after = cur; break; } } catch (Throwable ignored) {}
-        }
-      } catch (Throwable ignored) {}
+  try { after = getApplicationContext().getSharedPreferences(prefsFile, Context.MODE_PRIVATE).getString(key, null); } catch (Throwable ignored) {}
       Log.d("RefreshWorker","PayloadAfter="+after);
   long end = System.currentTimeMillis();
   Log.d("RefreshWorker","Concluido doWork durMs="+(end-start));
