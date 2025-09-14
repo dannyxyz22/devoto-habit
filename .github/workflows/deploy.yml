@@ -37,6 +37,9 @@ jobs:
           VITE_BASE_URL: /devoto-habit/
         run: npm run build
 
+      - name: Add CNAME for custom domain
+        run: echo "ignisverbi.app" > dist/CNAME
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
