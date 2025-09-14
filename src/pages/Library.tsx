@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { BackLink } from "@/components/app/BackLink";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { BOOKS } from "@/lib/books";
@@ -302,7 +303,7 @@ const Library = () => {
         canonical="/biblioteca"
       />
       <nav className="mb-4 text-sm">
-        <Link to="/" className="text-primary underline-offset-4 hover:underline">← Início</Link>
+        <BackLink to="/" label="Início" />
       </nav>
       <h1 className="text-3xl font-bold mb-6">Biblioteca</h1>
       <section className="grid md:grid-cols-2 gap-6">

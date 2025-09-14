@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
+import { BackLink } from "@/components/app/BackLink";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Progress } from "@/components/ui/progress";
@@ -349,7 +350,7 @@ const Reader = () => {
         }}
       />
       <nav className="mb-4 text-sm">
-        <Link to="/biblioteca" className="text-primary underline-offset-4 hover:underline">← Biblioteca</Link>
+        <BackLink to="/biblioteca" label="Biblioteca" />
       </nav>
 
       <h1 className="text-2xl font-bold">{meta.title}</h1>

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
+import { BackLink } from "@/components/app/BackLink";
 import { Button } from "@/components/ui/button";
 import { SEO } from "@/components/app/SEO";
 import ePub, { Rendition } from "epubjs";
@@ -260,7 +261,7 @@ const EpubReader = () => {
     <main className="container mx-auto py-4">
       <SEO title={`EPUB — ${epubId}`} description="Leitor EPUB" canonical={`/epub/${epubId}`} />
       <nav className="mb-4 text-sm">
-        <Link to="/biblioteca" className="text-primary underline-offset-4 hover:underline">← Biblioteca</Link>
+        <BackLink to="/biblioteca" label="Biblioteca" />
       </nav>
       {err && (
         <div className="mb-2 text-destructive">{err}</div>
