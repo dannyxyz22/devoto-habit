@@ -1,10 +1,9 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { BOOKS } from "@/lib/books";
 import { SEO } from "@/components/app/SEO";
-import { PageHeader } from "@/components/app/PageHeader";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -302,7 +301,10 @@ const Library = () => {
         description="Escolha um clássico católico em português e comece sua leitura devocional."
         canonical="/biblioteca"
       />
-      <PageHeader title="Biblioteca" />
+      <nav className="mb-4 text-sm">
+        <Link to="/" className="text-primary underline-offset-4 hover:underline">← Início</Link>
+      </nav>
+      <h1 className="text-3xl font-bold mb-6">Biblioteca</h1>
       <section className="grid md:grid-cols-2 gap-6">
         {BOOKS.map((book) => (
           <Card key={book.id} className="hover:shadow-lg transition-shadow">
