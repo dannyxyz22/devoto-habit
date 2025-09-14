@@ -1,7 +1,8 @@
 import { useEffect } from "react";
+import { APP_NAME } from "@/config/appMeta";
 
 type SEOProps = {
-  title: string;
+  title?: string;
   description?: string;
   canonical?: string;
   image?: string;
@@ -9,9 +10,10 @@ type SEOProps = {
 };
 
 export const SEO = ({ title, description, canonical, image, jsonLd }: SEOProps) => {
+  const effectiveTitle = title || APP_NAME;
   useEffect(() => {
     // Title
-    if (title) document.title = title;
+    if (effectiveTitle) document.title = effectiveTitle;
 
     // Description
     if (description) {
@@ -47,7 +49,7 @@ export const SEO = ({ title, description, canonical, image, jsonLd }: SEOProps) 
       meta.content = content;
     };
 
-    setOg('og:title', title);
+  setOg('og:title', effectiveTitle);
     setOg('og:description', description);
     setOg('og:image', image);
 
@@ -63,7 +65,7 @@ export const SEO = ({ title, description, canonical, image, jsonLd }: SEOProps) 
     } else if (existing) {
       existing.remove();
     }
-  }, [title, description, canonical, image, jsonLd]);
+  }, [effectiveTitle, description, canonical, image, jsonLd]);
 
   return null;
 };

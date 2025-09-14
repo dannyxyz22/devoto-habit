@@ -83,3 +83,27 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+
+### App Name Single Source of Truth
+
+O nome do aplicativo (web/PWA/Capacitor) agora é centralizado em `src/config/appMeta.ts`.
+
+Edite:
+```
+export const APP_NAME = 'Leitura Devota';
+export const APP_SHORT_NAME = 'Devota';
+```
+
+Depois rode para propagar para `public/manifest.json`, `capacitor.config.ts` e `package.json` (displayName):
+```
+npm run sync:app-name
+```
+
+Isso atualiza:
+- Manifest PWA (`name`, `short_name`)
+- Capacitor (`appName`)
+- `package.json` (`displayName` campo auxiliar)
+
+O componente `SEO` usa `APP_NAME` como fallback de título caso não seja passado.
+
+Caso publique sob outro domínio, ajuste também `APP_CANONICAL_HOST` em `appMeta.ts`.
