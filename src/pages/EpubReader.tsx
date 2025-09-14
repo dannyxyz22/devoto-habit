@@ -258,7 +258,7 @@ const EpubReader = () => {
   }, []);
 
   return (
-    <main className="container mx-auto py-4">
+  <main className="container mx-auto py-10">
       <SEO title={`EPUB — ${epubId}`} description="Leitor EPUB" canonical={`/epub/${epubId}`} />
       <nav className="mb-4 text-sm">
         <BackLink to="/biblioteca" label="Biblioteca" />

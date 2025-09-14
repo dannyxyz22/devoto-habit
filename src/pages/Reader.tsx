@@ -336,7 +336,7 @@ const Reader = () => {
   }
 
   return (
-    <main className="container mx-auto py-6">
+  <main className="container mx-auto py-10">
       <SEO
         title={`${meta.title} — Leitura Devota`}
         description={`Leia ${meta.title} de ${meta.author} em português com progresso e streak.`}
