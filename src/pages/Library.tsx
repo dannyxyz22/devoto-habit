@@ -306,14 +306,22 @@ const Library = () => {
       <section className="grid md:grid-cols-2 gap-6">
         {BOOKS.map((book) => (
           <Card key={book.id} className="hover:shadow-lg transition-shadow">
-            {book.type === 'epub'
-              ? (<EpubCoverLoader id={book.id} title={book.title} sourceUrl={book.sourceUrl} />)
-              : (book.coverImage && (
-                  <Cover
-                    src={book.coverImage}
-                    alt={`Capa do livro ${book.title}`}
-                  />
-                ))}
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => navigate(book.type === 'epub' ? `/epub/${book.id}` : `/leitor/${book.id}`)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(book.type === 'epub' ? `/epub/${book.id}` : `/leitor/${book.id}`); } }}
+              className="cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2"
+            >
+              {book.type === 'epub'
+                ? (<EpubCoverLoader id={book.id} title={book.title} sourceUrl={book.sourceUrl} />)
+                : (book.coverImage && (
+                    <Cover
+                      src={book.coverImage}
+                      alt={`Capa do livro ${book.title}`}
+                    />
+                  ))}
+            </div>
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 <span>{book.title}</span>
