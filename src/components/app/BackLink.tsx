@@ -15,7 +15,7 @@ export const BackLink = ({ to, label, hideIcon = false, className, ...rest }: Ba
     <Link
       to={to}
       className={cn(
-        "inline-flex items-center gap-1 text-primary text-sm underline-offset-4 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded-sm",
+        "inline-flex items-center gap-1 text-primary text-base underline-offset-4 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded-sm",
         className
       )}
       {...rest}
