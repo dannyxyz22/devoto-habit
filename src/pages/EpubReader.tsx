@@ -133,6 +133,7 @@ const EpubReader = () => {
 
         setProgress(epubId, { partIndex: 0, chapterIndex: 0, percent });
 
+
         
 
         // Ensure today's baseline exists (based on percent) and compute daily goal percent
