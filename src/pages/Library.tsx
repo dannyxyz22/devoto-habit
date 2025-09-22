@@ -200,7 +200,10 @@ const Library = () => {
           const prog = getProgress(selectedBook);
           const todayISO = formatISO(new Date(), { representation: "date" });
           const existing = getDailyBaseline(selectedBook, todayISO);
-          if (!existing) setDailyBaseline(selectedBook, todayISO, { words: 0, percent: prog?.percent || 0 });
+          if (!existing) {
+            setDailyBaseline(selectedBook, todayISO, { words: 0, percent: prog?.percent || 0 });
+            try { console.log('[Baseline] persistida', { scope: 'Library', bookId: selectedBook, todayISO, words: 0, percent: prog?.percent || 0 }); } catch {}
+          }
         } catch {}
       }
       // For EPUBs, just navigate to the EPUB reader
@@ -254,7 +257,8 @@ const Library = () => {
           });
         });
         const todayISO = formatISO(new Date(), { representation: "date" });
-        setDailyBaseline(selectedBook, todayISO, { words: wordsUpToCurrent, percent });
+  setDailyBaseline(selectedBook, todayISO, { words: wordsUpToCurrent, percent });
+  try { console.log('[Baseline] persistida', { scope: 'Library', bookId: selectedBook, todayISO, words: wordsUpToCurrent, percent }); } catch {}
         // Persist plan start for plan progress calculations (start indexes and words)
         try {
           localStorage.setItem(
@@ -283,7 +287,8 @@ const Library = () => {
           });
         });
         const todayISO = formatISO(new Date(), { representation: "date" });
-        setDailyBaseline(selectedBook, todayISO, { words: wordsUpToCurrent, percent });
+  setDailyBaseline(selectedBook, todayISO, { words: wordsUpToCurrent, percent });
+  try { console.log('[Baseline] persistida', { scope: 'Library', bookId: selectedBook, todayISO, words: wordsUpToCurrent, percent }); } catch {}
       }
     }
     setOpen(false);

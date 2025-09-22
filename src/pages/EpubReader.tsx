@@ -135,8 +135,15 @@ const EpubReader = () => {
         // Ensure today's baseline exists (based on percent) and compute daily goal percent
         const base = getDailyBaseline(epubId, todayISO);
         const baselinePercent = base ? base.percent : percent;
-        if (!base) {
-          setDailyBaseline(epubId, todayISO, { words: 0, percent: baselinePercent });
+        if (base) {
+          try { console.log('[Baseline] existente', { scope: 'EpubReader', bookId: epubId, todayISO, base }); } catch {}
+        } else {
+          if ((percent ?? 0) > 0) {
+            setDailyBaseline(epubId, todayISO, { words: 0, percent: baselinePercent });
+            try { console.log('[Baseline] persistida', { scope: 'EpubReader', bookId: epubId, todayISO, baselinePercent }); } catch {}
+          } else {
+            try { console.log('[Baseline] skip persist: percent atual 0', { scope: 'EpubReader', bookId: epubId, todayISO, percent }); } catch {}
+          }
         }
 
         // Compute days remaining from the EPUB reading plan (if any)

@@ -155,6 +155,13 @@ const Reader = () => {
 
   const wordsUpToCurrent = useMemo(() => computeWordsUpToPosition(parts, { partIndex: p.partIndex, chapterIndex: p.chapterIndex }), [parts, p]);
 
+  // Words-based overall book percent (more precise than chapter-count percent)
+  const totalBookProgressPercent = useMemo(() => {
+    if (!parts) return 0;
+    const denom = Math.max(1, totalWords);
+    return Math.min(100, Math.round((wordsUpToCurrent / denom) * 100));
+  }, [parts, wordsUpToCurrent, totalWords]);
+
   const plan = useMemo(() => getReadingPlan(bookId), [bookId]);
 
   // Calculate target words based on plan
@@ -183,10 +190,24 @@ const Reader = () => {
   // Persist baseline if missing (side-effect, no UI dependency)
   useEffect(() => {
     const base = getDailyBaseline(bookId, todayISO);
-    if (!base) {
-      setDailyBaseline(bookId, todayISO, { words: wordsUpToCurrent, percent: p.percent });
+    if (base) {
+      try { console.log('[Baseline] existente', { scope: 'Reader', bookId, todayISO, base }); } catch {}
+      return;
     }
-  }, [bookId, todayISO, wordsUpToCurrent, p.percent]);
+    // Avoid persisting zero before parts/progress are ready
+    const hasProgress = (p?.percent ?? 0) > 0 || p.partIndex > 0 || p.chapterIndex > 0 || wordsUpToCurrent > 0;
+    if (!parts) {
+      try { console.log('[Baseline] skip persist: parts não carregadas', { scope: 'Reader', bookId, todayISO, wordsUpToCurrent, p }); } catch {}
+      return;
+    }
+    if (!hasProgress) {
+      try { console.log('[Baseline] skip persist: sem progresso ainda', { scope: 'Reader', bookId, todayISO, wordsUpToCurrent, p }); } catch {}
+      return;
+    }
+    // Persist percent aligned to the words-based total book progress for consistency
+    setDailyBaseline(bookId, todayISO, { words: wordsUpToCurrent, percent: totalBookProgressPercent });
+    try { console.log('[Baseline] persistida', { scope: 'Reader', bookId, todayISO, words: wordsUpToCurrent, percent: totalBookProgressPercent }); } catch {}
+  }, [bookId, todayISO, parts, wordsUpToCurrent, p.partIndex, p.chapterIndex, p.percent, totalBookProgressPercent]);
 
   const daysRemaining = useMemo(() => computeDaysRemaining(plan?.targetDateISO), [plan]);
   const dailyTargetWords = useMemo(

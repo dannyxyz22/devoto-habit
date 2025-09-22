@@ -127,14 +127,28 @@ const Index = () => {
     if (base) return activeIsEpub ? base.percent : base.words;
     return activeIsEpub ? (p.percent || 0) : wordsUpToCurrent;
   }, [activeBookId, activeIsEpub, todayISO, wordsUpToCurrent, p.percent]);
-  // Persist baseline if missing
+  // Persist baseline if missing, with guards and logs
   useEffect(() => {
     if (!activeBookId) return;
     const base = getDailyBaseline(activeBookId, todayISO);
-    if (!base) {
-      setDailyBaseline(activeBookId, todayISO, { words: wordsUpToCurrent, percent: p.percent });
+    if (base) {
+      try { console.log('[Baseline] existente', { scope: 'Index', bookId: activeBookId, todayISO, base }); } catch {}
+      return;
     }
-  }, [activeBookId, todayISO, wordsUpToCurrent, p.percent]);
+    const hasProgress = activeIsEpub ? ((p?.percent ?? 0) > 0) : (wordsUpToCurrent > 0);
+    if (!parts && !activeIsEpub) {
+      try { console.log('[Baseline] skip persist: parts não carregadas', { scope: 'Index', bookId: activeBookId, todayISO, wordsUpToCurrent, p, activeIsEpub }); } catch {}
+      return;
+    }
+    if (!hasProgress) {
+      try { console.log('[Baseline] skip persist: sem progresso ainda', { scope: 'Index', bookId: activeBookId, todayISO, wordsUpToCurrent, percent: p.percent, activeIsEpub }); } catch {}
+      return;
+    }
+    // Use consistent percent: EPUB uses p.percent; non-EPUB uses words-based totalBookProgressPercent
+    const baselinePercent = activeIsEpub ? (p.percent || 0) : (parts ? Math.min(100, Math.round((wordsUpToCurrent / Math.max(1, totalWords)) * 100)) : 0);
+    setDailyBaseline(activeBookId, todayISO, { words: wordsUpToCurrent, percent: baselinePercent });
+    try { console.log('[Baseline] persistida', { scope: 'Index', bookId: activeBookId, todayISO, words: wordsUpToCurrent, percent: baselinePercent, activeIsEpub }); } catch {}
+  }, [activeBookId, todayISO, parts, activeIsEpub, wordsUpToCurrent, p.percent, totalWords]);
 
   const daysRemaining = useMemo(() => computeDaysRemaining(plan?.targetDateISO), [plan]);
   // EPUB daily target uses percentage instead of words
