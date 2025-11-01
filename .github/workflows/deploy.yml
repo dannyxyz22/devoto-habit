@@ -39,6 +39,8 @@ jobs:
 
       - name: Build blog (Astro)
         working-directory: ./blog
+        env:
+          VITE_BASE_URL: /blog/
         run: |
           npm ci
           npm run build
