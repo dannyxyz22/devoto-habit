@@ -36,16 +36,10 @@ jobs:
         run: |
           npm ci
           npm run build
+          cd blog && npm ci && npm run build
         # Isso gera ./dist com o site principal
 
-      # --- Build do blog (feito com Astro) ---
-      - name: Build Astro blog
-        working-directory: ./blog
-        env:
-          VITE_BASE_URL: /blog/
-        run: |
-          npm ci
-          npm run build
+
 
 
       # --- Publicar ---
