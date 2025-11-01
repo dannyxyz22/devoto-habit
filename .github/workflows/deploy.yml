@@ -36,10 +36,19 @@ jobs:
         run: |
           npm ci
           npm run build
-          cd blog && npm ci && npm run build
-        # Isso gera ./dist com o site principal
 
+      - name: Build blog (Astro)
+        working-directory: ./blog
+        run: |
+          npm ci
+          npm run build
 
+      - name: Verify dist structure
+        run: |
+          echo "Listing dist/ for debug"
+          ls -la dist || true
+          echo "Listing dist/blog/ for debug"
+          ls -la dist/blog || true
 
 
       # --- Publicar ---

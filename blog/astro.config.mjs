@@ -6,7 +6,10 @@ import { defineConfig } from 'astro/config';
 
 // https://astro.build/config
 export default defineConfig({
-	site: 'https://www.ignisverbi.app/blog',
-	outDir: '../dist/blog',            // 👈 gera os arquivos no dist geral do site
+  	site: 'https://www.ignisverbi.app',
+  // base para todos os links e assets do blog
+ 	base: '/blog/',
+  // gera o resultado direto para o dist do site principal
+ 	outDir: '../dist/blog',  // 👈 gera os arquivos no dist geral do site
 	integrations: [mdx(), sitemap()],
 });
