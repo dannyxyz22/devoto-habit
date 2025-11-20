@@ -477,12 +477,7 @@ const EpubReader = () => {
         {/* Book Pages - Full width on mobile, bordered on desktop */}
         <div className="relative w-full lg:bg-gradient-to-b lg:from-slate-800 lg:to-slate-900 lg:rounded-2xl lg:p-6 lg:shadow-2xl">
           <div
-            className="relative bg-white lg:bg-amber-50 lg:rounded-lg lg:shadow-[0_0_60px_rgba(0,0,0,0.5)] overflow-hidden"
-            style={{
-              minHeight: '100vh',
-              height: '100vh',
-              aspectRatio: effectiveSpread === 'auto' ? '16/10' : undefined
-            }}
+            className="relative bg-white lg:bg-amber-50 lg:rounded-lg lg:shadow-[0_0_60px_rgba(0,0,0,0.5)] overflow-hidden h-screen lg:h-[85vh]"
             onClick={() => {
               // Toggle mobile menu and fullscreen on tap (mobile only)
               if (window.innerWidth < 1024) {
