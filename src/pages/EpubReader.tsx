@@ -38,6 +38,7 @@ const EpubReader = () => {
       return false;
     }
   });
+  const [showMobileMenu, setShowMobileMenu] = useState<boolean>(true);
 
   // Persist layout mode preference
   useEffect(() => {
@@ -330,6 +331,30 @@ const EpubReader = () => {
   // Keyboard shortcuts for navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      const rendition = renditionRef.current;
+      if (!rendition) return;
+      switch (e.key) {
+        case 'ArrowLeft':
+        case 'PageUp':
+          e.preventDefault();
+          rendition.prev();
+          break;
+        case 'ArrowRight':
+        case 'PageDown':
+        case ' ':
+          e.preventDefault();
+          rendition.next();
+          break;
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Keyboard shortcuts for navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore if user is typing in an input/textarea
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
         return;
@@ -358,40 +383,47 @@ const EpubReader = () => {
   }, []);
 
   return (
-    <main className="min-h-screen bg-slate-900 flex flex-col items-center justify-center py-8 px-4">
+    <main className="min-h-screen lg:bg-slate-900 flex flex-col items-center justify-center lg:py-8 lg:px-4">
       <SEO title={`EPUB — ${epubId}`} description="Leitor EPUB" canonical={`/epub/${epubId}`} />
 
-      {/* Header with back link and settings */}
-      <div className="w-full max-w-7xl mb-6 flex items-center justify-between">
-        <nav className="text-sm">
-          <BackLink to="/biblioteca" label="Biblioteca" className="text-slate-300 hover:text-white" />
+      {/* Header - Hidden on mobile unless showMobileMenu is true */}
+      <div
+        className={`
+          w-full max-w-7xl mb-6 flex items-center justify-between
+          transition-all duration-300 fixed top-0 left-0 right-0 p-4 z-50 bg-white/90 backdrop-blur lg:static lg:bg-transparent lg:p-0
+          lg:opacity-100 lg:translate-y-0
+          ${showMobileMenu ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-full pointer-events-none'}
+        `}
+      >
+        <nav className="text-sm lg:block">
+          <BackLink to="/biblioteca" label="Biblioteca" className="text-slate-900 lg:text-slate-300 hover:text-slate-700 lg:hover:text-white" />
         </nav>
 
         {/* Settings Panel - Compact version */}
         <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen}>
           <CollapsibleTrigger asChild>
-            <Button variant="ghost" size="icon" className="text-slate-300 hover:text-white hover:bg-slate-800">
+            <Button variant="ghost" size="icon" className="text-slate-900 lg:text-slate-300 hover:text-slate-700 lg:hover:text-white lg:hover:bg-slate-800">
               <Settings className="h-5 w-5" />
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent className="absolute right-4 top-16 z-50">
-            <div className="bg-slate-800 border border-slate-700 rounded-lg p-4 shadow-xl min-w-[280px]">
-              <p className="text-sm font-medium text-slate-200 mb-3">Modo de layout</p>
+            <div className="bg-white lg:bg-slate-800 border border-slate-200 lg:border-slate-700 rounded-lg p-4 shadow-xl min-w-[280px]">
+              <p className="text-sm font-medium text-slate-900 lg:text-slate-200 mb-3">Modo de layout</p>
               <ToggleGroup type="single" value={layoutMode} onValueChange={(v) => v && setLayoutMode(v as LayoutMode)}>
-                <ToggleGroupItem value="auto" aria-label="Layout automático" title="Automático" className="data-[state=on]:bg-slate-700">
+                <ToggleGroupItem value="auto" aria-label="Layout automático" title="Automático" className="data-[state=on]:bg-slate-100 lg:data-[state=on]:bg-slate-700">
                   <Settings className="h-4 w-4 mr-2" />
                   Auto
                 </ToggleGroupItem>
-                <ToggleGroupItem value="single" aria-label="Página única" title="Página Única" className="data-[state=on]:bg-slate-700">
+                <ToggleGroupItem value="single" aria-label="Página única" title="Página Única" className="data-[state=on]:bg-slate-100 lg:data-[state=on]:bg-slate-700">
                   <BookOpen className="h-4 w-4 mr-2" />
                   1 Página
                 </ToggleGroupItem>
-                <ToggleGroupItem value="double" aria-label="Duas páginas" title="Duas Páginas" className="data-[state=on]:bg-slate-700">
+                <ToggleGroupItem value="double" aria-label="Duas páginas" title="Duas Páginas" className="data-[state=on]:bg-slate-100 lg:data-[state=on]:bg-slate-700">
                   <BookOpenCheck className="h-4 w-4 mr-2" />
                   2 Páginas
                 </ToggleGroupItem>
               </ToggleGroup>
-              <p className="text-xs text-slate-400 mt-3">
+              <p className="text-xs text-slate-600 lg:text-slate-400 mt-3">
                 {layoutMode === "auto" && containerWidth >= 900 && "Modo atual: duas páginas (tela larga)"}
                 {layoutMode === "auto" && containerWidth < 900 && "Modo atual: página única (tela estreita)"}
                 {layoutMode === "single" && "Modo atual: sempre página única"}
@@ -403,14 +435,14 @@ const EpubReader = () => {
       </div>
 
       {err && (
-        <div className="mb-4 text-red-400 bg-red-900/20 border border-red-800 rounded-lg px-4 py-2">
+        <div className="mb-4 text-red-400 bg-red-900/20 border border-red-800 rounded-lg px-4 py-2 z-50 relative">
           {err}
         </div>
       )}
 
       {/* Book Container */}
       <div className="relative w-full max-w-7xl flex-1 flex items-center justify-center">
-        {/* Navigation Button - Left */}
+        {/* Navigation Button - Left (Desktop only) */}
         <Button
           onClick={() => renditionRef.current?.prev()}
           variant="ghost"
@@ -422,22 +454,29 @@ const EpubReader = () => {
           </svg>
         </Button>
 
-        {/* Book Pages */}
-        <div className="relative bg-gradient-to-b from-slate-800 to-slate-900 rounded-2xl p-6 shadow-2xl w-full">
+        {/* Book Pages - Full width on mobile, bordered on desktop */}
+        <div className="relative w-full lg:bg-gradient-to-b lg:from-slate-800 lg:to-slate-900 lg:rounded-2xl lg:p-6 lg:shadow-2xl">
           <div
-            className="relative bg-amber-50 rounded-lg shadow-[0_0_60px_rgba(0,0,0,0.5)] overflow-hidden"
+            className="relative bg-white lg:bg-amber-50 lg:rounded-lg lg:shadow-[0_0_60px_rgba(0,0,0,0.5)] overflow-hidden"
             style={{
-              minHeight: '70vh',
-              aspectRatio: effectiveSpread === 'auto' ? '16/10' : '3/4'
+              minHeight: '100vh',
+              height: '100vh',
+              aspectRatio: effectiveSpread === 'auto' ? '16/10' : undefined
+            }}
+            onClick={() => {
+              // Toggle mobile menu on tap (mobile only)
+              if (window.innerWidth < 1024) {
+                setShowMobileMenu(prev => !prev);
+              }
             }}
           >
             {/* EPUB Viewer */}
             <div ref={viewerRef} className="w-full h-full" />
 
-            {/* Center Shadow (Book Fold Effect) - Only in double page mode */}
+            {/* Center Shadow (Book Fold Effect) - Only in double page mode on desktop */}
             {effectiveSpread === 'auto' && (
               <div
-                className="absolute top-0 bottom-0 left-1/2 w-4 -ml-2 pointer-events-none z-10"
+                className="absolute top-0 bottom-0 left-1/2 w-4 -ml-2 pointer-events-none z-10 hidden lg:block"
                 style={{
                   background: 'linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.08) 20%, rgba(0,0,0,0.15) 50%, rgba(0,0,0,0.08) 80%, transparent 100%)'
                 }}
@@ -446,7 +485,7 @@ const EpubReader = () => {
           </div>
         </div>
 
-        {/* Navigation Button - Right */}
+        {/* Navigation Button - Right (Desktop only) */}
         <Button
           onClick={() => renditionRef.current?.next()}
           variant="ghost"
@@ -456,24 +495,6 @@ const EpubReader = () => {
           <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
-        </Button>
-      </div>
-
-      {/* Mobile Navigation - Bottom */}
-      <div className="mt-6 flex gap-3 lg:hidden">
-        <Button
-          onClick={() => renditionRef.current?.prev()}
-          variant="outline"
-          className="bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700 hover:text-white"
-        >
-          ← Anterior
-        </Button>
-        <Button
-          onClick={() => renditionRef.current?.next()}
-          variant="outline"
-          className="bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700 hover:text-white"
-        >
-          Próximo →
         </Button>
       </div>
     </main>
