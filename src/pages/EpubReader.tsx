@@ -327,42 +327,71 @@ const EpubReader = () => {
     };
   }, []);
 
-  return (
-    <main className="container mx-auto py-10">
-      <SEO title={`EPUB — ${epubId}`} description="Leitor EPUB" canonical={`/epub/${epubId}`} />
-      <nav className="mb-4 text-sm">
-        <BackLink to="/biblioteca" label="Biblioteca" />
-      </nav>
+  // Keyboard shortcuts for navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if user is typing in an input/textarea
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
 
-      {/* Layout Settings Panel */}
-      <div className="border rounded-md p-3 mb-4">
+      const rendition = renditionRef.current;
+      if (!rendition) return;
+
+      switch (e.key) {
+        case 'ArrowLeft':
+        case 'PageUp':
+          e.preventDefault();
+          rendition.prev();
+          break;
+        case 'ArrowRight':
+        case 'PageDown':
+        case ' ': // Space bar
+          e.preventDefault();
+          rendition.next();
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  return (
+    <main className="min-h-screen bg-slate-900 flex flex-col items-center justify-center py-8 px-4">
+      <SEO title={`EPUB — ${epubId}`} description="Leitor EPUB" canonical={`/epub/${epubId}`} />
+
+      {/* Header with back link and settings */}
+      <div className="w-full max-w-7xl mb-6 flex items-center justify-between">
+        <nav className="text-sm">
+          <BackLink to="/biblioteca" label="Biblioteca" className="text-slate-300 hover:text-white" />
+        </nav>
+
+        {/* Settings Panel - Compact version */}
         <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen}>
-          <div className="mb-2 flex items-center justify-between">
-            <p className="text-sm font-medium">Opções de visualização</p>
-            <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label={settingsOpen ? "Recolher opções" : "Expandir opções"}>
-                <Settings className="h-4 w-4" />
-              </Button>
-            </CollapsibleTrigger>
-          </div>
-          <CollapsibleContent className="space-y-3">
-            <div>
-              <p className="text-sm font-medium mb-2">Modo de layout</p>
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" size="icon" className="text-slate-300 hover:text-white hover:bg-slate-800">
+              <Settings className="h-5 w-5" />
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="absolute right-4 top-16 z-50">
+            <div className="bg-slate-800 border border-slate-700 rounded-lg p-4 shadow-xl min-w-[280px]">
+              <p className="text-sm font-medium text-slate-200 mb-3">Modo de layout</p>
               <ToggleGroup type="single" value={layoutMode} onValueChange={(v) => v && setLayoutMode(v as LayoutMode)}>
-                <ToggleGroupItem value="auto" aria-label="Layout automático" title="Automático">
+                <ToggleGroupItem value="auto" aria-label="Layout automático" title="Automático" className="data-[state=on]:bg-slate-700">
                   <Settings className="h-4 w-4 mr-2" />
                   Auto
                 </ToggleGroupItem>
-                <ToggleGroupItem value="single" aria-label="Página única" title="Página Única">
+                <ToggleGroupItem value="single" aria-label="Página única" title="Página Única" className="data-[state=on]:bg-slate-700">
                   <BookOpen className="h-4 w-4 mr-2" />
                   1 Página
                 </ToggleGroupItem>
-                <ToggleGroupItem value="double" aria-label="Duas páginas" title="Duas Páginas">
+                <ToggleGroupItem value="double" aria-label="Duas páginas" title="Duas Páginas" className="data-[state=on]:bg-slate-700">
                   <BookOpenCheck className="h-4 w-4 mr-2" />
                   2 Páginas
                 </ToggleGroupItem>
               </ToggleGroup>
-              <p className="text-xs text-muted-foreground mt-2">
+              <p className="text-xs text-slate-400 mt-3">
                 {layoutMode === "auto" && containerWidth >= 900 && "Modo atual: duas páginas (tela larga)"}
                 {layoutMode === "auto" && containerWidth < 900 && "Modo atual: página única (tela estreita)"}
                 {layoutMode === "single" && "Modo atual: sempre página única"}
@@ -374,14 +403,78 @@ const EpubReader = () => {
       </div>
 
       {err && (
-        <div className="mb-2 text-destructive">{err}</div>
+        <div className="mb-4 text-red-400 bg-red-900/20 border border-red-800 rounded-lg px-4 py-2">
+          {err}
+        </div>
       )}
-      <div className="border rounded h-[80vh] overflow-hidden">
-        <div ref={viewerRef} className="w-full h-full" />
+
+      {/* Book Container */}
+      <div className="relative w-full max-w-7xl flex-1 flex items-center justify-center">
+        {/* Navigation Button - Left */}
+        <Button
+          onClick={() => renditionRef.current?.prev()}
+          variant="ghost"
+          size="icon"
+          className="absolute -left-16 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white shadow-lg backdrop-blur-sm z-10 hidden lg:flex"
+        >
+          <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </Button>
+
+        {/* Book Pages */}
+        <div className="relative bg-gradient-to-b from-slate-800 to-slate-900 rounded-2xl p-6 shadow-2xl w-full">
+          <div
+            className="relative bg-amber-50 rounded-lg shadow-[0_0_60px_rgba(0,0,0,0.5)] overflow-hidden"
+            style={{
+              minHeight: '70vh',
+              aspectRatio: effectiveSpread === 'auto' ? '16/10' : '3/4'
+            }}
+          >
+            {/* EPUB Viewer */}
+            <div ref={viewerRef} className="w-full h-full" />
+
+            {/* Center Shadow (Book Fold Effect) - Only in double page mode */}
+            {effectiveSpread === 'auto' && (
+              <div
+                className="absolute top-0 bottom-0 left-1/2 w-4 -ml-2 pointer-events-none z-10"
+                style={{
+                  background: 'linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.08) 20%, rgba(0,0,0,0.15) 50%, rgba(0,0,0,0.08) 80%, transparent 100%)'
+                }}
+              />
+            )}
+          </div>
+        </div>
+
+        {/* Navigation Button - Right */}
+        <Button
+          onClick={() => renditionRef.current?.next()}
+          variant="ghost"
+          size="icon"
+          className="absolute -right-16 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white shadow-lg backdrop-blur-sm z-10 hidden lg:flex"
+        >
+          <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </Button>
       </div>
-      <div className="mt-3 flex gap-2">
-        <Button onClick={() => renditionRef.current?.prev()}>← Anterior</Button>
-        <Button onClick={() => renditionRef.current?.next()}>Próximo →</Button>
+
+      {/* Mobile Navigation - Bottom */}
+      <div className="mt-6 flex gap-3 lg:hidden">
+        <Button
+          onClick={() => renditionRef.current?.prev()}
+          variant="outline"
+          className="bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700 hover:text-white"
+        >
+          ← Anterior
+        </Button>
+        <Button
+          onClick={() => renditionRef.current?.next()}
+          variant="outline"
+          className="bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700 hover:text-white"
+        >
+          Próximo →
+        </Button>
       </div>
     </main>
   );
