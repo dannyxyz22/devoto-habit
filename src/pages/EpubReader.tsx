@@ -237,8 +237,9 @@ const EpubReader = () => {
                 })();
               } catch { }
             });
-            // Attach swipe gestures to each rendered section (inside iframe)
-            const attachSwipe = (contents: any) => {
+
+            // Attach gestures and click events to each rendered section (inside iframe)
+            const attachEvents = (contents: any) => {
               try {
                 const doc = contents?.document as Document | undefined;
                 if (!doc) return;
@@ -246,6 +247,7 @@ const EpubReader = () => {
                 const threshold = 50; // px
                 const restraintY = 40; // px vertical tolerance
                 const maxTime = 800; // ms
+
                 const onTouchStart = (e: TouchEvent) => {
                   const t = e.changedTouches?.[0];
                   if (!t) return;
@@ -253,34 +255,58 @@ const EpubReader = () => {
                   startY = t.clientY;
                   startT = Date.now();
                 };
+
                 const onTouchEnd = (e: TouchEvent) => {
                   const t = e.changedTouches?.[0];
                   if (!t) return;
                   const dx = t.clientX - startX;
                   const dy = t.clientY - startY;
                   const dt = Date.now() - startT;
+
+                  // Swipe detection
                   if (dt <= maxTime && Math.abs(dy) <= restraintY && Math.abs(dx) >= threshold) {
                     if (dx < 0) rendition.next(); else rendition.prev();
                   }
                 };
+
+                // Click/Tap detection for menu toggle
+                const onClick = (e: Event) => {
+                  // Only on mobile
+                  if (window.innerWidth < 1024) {
+                    // Toggle logic
+                    setShowMobileMenu(prev => {
+                      const showing = !prev;
+                      if (!showing) {
+                        document.documentElement.requestFullscreen().catch(() => { });
+                      } else {
+                        if (document.fullscreenElement) document.exitFullscreen().catch(() => { });
+                      }
+                      return showing;
+                    });
+                  }
+                };
+
                 doc.addEventListener('touchstart', onTouchStart, { passive: true });
                 doc.addEventListener('touchend', onTouchEnd, { passive: true });
+                doc.addEventListener('click', onClick);
+
                 // Clean up when section is unloaded
                 contents?.window?.addEventListener('unload', () => {
                   try {
                     doc.removeEventListener('touchstart', onTouchStart as any);
                     doc.removeEventListener('touchend', onTouchEnd as any);
+                    doc.removeEventListener('click', onClick);
                   } catch { }
                 });
               } catch { }
             };
 
-            // Ativa swipe gestures normalmente
-            rendition.on('rendered', (_section: any, contents: any) => attachSwipe(contents));
+            // Ativa swipe gestures e clicks
+            rendition.on('rendered', (_section: any, contents: any) => attachEvents(contents));
             try {
               const current = (rendition as any).getContents?.();
               const list = Array.isArray(current) ? current : (current ? [current] : []);
-              list.forEach((c: any) => attachSwipe(c));
+              list.forEach((c: any) => attachEvents(c));
             } catch { }
 
             // Exibe a posição salva (ou início)
@@ -331,30 +357,6 @@ const EpubReader = () => {
   // Keyboard shortcuts for navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      const rendition = renditionRef.current;
-      if (!rendition) return;
-      switch (e.key) {
-        case 'ArrowLeft':
-        case 'PageUp':
-          e.preventDefault();
-          rendition.prev();
-          break;
-        case 'ArrowRight':
-        case 'PageDown':
-        case ' ':
-          e.preventDefault();
-          rendition.next();
-          break;
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  // Keyboard shortcuts for navigation
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore if user is typing in an input/textarea
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
         return;
@@ -380,6 +382,18 @@ const EpubReader = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Sync menu state with fullscreen changes
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      // If user exits fullscreen (via ESC or system gesture), show the menu
+      if (!document.fullscreenElement) {
+        setShowMobileMenu(true);
+      }
+    };
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
   }, []);
 
   return (
@@ -464,9 +478,19 @@ const EpubReader = () => {
               aspectRatio: effectiveSpread === 'auto' ? '16/10' : undefined
             }}
             onClick={() => {
-              // Toggle mobile menu on tap (mobile only)
+              // Toggle mobile menu and fullscreen on tap (mobile only)
               if (window.innerWidth < 1024) {
-                setShowMobileMenu(prev => !prev);
+                if (showMobileMenu) {
+                  // Hide menu -> Enter Fullscreen
+                  setShowMobileMenu(false);
+                  document.documentElement.requestFullscreen().catch(() => { });
+                } else {
+                  // Show menu -> Exit Fullscreen
+                  setShowMobileMenu(true);
+                  if (document.fullscreenElement) {
+                    document.exitFullscreen().catch(() => { });
+                  }
+                }
               }
             }}
           >
