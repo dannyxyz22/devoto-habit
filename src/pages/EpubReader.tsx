@@ -14,11 +14,13 @@ import { computeDaysRemaining, computeDailyProgressPercent } from "@/lib/reading
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { Settings, BookOpen, BookOpenCheck } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
 
 type LayoutMode = "auto" | "single" | "double";
 
 const EpubReader = () => {
   const { epubId = "" } = useParams();
+  const { toast } = useToast();
   const viewerRef = useRef<HTMLDivElement | null>(null);
   const renditionRef = useRef<Rendition | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -278,6 +280,10 @@ const EpubReader = () => {
                       const showing = !prev;
                       if (!showing) {
                         document.documentElement.requestFullscreen().catch(() => { });
+                        toast({
+                          description: "Toque na tela para sair do modo 'Tela cheia' e arraste para os lados para mudar de página",
+                          duration: 4000,
+                        });
                       } else {
                         if (document.fullscreenElement) document.exitFullscreen().catch(() => { });
                       }
@@ -331,7 +337,7 @@ const EpubReader = () => {
     load();
 
     return () => { cancelled = true; try { renditionRef.current?.destroy(); } catch { } };
-  }, [epubId, effectiveSpread]);
+  }, [epubId, effectiveSpread, toast]);
 
   // Watch for dark mode changes and re-apply theme
   useEffect(() => {
@@ -484,6 +490,10 @@ const EpubReader = () => {
                   // Hide menu -> Enter Fullscreen
                   setShowMobileMenu(false);
                   document.documentElement.requestFullscreen().catch(() => { });
+                  toast({
+                    description: "Toque na tela para sair do modo 'Tela cheia' e arraste para os lados para mudar de página",
+                    duration: 4000,
+                  });
                 } else {
                   // Show menu -> Exit Fullscreen
                   setShowMobileMenu(true);
