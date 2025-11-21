@@ -231,8 +231,8 @@ const EpubReader = () => {
                   try { console.log('[Baseline] existente', { scope: 'EpubReader', bookId: epubId, todayISO, base }); } catch { }
                 } else {
                   if ((percent ?? 0) > 0) {
-                    setDailyBaseline(epubId, todayISO, { words: 0, percent: baselinePercent });
-                    try { console.log('[Baseline] persistida', { scope: 'EpubReader', bookId: epubId, todayISO, baselinePercent }); } catch { }
+                    setDailyBaseline(epubId, todayISO, { words: 0, percent: percent });
+                    try { console.log('[Baseline] persistida', { scope: 'EpubReader', bookId: epubId, todayISO, baselinePercent: percent }); } catch { }
                   } else {
                     try { console.log('[Baseline] skip persist: percent atual 0', { scope: 'EpubReader', bookId: epubId, todayISO, percent }); } catch { }
                   }

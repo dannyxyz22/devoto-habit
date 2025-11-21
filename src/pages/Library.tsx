@@ -289,16 +289,7 @@ const Library = () => {
         } catch { }
       } else {
         setReadingPlan(selectedBook, null);
-        // Initialize baseline from current percent if missing
-        try {
-          const prog = getProgress(selectedBook);
-          const todayISO = formatISO(new Date(), { representation: "date" });
-          const existing = getDailyBaseline(selectedBook, todayISO);
-          if (!existing) {
-            setDailyBaseline(selectedBook, todayISO, { words: 0, percent: prog?.percent || 0 });
-            try { console.log('[Baseline] persistida', { scope: 'Library', bookId: selectedBook, todayISO, words: 0, percent: prog?.percent || 0 }); } catch { }
-          }
-        } catch { }
+        // Don't initialize baseline here for EPUBs - let EpubReader do it when user actually starts reading
       }
       // For EPUBs, just navigate to the EPUB reader
       setOpen(false);
