@@ -14,7 +14,19 @@ export type BookMeta = {
 // Note: keep using JPG that exists in src/assets. If you switch to PNG, ensure the file exists.
 import filoteiaCover from "@/assets/book-cover-filoteia.jpg";
 
-export const BOOKS: BookMeta[] = [
+// Validate that no static book IDs start with 'user-' to prevent collision with user uploads
+const validateBookIds = (books: BookMeta[]): BookMeta[] => {
+  books.forEach(book => {
+    if (book.id.startsWith('user-')) {
+      throw new Error(
+        `Static book IDs cannot start with 'user-' (reserved for user uploads): ${book.id}`
+      );
+    }
+  });
+  return books;
+};
+
+export const BOOKS: BookMeta[] = validateBookIds([
   {
     id: "filoteia",
     title: "Introdução à Vida Devota (Filotéia)",
@@ -71,6 +83,6 @@ export const BOOKS: BookMeta[] = [
 
 
 
-];
+]);
 
 export const getBookById = (id: string) => BOOKS.find((b) => b.id === id);

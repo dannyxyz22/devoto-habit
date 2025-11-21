@@ -80,7 +80,9 @@ export const saveUserEpub = async (file: File): Promise<UserEpub> => {
         console.error('[Cover] Extraction failed:', error);
     }
 
-    // Generate unique ID
+    // Generate unique ID with 'user-' prefix
+    // NOTE: The 'user-' prefix is reserved for user uploads and validated in books.ts
+    // to prevent naming collisions with static books
     const id = `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
     const userEpub: UserEpub = {
