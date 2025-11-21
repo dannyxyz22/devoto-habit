@@ -169,6 +169,42 @@ Os usuários podem fazer upload de seus próprios EPUBs através da página Bibl
 - `src/pages/Library.tsx`: Interface de upload e listagem
 - `src/pages/EpubReader.tsx`: Leitura de EPUBs do usuário
 
+### Sistema de Rastreamento de Livros Físicos
+
+Os usuários podem adicionar e acompanhar o progresso de leitura de livros físicos através da página Biblioteca:
+
+**Funcionalidades**:
+- Busca de metadados via Google Books API e Open Library API
+- Download automático de capas de livros com bypass de CORS
+- Entrada manual de livros (título, autor, número de páginas)
+- Rastreamento de progresso por página
+- Armazenamento offline em IndexedDB
+
+**Busca de Metadados**:
+- Busca automática em Google Books API (primária)
+- Fallback para Open Library API se Google Books falhar
+- Cache de resultados por 24 horas para reduzir chamadas à API
+- Download de capas convertidas para Data URLs para acesso offline
+
+**Solução de CORS para Capas**:
+- Problema: Navegadores bloqueiam requisições diretas a `books.google.com` devido a política CORS
+- Solução: Proxy automático via `images.weserv.nl` quando requisição direta falha
+- Benefício: Capas são baixadas e armazenadas como Data URLs, acessíveis offline
+- Timeout de 10 segundos para evitar travamentos em downloads lentos
+
+**Implementação**:
+- `src/lib/physicalBooks.ts`: Funções de gerenciamento (salvar, atualizar progresso, deletar)
+- `src/lib/bookMetadataSearch.ts`: Busca de metadados e download de capas com proxy CORS
+- `src/components/app/BookSearchDialog.tsx`: Interface de busca e adição
+- `src/pages/PhysicalBookTracker.tsx`: Página de rastreamento de progresso
+- `src/pages/Library.tsx`: Listagem integrada com livros digitais
+
+**Convenção de IDs**:
+- Livros físicos: IDs começam com `physical-`, seguido de timestamp e string aleatória
+  - Exemplo: `physical-1763730720458-abc123xyz`
+- Flag `isPhysical: true` no objeto para identificação
+
+
 ### Detecção de Tipo de Livro
 
 O sistema detecta se um livro é do usuário através de:

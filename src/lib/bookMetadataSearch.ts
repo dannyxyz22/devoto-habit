@@ -153,9 +153,36 @@ async function downloadImageAsDataUrl(url: string): Promise<string | undefined> 
             if (fetchError instanceof Error && fetchError.name === 'AbortError') {
                 console.error('[MetadataSearch] Cover download timeout after 10s:', secureUrl);
             } else {
-                console.error('[MetadataSearch] Cover fetch error:', fetchError);
+                console.error('[MetadataSearch] Cover fetch error (likely CORS):', fetchError);
             }
-            return undefined;
+
+            // Try CORS proxy fallback
+            console.log('[MetadataSearch] Attempting CORS proxy fallback...');
+            try {
+                const proxyUrl = `https://images.weserv.nl/?url=${encodeURIComponent(secureUrl)}`;
+                const proxyResponse = await fetch(proxyUrl);
+
+                if (!proxyResponse.ok) {
+                    console.warn('[MetadataSearch] Proxy download failed:', proxyResponse.status);
+                    return undefined;
+                }
+
+                const proxyBlob = await proxyResponse.blob();
+                console.log('[MetadataSearch] Proxy cover downloaded, size:', proxyBlob.size, 'bytes');
+
+                const proxyDataUrl = await new Promise<string>((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result as string);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(proxyBlob);
+                });
+
+                console.log('[MetadataSearch] Proxy cover converted to Data URL, length:', proxyDataUrl.length);
+                return proxyDataUrl;
+            } catch (proxyError) {
+                console.error('[MetadataSearch] Proxy fallback also failed:', proxyError);
+                return undefined;
+            }
         }
     } catch (error) {
         console.error('[MetadataSearch] Image download error:', error);
