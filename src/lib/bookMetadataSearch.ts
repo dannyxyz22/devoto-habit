@@ -1,5 +1,6 @@
 /**
  * Book Metadata Search - Integration with Google Books API and Open Library
+ * With lazy loading support for cover images
  */
 
 const CACHE_DB_NAME = 'devoto-habit-metadata-cache';
@@ -10,7 +11,8 @@ const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 export interface BookSearchResult {
     title: string;
     author: string;
-    coverUrl?: string;
+    coverUrl?: string;              // Data URL after download (for storage)
+    coverSourceUrl?: string;        // Original API image URL (for lazy loading)
     totalPages?: number;
     isbn?: string;
     publisher?: string;
@@ -113,7 +115,7 @@ async function cacheMetadata(query: string, results: BookSearchResult[]): Promis
 /**
  * Download image and convert to Data URL for offline storage
  */
-async function downloadImageAsDataUrl(url: string): Promise<string | undefined> {
+export async function downloadImageAsDataUrl(url: string): Promise<string | undefined> {
     try {
         // Use HTTPS if URL is HTTP
         const secureUrl = url.replace(/^http:/, 'https:');
@@ -192,6 +194,7 @@ async function downloadImageAsDataUrl(url: string): Promise<string | undefined> 
 
 /**
  * Search Google Books API
+ * Returns results immediately with coverSourceUrl for lazy loading
  */
 async function searchGoogleBooks(query: string): Promise<BookSearchResult[]> {
     try {
@@ -211,31 +214,23 @@ async function searchGoogleBooks(query: string): Promise<BookSearchResult[]> {
             return [];
         }
 
-        const results: BookSearchResult[] = await Promise.all(
-            data.items.map(async (item: any) => {
-                const volumeInfo = item.volumeInfo;
+        // Return results immediately without waiting for cover downloads
+        const results: BookSearchResult[] = data.items.map((item: any) => {
+            const volumeInfo = item.volumeInfo;
 
-                // Download cover image as Data URL for offline access
-                let coverDataUrl: string | undefined;
-                if (volumeInfo.imageLinks?.thumbnail) {
-                    coverDataUrl = await downloadImageAsDataUrl(volumeInfo.imageLinks.thumbnail);
-                }
+            return {
+                title: volumeInfo.title || 'Unknown Title',
+                author: volumeInfo.authors?.[0] || 'Unknown Author',
+                coverSourceUrl: volumeInfo.imageLinks?.thumbnail,  // Store source URL for lazy loading
+                totalPages: volumeInfo.pageCount,
+                isbn: volumeInfo.industryIdentifiers?.[0]?.identifier,
+                publisher: volumeInfo.publisher,
+                publishedDate: volumeInfo.publishedDate,
+                description: volumeInfo.description,
+            };
+        });
 
-                return {
-                    title: volumeInfo.title || 'Unknown Title',
-                    author: volumeInfo.authors?.[0] || 'Unknown Author',
-                    coverUrl: coverDataUrl,
-                    totalPages: volumeInfo.pageCount,
-                    isbn: volumeInfo.industryIdentifiers?.[0]?.identifier,
-                    publisher: volumeInfo.publisher,
-                    publishedDate: volumeInfo.publishedDate,
-                    description: volumeInfo.description,
-                };
-            })
-        );
-
-        const coversDownloaded = results.filter(r => r.coverUrl).length;
-        console.log('[MetadataSearch] Google Books found:', results.length, 'results,', coversDownloaded, 'covers downloaded');
+        console.log('[MetadataSearch] Google Books found:', results.length, 'results (covers will load lazily)');
         return results;
     } catch (error) {
         console.error('[MetadataSearch] Google Books error:', error);
@@ -245,6 +240,7 @@ async function searchGoogleBooks(query: string): Promise<BookSearchResult[]> {
 
 /**
  * Search Open Library API
+ * Returns results immediately with coverSourceUrl for lazy loading
  */
 async function searchOpenLibrary(query: string): Promise<BookSearchResult[]> {
     try {
@@ -264,30 +260,26 @@ async function searchOpenLibrary(query: string): Promise<BookSearchResult[]> {
             return [];
         }
 
-        const results: BookSearchResult[] = await Promise.all(
-            data.docs.map(async (doc: any) => {
-                // Download cover image as Data URL
-                let coverDataUrl: string | undefined;
-                if (doc.cover_i) {
-                    const coverUrl = `https://covers.openlibrary.org/b/id/${doc.cover_i}-L.jpg`;
-                    coverDataUrl = await downloadImageAsDataUrl(coverUrl);
-                }
+        // Return results immediately without waiting for cover downloads
+        const results: BookSearchResult[] = data.docs.map((doc: any) => {
+            let coverSourceUrl: string | undefined;
+            if (doc.cover_i) {
+                coverSourceUrl = `https://covers.openlibrary.org/b/id/${doc.cover_i}-L.jpg`;
+            }
 
-                return {
-                    title: doc.title || 'Unknown Title',
-                    author: doc.author_name?.[0] || 'Unknown Author',
-                    coverUrl: coverDataUrl,
-                    totalPages: doc.number_of_pages_median,
-                    isbn: doc.isbn?.[0],
-                    publisher: doc.publisher?.[0],
-                    publishedDate: doc.first_publish_year?.toString(),
-                    description: undefined, // Open Library doesn't provide description in search
-                };
-            })
-        );
+            return {
+                title: doc.title || 'Unknown Title',
+                author: doc.author_name?.[0] || 'Unknown Author',
+                coverSourceUrl,  // Store source URL for lazy loading
+                totalPages: doc.number_of_pages_median,
+                isbn: doc.isbn?.[0],
+                publisher: doc.publisher?.[0],
+                publishedDate: doc.first_publish_year?.toString(),
+                description: undefined, // Open Library doesn't provide description in search
+            };
+        });
 
-        const coversDownloaded = results.filter(r => r.coverUrl).length;
-        console.log('[MetadataSearch] Open Library found:', results.length, 'results,', coversDownloaded, 'covers downloaded');
+        console.log('[MetadataSearch] Open Library found:', results.length, 'results (covers will load lazily)');
         return results;
     } catch (error) {
         console.error('[MetadataSearch] Open Library error:', error);

@@ -4,28 +4,24 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, Search, BookPlus } from "lucide-react";
-import { searchBookMetadata, type BookSearchResult } from "@/lib/bookMetadataSearch";
+import { searchBookMetadata, downloadImageAsDataUrl, type BookSearchResult } from "@/lib/bookMetadataSearch";
 import { savePhysicalBook } from "@/lib/physicalBooks";
 import { useToast } from "@/components/ui/use-toast";
-
 interface BookSearchDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onBookAdded: () => void;
 }
-
 export function BookSearchDialog({ open, onOpenChange, onBookAdded }: BookSearchDialogProps) {
     const [searchQuery, setSearchQuery] = useState("");
     const [isSearching, setIsSearching] = useState(false);
     const [searchResults, setSearchResults] = useState<BookSearchResult[]>([]);
     const [showManualEntry, setShowManualEntry] = useState(false);
     const { toast } = useToast();
-
     // Manual entry form state
     const [manualTitle, setManualTitle] = useState("");
     const [manualAuthor, setManualAuthor] = useState("");
     const [manualPages, setManualPages] = useState("");
-
     const handleSearch = async () => {
         if (!searchQuery.trim()) {
             toast({
@@ -35,14 +31,11 @@ export function BookSearchDialog({ open, onOpenChange, onBookAdded }: BookSearch
             });
             return;
         }
-
         setIsSearching(true);
         setSearchResults([]);
         setShowManualEntry(false);
-
         try {
             const results = await searchBookMetadata(searchQuery);
-
             if (results.length === 0) {
                 toast({
                     title: "Nenhum resultado encontrado",
@@ -50,7 +43,22 @@ export function BookSearchDialog({ open, onOpenChange, onBookAdded }: BookSearch
                 });
                 setShowManualEntry(true);
             } else {
+                // Show results immediately
                 setSearchResults(results);
+                // Download covers asynchronously in the background
+                results.forEach(async (result, index) => {
+                    if (result.coverSourceUrl && !result.coverUrl) {
+                        const coverDataUrl = await downloadImageAsDataUrl(result.coverSourceUrl);
+                        if (coverDataUrl) {
+                            // Update the specific result with the downloaded cover
+                            setSearchResults(prevResults =>
+                                prevResults.map((r, i) =>
+                                    i === index ? { ...r, coverUrl: coverDataUrl } : r
+                                )
+                            );
+                        }
+                    }
+                });
             }
         } catch (error) {
             console.error("Search error:", error);
@@ -64,11 +72,9 @@ export function BookSearchDialog({ open, onOpenChange, onBookAdded }: BookSearch
             setIsSearching(false);
         }
     };
-
     const handleSelectBook = async (result: BookSearchResult) => {
         try {
             console.log('[BookSearch] Saving book:', result.title, 'with cover:', !!result.coverUrl);
-
             await savePhysicalBook({
                 title: result.title,
                 author: result.author,
@@ -80,14 +86,11 @@ export function BookSearchDialog({ open, onOpenChange, onBookAdded }: BookSearch
                 publishedDate: result.publishedDate,
                 description: result.description || "",
             });
-
             console.log('[BookSearch] Book saved successfully');
-
             toast({
                 title: "Livro adicionado!",
                 description: `${result.title} foi adicionado à sua biblioteca`,
             });
-
             onBookAdded();
             onOpenChange(false);
             resetForm();
@@ -100,7 +103,6 @@ export function BookSearchDialog({ open, onOpenChange, onBookAdded }: BookSearch
             });
         }
     };
-
     const handleManualAdd = async () => {
         if (!manualTitle.trim() || !manualAuthor.trim() || !manualPages) {
             toast({
@@ -110,7 +112,6 @@ export function BookSearchDialog({ open, onOpenChange, onBookAdded }: BookSearch
             });
             return;
         }
-
         const totalPages = parseInt(manualPages, 10);
         if (isNaN(totalPages) || totalPages <= 0) {
             toast({
@@ -120,7 +121,6 @@ export function BookSearchDialog({ open, onOpenChange, onBookAdded }: BookSearch
             });
             return;
         }
-
         try {
             await savePhysicalBook({
                 title: manualTitle.trim(),
@@ -129,12 +129,10 @@ export function BookSearchDialog({ open, onOpenChange, onBookAdded }: BookSearch
                 currentPage: 0,
                 description: "",
             });
-
             toast({
                 title: "Livro adicionado!",
                 description: `${manualTitle} foi adicionado à sua biblioteca`,
             });
-
             onBookAdded();
             onOpenChange(false);
             resetForm();
@@ -147,7 +145,6 @@ export function BookSearchDialog({ open, onOpenChange, onBookAdded }: BookSearch
             });
         }
     };
-
     const resetForm = () => {
         setSearchQuery("");
         setSearchResults([]);
@@ -156,7 +153,6 @@ export function BookSearchDialog({ open, onOpenChange, onBookAdded }: BookSearch
         setManualAuthor("");
         setManualPages("");
     };
-
     return (
         <Dialog open={open} onOpenChange={(newOpen) => {
             onOpenChange(newOpen);
@@ -169,7 +165,6 @@ export function BookSearchDialog({ open, onOpenChange, onBookAdded }: BookSearch
                         Busque por ISBN ou título + autor, ou adicione manualmente
                     </DialogDescription>
                 </DialogHeader>
-
                 <div className="space-y-4">
                     {/* Search Input */}
                     <div className="flex gap-2">
@@ -189,7 +184,6 @@ export function BookSearchDialog({ open, onOpenChange, onBookAdded }: BookSearch
                             )}
                         </Button>
                     </div>
-
                     {/* Search Results */}
                     {searchResults.length > 0 && (
                         <div className="space-y-2">
@@ -201,13 +195,20 @@ export function BookSearchDialog({ open, onOpenChange, onBookAdded }: BookSearch
                                         className="flex gap-3 p-3 border rounded-lg hover:bg-accent cursor-pointer transition-colors"
                                         onClick={() => handleSelectBook(result)}
                                     >
-                                        {result.coverUrl && (
-                                            <img
-                                                src={result.coverUrl}
-                                                alt={result.title}
-                                                className="w-16 h-24 object-cover rounded"
-                                            />
-                                        )}
+                                        {/* Cover Image or Loading Placeholder */}
+                                        <div className="w-16 h-24 flex-shrink-0 rounded overflow-hidden bg-muted flex items-center justify-center">
+                                            {result.coverUrl ? (
+                                                <img
+                                                    src={result.coverUrl}
+                                                    alt={result.title}
+                                                    className="w-full h-full object-cover"
+                                                />
+                                            ) : result.coverSourceUrl ? (
+                                                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                                            ) : (
+                                                <BookPlus className="h-6 w-6 text-muted-foreground" />
+                                            )}
+                                        </div>
                                         <div className="flex-1 min-w-0">
                                             <h4 className="font-medium truncate">{result.title}</h4>
                                             <p className="text-sm text-muted-foreground">{result.author}</p>
@@ -223,7 +224,6 @@ export function BookSearchDialog({ open, onOpenChange, onBookAdded }: BookSearch
                             </div>
                         </div>
                     )}
-
                     {/* Manual Entry Form */}
                     {showManualEntry && (
                         <div className="space-y-4 pt-4 border-t">
@@ -231,7 +231,6 @@ export function BookSearchDialog({ open, onOpenChange, onBookAdded }: BookSearch
                                 <BookPlus className="h-5 w-5" />
                                 <h3 className="text-sm font-medium">Adicionar manualmente</h3>
                             </div>
-
                             <div className="space-y-3">
                                 <div>
                                     <Label htmlFor="manual-title">Título *</Label>
@@ -242,7 +241,6 @@ export function BookSearchDialog({ open, onOpenChange, onBookAdded }: BookSearch
                                         placeholder="Título do livro"
                                     />
                                 </div>
-
                                 <div>
                                     <Label htmlFor="manual-author">Autor *</Label>
                                     <Input
@@ -252,7 +250,6 @@ export function BookSearchDialog({ open, onOpenChange, onBookAdded }: BookSearch
                                         placeholder="Nome do autor"
                                     />
                                 </div>
-
                                 <div>
                                     <Label htmlFor="manual-pages">Número de páginas *</Label>
                                     <Input
@@ -264,14 +261,12 @@ export function BookSearchDialog({ open, onOpenChange, onBookAdded }: BookSearch
                                         placeholder="300"
                                     />
                                 </div>
-
                                 <Button onClick={handleManualAdd} className="w-full">
                                     Adicionar Livro
                                 </Button>
                             </div>
                         </div>
                     )}
-
                     {/* Show manual entry button if no results */}
                     {!showManualEntry && searchResults.length === 0 && !isSearching && (
                         <Button
