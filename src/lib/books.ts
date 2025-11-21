@@ -6,6 +6,8 @@ export type BookMeta = {
   description: string;
   coverImage?: string;
   type?: 'json' | 'epub';
+  isUserUpload?: boolean;  // Flag for user-uploaded books
+  addedDate?: number;      // Timestamp for sorting
 };
 
 // Import asset via Vite so the URL is correctly handled in build
@@ -68,7 +70,7 @@ export const BOOKS: BookMeta[] = [
   },
 
 
-  
+
 ];
 
 export const getBookById = (id: string) => BOOKS.find((b) => b.id === id);

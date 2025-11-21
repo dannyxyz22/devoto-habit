@@ -15,6 +15,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { Settings, BookOpen, BookOpenCheck, Maximize, Minimize } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import { getUserEpubBlob } from "@/lib/userEpubs";
 
 type LayoutMode = "auto" | "single" | "double";
 
@@ -135,37 +136,53 @@ const EpubReader = () => {
       } catch { }
     };
     try { localStorage.setItem('lastBookId', epubId); } catch { }
-    const meta = BOOKS.find(b => b.id === epubId);
-    const src = meta?.sourceUrl || `/epubs/${epubId}.epub`;
-    const url = resolveEpubSource(src);
+
+    // Check if this is a user-uploaded EPUB
+    const isUserUpload = epubId.startsWith('user-');
 
     let cancelled = false;
     const load = async () => {
       try {
         let ab: ArrayBuffer | null = null;
-        // Try Cache Storage first
-        try {
-          if ('caches' in window) {
-            const cache = await caches.open('epub-cache-v1');
-            const cached = await cache.match(url);
-            if (cached && cached.ok) {
-              ab = await cached.arrayBuffer();
-            }
+
+        // If it's a user upload, load from IndexedDB
+        if (isUserUpload) {
+          const blob = await getUserEpubBlob(epubId);
+          if (!blob) {
+            throw new Error('User EPUB not found in storage');
           }
-        } catch { }
-        // If not cached, fetch and cache it
-        if (!ab) {
-          const resp = await fetch(url);
-          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-          // Clone and store in cache (best-effort)
+          ab = await blob.arrayBuffer();
+        } else {
+          // Original logic for built-in books
+          const meta = BOOKS.find(b => b.id === epubId);
+          const src = meta?.sourceUrl || `/epubs/${epubId}.epub`;
+          const url = resolveEpubSource(src);
+
+          // Try Cache Storage first
           try {
             if ('caches' in window) {
               const cache = await caches.open('epub-cache-v1');
-              await cache.put(url, resp.clone());
+              const cached = await cache.match(url);
+              if (cached && cached.ok) {
+                ab = await cached.arrayBuffer();
+              }
             }
           } catch { }
-          ab = await resp.arrayBuffer();
+          // If not cached, fetch and cache it
+          if (!ab) {
+            const resp = await fetch(url);
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            // Clone and store in cache (best-effort)
+            try {
+              if ('caches' in window) {
+                const cache = await caches.open('epub-cache-v1');
+                await cache.put(url, resp.clone());
+              }
+            } catch { }
+            ab = await resp.arrayBuffer();
+          }
         }
+
         if (cancelled) return;
         const book = ePub(ab);
         const rendition = book.renderTo(container, { width: "100%", height: "100%", spread: effectiveSpread as any });

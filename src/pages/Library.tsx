@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { BackLink } from "@/components/app/BackLink";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { BOOKS } from "@/lib/books";
+import { BOOKS, type BookMeta } from "@/lib/books";
 import { SEO } from "@/components/app/SEO";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,8 @@ import { formatISO } from "date-fns";
 import { resolveEpubSource } from "@/lib/utils";
 import ePub from "epubjs";
 import { getCoverObjectUrl, saveCoverBlob } from "@/lib/coverCache";
+import { saveUserEpub, getUserEpubs, deleteUserEpub } from "@/lib/userEpubs";
+import { Upload, Trash2 } from "lucide-react";
 
 type Paragraph = { type: string; content: string };
 type Chapter = { chapter_title: string; content: Paragraph[] };
@@ -32,6 +34,9 @@ const Library = () => {
   const [targetChapter, setTargetChapter] = useState<string>("end");
   const [bookParts, setBookParts] = useState<Part[] | null>(null);
   const [selectedIsEpub, setSelectedIsEpub] = useState<boolean>(false);
+  const [allBooks, setAllBooks] = useState<BookMeta[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const today = new Date().toISOString().slice(0, 10);
 
@@ -130,6 +135,93 @@ const Library = () => {
     );
   };
 
+  // Load user EPUBs on mount and merge with existing books
+  useEffect(() => {
+    const loadBooks = async () => {
+      const userEpubs = await getUserEpubs();
+
+      // Convert user EPUBs to BookMeta format
+      const userBooks: BookMeta[] = userEpubs.map(epub => ({
+        id: epub.id,
+        title: epub.title,
+        author: epub.author,
+        sourceUrl: URL.createObjectURL(epub.blob), // Create blob URL for reading
+        description: 'Uploaded by user',
+        type: 'epub' as const,
+        isUserUpload: true,
+        addedDate: epub.addedDate,
+      }));
+
+      // Sort user books by date (newest first), then append existing books
+      const sortedUserBooks = userBooks.sort((a, b) => (b.addedDate || 0) - (a.addedDate || 0));
+      setAllBooks([...sortedUserBooks, ...BOOKS]);
+    };
+
+    loadBooks();
+  }, []);
+
+  // Handle EPUB file upload
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+      const userEpub = await saveUserEpub(file);
+
+      // Add to books list
+      const newBook: BookMeta = {
+        id: userEpub.id,
+        title: userEpub.title,
+        author: userEpub.author,
+        sourceUrl: URL.createObjectURL(userEpub.blob),
+        description: 'Uploaded by user',
+        type: 'epub',
+        isUserUpload: true,
+        addedDate: userEpub.addedDate,
+      };
+
+      setAllBooks(prev => [newBook, ...prev]);
+
+      toast({
+        title: 'EPUB uploaded successfully',
+        description: `${userEpub.title} by ${userEpub.author}`,
+      });
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast({
+        title: 'Upload failed',
+        description: error instanceof Error ? error.message : 'Failed to upload EPUB',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUploading(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  // Handle delete user EPUB
+  const handleDeleteBook = async (bookId: string) => {
+    try {
+      await deleteUserEpub(bookId);
+      setAllBooks(prev => prev.filter(book => book.id !== bookId));
+      toast({
+        title: 'Book deleted',
+        description: 'The book has been removed from your library',
+      });
+    } catch (error) {
+      console.error('Delete error:', error);
+      toast({
+        title: 'Delete failed',
+        description: 'Failed to delete the book',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const onChooseBook = async (bookId: string) => {
     setSelectedBook(bookId);
     const plan = getReadingPlan(bookId);
@@ -146,7 +238,7 @@ const Library = () => {
     }
 
     // Load book structure for chapter selection
-    const book = BOOKS.find(b => b.id === bookId);
+    const book = allBooks.find(b => b.id === bookId);
     setSelectedIsEpub(book?.type === 'epub');
     if (book) {
       if (book.type === 'epub') {
@@ -308,8 +400,25 @@ const Library = () => {
         </nav>
         <h1 className="text-3xl font-bold mb-6 lg:text-white">Biblioteca</h1>
       </div>
+      <div className="container mx-auto mb-6">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".epub"
+          onChange={handleFileUpload}
+          className="hidden"
+        />
+        <Button
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isUploading}
+          className="lg:bg-slate-800 lg:text-white lg:hover:bg-slate-700"
+        >
+          <Upload className="h-4 w-4 mr-2" />
+          {isUploading ? 'Uploading...' : 'Upload EPUB'}
+        </Button>
+      </div>
       <section className="container mx-auto grid md:grid-cols-2 gap-6">
-        {BOOKS.map((book) => (
+        {allBooks.map((book) => (
           <Card key={book.id} className="hover:shadow-lg transition-shadow">
             <div
               role="button"
@@ -330,7 +439,23 @@ const Library = () => {
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 <span>{book.title}</span>
-                <span className="text-sm text-muted-foreground">{book.author}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">{book.author}</span>
+                  {book.isUserUpload && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteBook(book.id);
+                      }}
+                      className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      title="Delete book"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
               </CardTitle>
             </CardHeader>
             <CardContent>
