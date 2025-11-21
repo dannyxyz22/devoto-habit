@@ -386,7 +386,7 @@ const Library = () => {
       }
     }
     setOpen(false);
-    navigate(`/leitor/${selectedBook}`);
+    navigate(selectedIsEpub ? `/epub/${selectedBook}` : `/leitor/${selectedBook}`);
   };
 
   return (
