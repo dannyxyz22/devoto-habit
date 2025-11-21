@@ -9,6 +9,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Progress } from "@/components/ui/progress";
 import { BOOKS, type BookMeta } from "@/lib/books";
 import { getUserEpubs } from "@/lib/userEpubs";
+import { getPhysicalBooks } from "@/lib/physicalBooks";
 import { differenceInCalendarDays, formatISO, parseISO } from "date-fns";
 import { useTodayISO } from "@/hooks/use-today";
 import { getStreak, getReadingPlan, getProgress, getDailyBaseline, setDailyBaseline, getStats, type Streak } from "@/lib/storage";
@@ -33,6 +34,7 @@ const Index = () => {
   const [allBooks, setAllBooks] = useState<BookMeta[]>(BOOKS);
   const [parts, setParts] = useState<Part[] | null>(null);
   const [activeIsEpub, setActiveIsEpub] = useState(false);
+  const [activeIsPhysical, setActiveIsPhysical] = useState(false);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -71,10 +73,14 @@ const Index = () => {
     } catch { }
   }, []);
 
-  // Load user books
+  // Load user books (EPUBs and Physical)
   useEffect(() => {
     const loadBooks = async () => {
-      const userEpubs = await getUserEpubs();
+      const [userEpubs, physicalBooks] = await Promise.all([
+        getUserEpubs(),
+        getPhysicalBooks(),
+      ]);
+
       const userBooks: BookMeta[] = userEpubs.map(epub => ({
         id: epub.id,
         title: epub.title,
@@ -86,7 +92,21 @@ const Index = () => {
         isUserUpload: true,
         addedDate: epub.addedDate,
       }));
-      setAllBooks([...userBooks, ...BOOKS]);
+
+      const physicalBooksMeta: BookMeta[] = physicalBooks.map(book => ({
+        id: book.id,
+        title: book.title,
+        author: book.author,
+        description: book.description || '',
+        coverImage: book.coverUrl,
+        type: 'physical' as const,
+        isPhysical: true,
+        totalPages: book.totalPages,
+        currentPage: book.currentPage,
+        addedDate: book.addedDate,
+      }));
+
+      setAllBooks([...userBooks, ...physicalBooksMeta, ...BOOKS]);
     };
     loadBooks();
   }, []);
@@ -96,8 +116,13 @@ const Index = () => {
     if (!activeBookId) return;
     const meta = allBooks.find(b => b.id === activeBookId);
     if (!meta) return;
-    setActiveIsEpub(meta.type === 'epub');
-    if (meta.type === 'epub') {
+
+    const isEpub = meta.type === 'epub';
+    const isPhysical = meta.type === 'physical';
+    setActiveIsEpub(isEpub);
+    setActiveIsPhysical(isPhysical);
+
+    if (isEpub || isPhysical) {
       setParts(null);
       return;
     } else {
@@ -107,7 +132,7 @@ const Index = () => {
         try { setParts(JSON.parse(cached)); return; } catch { }
       }
       setLoading(true);
-      fetch(meta.sourceUrl)
+      fetch(meta.sourceUrl!)
         .then(r => r.json())
         .then(json => {
           localStorage.setItem(cacheKey, JSON.stringify(json));
@@ -122,13 +147,16 @@ const Index = () => {
   const plan = useMemo(() => activeBookId ? getReadingPlan(activeBookId) : { targetDateISO: null }, [activeBookId]);
   const p = useMemo(() => activeBookId ? getProgress(activeBookId) : { partIndex: 0, chapterIndex: 0, percent: 0 }, [activeBookId]);
   const totalWords = useMemo(() => computeTotalWords(parts), [parts]);
+
+  const isPercentBased = activeIsEpub || activeIsPhysical;
+
   const wordsUpToCurrent = useMemo(
-    () => activeIsEpub ? 0 : computeWordsUpToPosition(parts, { partIndex: p.partIndex, chapterIndex: p.chapterIndex }),
-    [activeIsEpub, parts, p]
+    () => isPercentBased ? 0 : computeWordsUpToPosition(parts, { partIndex: p.partIndex, chapterIndex: p.chapterIndex }),
+    [isPercentBased, parts, p]
   );
   const targetWords = useMemo(
-    () => activeIsEpub ? 0 : computeWordsUpToInclusiveTarget(parts, { targetPartIndex: plan.targetPartIndex, targetChapterIndex: plan.targetChapterIndex }, totalWords),
-    [activeIsEpub, parts, plan, totalWords]
+    () => isPercentBased ? 0 : computeWordsUpToInclusiveTarget(parts, { targetPartIndex: plan.targetPartIndex, targetChapterIndex: plan.targetChapterIndex }, totalWords),
+    [isPercentBased, parts, plan, totalWords]
   );
 
   // Load plan start to compute progress from start to target
@@ -144,11 +172,12 @@ const Index = () => {
   const todayISO = useTodayISO();
   // Derive today's baseline synchronously to avoid transient old percent after day change
   const baselineForToday = useMemo(() => {
-    if (!activeBookId) return activeIsEpub ? (p.percent || 0) : wordsUpToCurrent;
+    if (!activeBookId) return isPercentBased ? (p.percent || 0) : wordsUpToCurrent;
     const base = getDailyBaseline(activeBookId, todayISO);
-    if (base) return activeIsEpub ? base.percent : base.words;
-    return activeIsEpub ? (p.percent || 0) : wordsUpToCurrent;
-  }, [activeBookId, activeIsEpub, todayISO, wordsUpToCurrent, p.percent]);
+    if (base) return isPercentBased ? base.percent : base.words;
+    return isPercentBased ? (p.percent || 0) : wordsUpToCurrent;
+  }, [activeBookId, isPercentBased, todayISO, wordsUpToCurrent, p.percent]);
+
   // Persist baseline if missing, with guards and logs
   useEffect(() => {
     if (!activeBookId) return;
@@ -157,39 +186,39 @@ const Index = () => {
       try { console.log('[Baseline] existente', { scope: 'Index', bookId: activeBookId, todayISO, base }); } catch { }
       return;
     }
-    const hasProgress = activeIsEpub ? ((p?.percent ?? 0) > 0) : (wordsUpToCurrent > 0);
-    if (!parts && !activeIsEpub) {
-      try { console.log('[Baseline] skip persist: parts não carregadas', { scope: 'Index', bookId: activeBookId, todayISO, wordsUpToCurrent, p, activeIsEpub }); } catch { }
+    const hasProgress = isPercentBased ? ((p?.percent ?? 0) > 0) : (wordsUpToCurrent > 0);
+    if (!parts && !isPercentBased) {
+      try { console.log('[Baseline] skip persist: parts não carregadas', { scope: 'Index', bookId: activeBookId, todayISO, wordsUpToCurrent, p, isPercentBased }); } catch { }
       return;
     }
     if (!hasProgress) {
-      try { console.log('[Baseline] skip persist: sem progresso ainda', { scope: 'Index', bookId: activeBookId, todayISO, wordsUpToCurrent, percent: p.percent, activeIsEpub }); } catch { }
+      try { console.log('[Baseline] skip persist: sem progresso ainda', { scope: 'Index', bookId: activeBookId, todayISO, wordsUpToCurrent, percent: p.percent, isPercentBased }); } catch { }
       return;
     }
-    // Use consistent percent: EPUB uses p.percent; non-EPUB uses words-based totalBookProgressPercent
-    const baselinePercent = activeIsEpub ? (p.percent || 0) : (parts ? Math.min(100, Math.round((wordsUpToCurrent / Math.max(1, totalWords)) * 100)) : 0);
+    // Use consistent percent: EPUB/Physical uses p.percent; non-EPUB uses words-based totalBookProgressPercent
+    const baselinePercent = isPercentBased ? (p.percent || 0) : (parts ? Math.min(100, Math.round((wordsUpToCurrent / Math.max(1, totalWords)) * 100)) : 0);
     setDailyBaseline(activeBookId, todayISO, { words: wordsUpToCurrent, percent: baselinePercent });
-    try { console.log('[Baseline] persistida', { scope: 'Index', bookId: activeBookId, todayISO, words: wordsUpToCurrent, percent: baselinePercent, activeIsEpub }); } catch { }
-  }, [activeBookId, todayISO, parts, activeIsEpub, wordsUpToCurrent, p.percent, totalWords]);
+    try { console.log('[Baseline] persistida', { scope: 'Index', bookId: activeBookId, todayISO, words: wordsUpToCurrent, percent: baselinePercent, isPercentBased }); } catch { }
+  }, [activeBookId, todayISO, parts, isPercentBased, wordsUpToCurrent, p.percent, totalWords]);
 
   const daysRemaining = useMemo(() => computeDaysRemaining(plan?.targetDateISO), [plan]);
-  // EPUB daily target uses percentage instead of words
+  // EPUB/Physical daily target uses percentage instead of words
   const dailyTargetWords = useMemo(
-    () => activeIsEpub
+    () => isPercentBased
       ? (daysRemaining ? Math.ceil(Math.max(0, 100 - (baselineForToday || 0)) / daysRemaining) : null)
       : computeDailyTargetWords(targetWords, baselineForToday, daysRemaining),
-    [activeIsEpub, targetWords, baselineForToday, daysRemaining]
+    [isPercentBased, targetWords, baselineForToday, daysRemaining]
   );
   const achievedWordsToday = useMemo(
-    () => activeIsEpub ? Math.max(0, (p.percent || 0) - (baselineForToday || 0)) : computeAchievedWordsToday(wordsUpToCurrent, baselineForToday),
-    [activeIsEpub, p.percent, baselineForToday, wordsUpToCurrent]
+    () => isPercentBased ? Math.max(0, (p.percent || 0) - (baselineForToday || 0)) : computeAchievedWordsToday(wordsUpToCurrent, baselineForToday),
+    [isPercentBased, p.percent, baselineForToday, wordsUpToCurrent]
   );
   const dailyProgressPercent = useMemo(
     () => computeDailyProgressPercent(achievedWordsToday, dailyTargetWords),
     [achievedWordsToday, dailyTargetWords]
   );
   const planProgressPercent = useMemo(() => {
-    if (activeIsEpub) {
+    if (isPercentBased) {
       // From plan start percent to 100% target
       const rawStart = planStart?.startWords != null ? planStart.startWords : null; // for type narrowing only
       const startPercent = (() => { try { const raw = localStorage.getItem(`planStart:${activeBookId}`); const j = raw ? JSON.parse(raw) : null; return j?.startPercent ?? 0; } catch { return 0; } })();
@@ -198,8 +227,9 @@ const Index = () => {
       return Math.min(100, Math.round((num / denom) * 100));
     }
     return computePlanProgressPercent(parts, wordsUpToCurrent, targetWords, planStart);
-  }, [activeIsEpub, parts, wordsUpToCurrent, targetWords, planStart, p.percent, activeBookId]);
-  const totalBookProgressPercent = useMemo(() => activeIsEpub ? (p.percent || 0) : (parts ? Math.min(100, Math.round((wordsUpToCurrent / Math.max(1, totalWords)) * 100)) : null), [activeIsEpub, parts, wordsUpToCurrent, totalWords, p.percent]);
+  }, [isPercentBased, parts, wordsUpToCurrent, targetWords, planStart, p.percent, activeBookId]);
+
+  const totalBookProgressPercent = useMemo(() => isPercentBased ? (p.percent || 0) : (parts ? Math.min(100, Math.round((wordsUpToCurrent / Math.max(1, totalWords)) * 100)) : null), [isPercentBased, parts, wordsUpToCurrent, totalWords, p.percent]);
 
   // Current reading position labels
   const currentPartTitle = useMemo(() => {
@@ -259,7 +289,7 @@ const Index = () => {
             <>
               <Progress value={dailyProgressPercent} />
               <p className="text-sm text-muted-foreground mt-2">
-                {dailyProgressPercent}% — {achievedWordsToday}/{dailyTargetWords} {activeIsEpub ? "%" : "palavras"}
+                {dailyProgressPercent}% — {achievedWordsToday}/{dailyTargetWords} {isPercentBased ? "%" : "palavras"}
               </p>
             </>
           ) : (
@@ -276,7 +306,7 @@ const Index = () => {
               <p className="text-sm text-muted-foreground mt-2">Meta: {planProgressPercent}%
                 {daysRemaining ? ` • ${daysRemaining} dia(s) restantes` : ""}
               </p>
-              {!activeIsEpub && parts && plan?.targetPartIndex != null && (
+              {!isPercentBased && parts && plan?.targetPartIndex != null && (
                 <p className="text-sm text-muted-foreground mt-1">
                   {`${targetPartTitle ? `${targetPartTitle}` : ""}`}
                   <br />
@@ -314,12 +344,12 @@ const Index = () => {
         <div className="rounded-lg border p-4">
           <h3 className="text-lg font-semibold">Marcador do livro</h3>
           {used && activeBookId ? (
-            activeIsEpub ? (
+            isPercentBased ? (
               <>
                 <p className="text-sm text-muted-foreground mt-1">{p.percent || 0}% lido</p>
                 <div className="mt-2">
                   <Button asChild variant="link">
-                    <Link to={`/epub/${activeBookId}`}>Continuar leitura</Link>
+                    <Link to={activeIsPhysical ? `/physical/${activeBookId}` : `/epub/${activeBookId}`}>Continuar leitura</Link>
                   </Button>
                 </div>
               </>
