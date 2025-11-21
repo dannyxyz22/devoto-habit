@@ -7,7 +7,8 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useEffect, useMemo, useState } from "react";
 import { Progress } from "@/components/ui/progress";
-import { BOOKS } from "@/lib/books";
+import { BOOKS, type BookMeta } from "@/lib/books";
+import { getUserEpubs } from "@/lib/userEpubs";
 import { differenceInCalendarDays, formatISO, parseISO } from "date-fns";
 import { useTodayISO } from "@/hooks/use-today";
 import { getStreak, getReadingPlan, getProgress, getDailyBaseline, setDailyBaseline, getStats, type Streak } from "@/lib/storage";
@@ -29,6 +30,7 @@ const Index = () => {
   const [streak, setStreak] = useState<Streak>(() => getStreak());
   const [used, setUsed] = useState(false);
   const [activeBookId, setActiveBookId] = useState<string | null>(null);
+  const [allBooks, setAllBooks] = useState<BookMeta[]>(BOOKS);
   const [parts, setParts] = useState<Part[] | null>(null);
   const [activeIsEpub, setActiveIsEpub] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -66,13 +68,33 @@ const Index = () => {
         }
       }
       setActiveBookId(chosen);
-    } catch {}
+    } catch { }
+  }, []);
+
+  // Load user books
+  useEffect(() => {
+    const loadBooks = async () => {
+      const userEpubs = await getUserEpubs();
+      const userBooks: BookMeta[] = userEpubs.map(epub => ({
+        id: epub.id,
+        title: epub.title,
+        author: epub.author,
+        sourceUrl: URL.createObjectURL(epub.blob),
+        description: 'Uploaded by user',
+        coverImage: epub.coverUrl,
+        type: 'epub' as const,
+        isUserUpload: true,
+        addedDate: epub.addedDate,
+      }));
+      setAllBooks([...userBooks, ...BOOKS]);
+    };
+    loadBooks();
   }, []);
 
   // Load active book structure to compute progress when needed
   useEffect(() => {
     if (!activeBookId) return;
-    const meta = BOOKS.find(b => b.id === activeBookId);
+    const meta = allBooks.find(b => b.id === activeBookId);
     if (!meta) return;
     setActiveIsEpub(meta.type === 'epub');
     if (meta.type === 'epub') {
@@ -82,7 +104,7 @@ const Index = () => {
       const cacheKey = `book:${meta.id}`;
       const cached = localStorage.getItem(cacheKey);
       if (cached) {
-        try { setParts(JSON.parse(cached)); return; } catch {}
+        try { setParts(JSON.parse(cached)); return; } catch { }
       }
       setLoading(true);
       fetch(meta.sourceUrl)
@@ -94,7 +116,7 @@ const Index = () => {
         .catch(() => setErr("Falha ao carregar o livro para estatísticas."))
         .finally(() => setLoading(false));
     }
-  }, [activeBookId]);
+  }, [activeBookId, allBooks]);
 
   // Compute plan progress and daily goal similar to Reader
   const plan = useMemo(() => activeBookId ? getReadingPlan(activeBookId) : { targetDateISO: null }, [activeBookId]);
@@ -132,22 +154,22 @@ const Index = () => {
     if (!activeBookId) return;
     const base = getDailyBaseline(activeBookId, todayISO);
     if (base) {
-      try { console.log('[Baseline] existente', { scope: 'Index', bookId: activeBookId, todayISO, base }); } catch {}
+      try { console.log('[Baseline] existente', { scope: 'Index', bookId: activeBookId, todayISO, base }); } catch { }
       return;
     }
     const hasProgress = activeIsEpub ? ((p?.percent ?? 0) > 0) : (wordsUpToCurrent > 0);
     if (!parts && !activeIsEpub) {
-      try { console.log('[Baseline] skip persist: parts não carregadas', { scope: 'Index', bookId: activeBookId, todayISO, wordsUpToCurrent, p, activeIsEpub }); } catch {}
+      try { console.log('[Baseline] skip persist: parts não carregadas', { scope: 'Index', bookId: activeBookId, todayISO, wordsUpToCurrent, p, activeIsEpub }); } catch { }
       return;
     }
     if (!hasProgress) {
-      try { console.log('[Baseline] skip persist: sem progresso ainda', { scope: 'Index', bookId: activeBookId, todayISO, wordsUpToCurrent, percent: p.percent, activeIsEpub }); } catch {}
+      try { console.log('[Baseline] skip persist: sem progresso ainda', { scope: 'Index', bookId: activeBookId, todayISO, wordsUpToCurrent, percent: p.percent, activeIsEpub }); } catch { }
       return;
     }
     // Use consistent percent: EPUB uses p.percent; non-EPUB uses words-based totalBookProgressPercent
     const baselinePercent = activeIsEpub ? (p.percent || 0) : (parts ? Math.min(100, Math.round((wordsUpToCurrent / Math.max(1, totalWords)) * 100)) : 0);
     setDailyBaseline(activeBookId, todayISO, { words: wordsUpToCurrent, percent: baselinePercent });
-    try { console.log('[Baseline] persistida', { scope: 'Index', bookId: activeBookId, todayISO, words: wordsUpToCurrent, percent: baselinePercent, activeIsEpub }); } catch {}
+    try { console.log('[Baseline] persistida', { scope: 'Index', bookId: activeBookId, todayISO, words: wordsUpToCurrent, percent: baselinePercent, activeIsEpub }); } catch { }
   }, [activeBookId, todayISO, parts, activeIsEpub, wordsUpToCurrent, p.percent, totalWords]);
 
   const daysRemaining = useMemo(() => computeDaysRemaining(plan?.targetDateISO), [plan]);
@@ -209,15 +231,15 @@ const Index = () => {
 
   // Push widget update when progress/goal changes (native only)
   useEffect(() => {
-  const isNative = canUseNative();
-  if (!isNative) return;
+    const isNative = canUseNative();
+    if (!isNative) return;
     const percent = Math.max(0, Math.min(100, Math.round(dailyProgressPercent || 0)));
     const hasGoal = dailyTargetWords != null && dailyTargetWords > 0;
     (async () => {
       try {
         await updateDailyProgressWidget(percent, hasGoal);
-    await WidgetUpdater.update?.();
-      } catch {}
+        await WidgetUpdater.update?.();
+      } catch { }
     })();
   }, [dailyProgressPercent, dailyTargetWords]);
 
@@ -233,11 +255,11 @@ const Index = () => {
         {/* Meta diária (se houver) */}
         <div className="rounded-lg border p-4">
           <h3 className="text-lg font-semibold">Meta diária</h3>
-      {used && activeBookId && dailyProgressPercent != null ? (
+          {used && activeBookId && dailyProgressPercent != null ? (
             <>
               <Progress value={dailyProgressPercent} />
               <p className="text-sm text-muted-foreground mt-2">
-        {dailyProgressPercent}% — {achievedWordsToday}/{dailyTargetWords} {activeIsEpub ? "%" : "palavras"}
+                {dailyProgressPercent}% — {achievedWordsToday}/{dailyTargetWords} {activeIsEpub ? "%" : "palavras"}
               </p>
             </>
           ) : (
@@ -248,13 +270,13 @@ const Index = () => {
         {/* Meta de leitura: mostra progresso da meta (se houver) */}
         <div className="rounded-lg border p-4">
           <h3 className="text-lg font-semibold">Meta de leitura</h3>
-      {used && activeBookId && plan?.targetDateISO && planProgressPercent != null ? (
+          {used && activeBookId && plan?.targetDateISO && planProgressPercent != null ? (
             <>
               <Progress value={planProgressPercent} />
               <p className="text-sm text-muted-foreground mt-2">Meta: {planProgressPercent}%
                 {daysRemaining ? ` • ${daysRemaining} dia(s) restantes` : ""}
               </p>
-        {!activeIsEpub && parts && plan?.targetPartIndex != null && (
+              {!activeIsEpub && parts && plan?.targetPartIndex != null && (
                 <p className="text-sm text-muted-foreground mt-1">
                   {`${targetPartTitle ? `${targetPartTitle}` : ""}`}
                   <br />
@@ -272,11 +294,11 @@ const Index = () => {
           <h3 className="text-lg font-semibold">Livro ativo</h3>
           {used ? (
             <>
-              <p className="text-muted-foreground text-sm">{activeBookId ? (BOOKS.find(b=>b.id===activeBookId)?.title || activeBookId) : "—"}</p>
-        {activeBookId && totalBookProgressPercent != null && (
+              <p className="text-muted-foreground text-sm">{activeBookId ? (allBooks.find(b => b.id === activeBookId)?.title || activeBookId) : "—"}</p>
+              {activeBookId && totalBookProgressPercent != null && (
                 <div className="mt-2">
                   <Progress value={totalBookProgressPercent} />
-          <p className="text-sm text-muted-foreground mt-2">Livro: {totalBookProgressPercent}%</p>
+                  <p className="text-sm text-muted-foreground mt-2">Livro: {totalBookProgressPercent}%</p>
                 </div>
               )}
             </>
@@ -356,7 +378,7 @@ const Index = () => {
           <p className="text-muted-foreground text-sm">{err}</p>
         </div>
       )}
-      
+
     </main>
   );
 };
