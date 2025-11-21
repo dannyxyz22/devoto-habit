@@ -6,7 +6,7 @@ import { updateDailyProgressWidget } from '@/main';
 // Central DRY function to recompute daily percent & push widget without needing UI pages.
 export async function performDailyWidgetRefresh() {
   try {
-    const todayISO = new Date().toISOString().slice(0,10);
+    const todayISO = new Date().toISOString().slice(0, 10);
     // Choose active book same heuristic as Index
     let activeBookId: string | null = null;
     try {
@@ -15,17 +15,23 @@ export async function performDailyWidgetRefresh() {
       if (!activeBookId) {
         for (const b of BOOKS) {
           const plan = getReadingPlan(b.id);
-            if (plan?.targetDateISO) { activeBookId = b.id; break; }
+          if (plan?.targetDateISO) { activeBookId = b.id; break; }
         }
       }
-    } catch {}
+    } catch { }
+
     if (!activeBookId) return; // nothing to refresh
+
     const meta = BOOKS.find(b => b.id === activeBookId);
-    if (!meta) return;
+    const isUserEpub = activeBookId.startsWith('user-');
+
+    if (!meta && !isUserEpub) return;
+
     const progress = getProgress(activeBookId);
     let dailyProgressPercent: number | null = null;
     let hasGoal = false;
-    if (meta.type === 'epub') {
+
+    if (isUserEpub || meta?.type === 'epub') {
       // EPUB: percent based logic
       const base = getDailyBaseline(activeBookId, todayISO);
       if (!base && (progress.percent || 0) > 0) {
@@ -40,8 +46,9 @@ export async function performDailyWidgetRefresh() {
       hasGoal = dailyTargetPercent != null && dailyTargetPercent > 0;
     } else {
       // Non EPUB: load structure if cached only (avoid network on background)
+      if (!meta) return; // Should not happen given checks above
       let parts: any = null;
-      try { const cached = localStorage.getItem(`book:${meta.id}`); if (cached) parts = JSON.parse(cached); } catch {}
+      try { const cached = localStorage.getItem(`book:${meta.id}`); if (cached) parts = JSON.parse(cached); } catch { }
       if (!parts) return; // no cached data, skip silent refresh
       const totalWords = computeTotalWords(parts);
       const wordsUpToCurrent = computeWordsUpToPosition(parts, { partIndex: progress.partIndex, chapterIndex: progress.chapterIndex });
@@ -50,7 +57,7 @@ export async function performDailyWidgetRefresh() {
       const base = getDailyBaseline(activeBookId, todayISO);
       if (!base && wordsUpToCurrent > 0) {
         // Use words-based total book percent for baseline percent
-        const totalBookPercent = Math.min(100, Math.round((wordsUpToCurrent / Math.max(1,totalWords))*100));
+        const totalBookPercent = Math.min(100, Math.round((wordsUpToCurrent / Math.max(1, totalWords)) * 100));
         setDailyBaseline(activeBookId, todayISO, { words: wordsUpToCurrent, percent: totalBookPercent });
       }
       const baselineWords = base ? base.words : wordsUpToCurrent;
@@ -60,13 +67,14 @@ export async function performDailyWidgetRefresh() {
       dailyProgressPercent = computeDailyProgressPercent(achievedWordsToday, dailyTargetWords);
       hasGoal = dailyTargetWords != null && dailyTargetWords > 0;
     }
+
     if (dailyProgressPercent != null) {
       await updateDailyProgressWidget(dailyProgressPercent, hasGoal);
     }
   } catch (e) {
-    try { console.log('[DailyRefresh] erro', e); } catch {}
+    try { console.log('[DailyRefresh] erro', e); } catch { }
   }
 }
 
 // Expose on window for native-triggered usage
-try { (window as any).devotaDailyRefresh = performDailyWidgetRefresh; } catch {}
+try { (window as any).devotaDailyRefresh = performDailyWidgetRefresh; } catch { }

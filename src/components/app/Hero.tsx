@@ -40,11 +40,15 @@ export const Hero = () => {
         setCtaLabel("Continuar");
         const last = ls.getItem('lastBookId');
         if (last) {
-          const meta = BOOKS.find(b => b.id === last);
-          setCtaHref(meta?.type === 'epub' ? `/epub/${last}` : `/leitor/${last}`);
+          if (last.startsWith('user-')) {
+            setCtaHref(`/epub/${last}`);
+          } else {
+            const meta = BOOKS.find(b => b.id === last);
+            setCtaHref(meta?.type === 'epub' ? `/epub/${last}` : `/leitor/${last}`);
+          }
         }
       }
-    } catch {}
+    } catch { }
   }, []);
 
   return (

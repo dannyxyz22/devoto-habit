@@ -272,7 +272,7 @@ const Library = () => {
   const startReading = async (withPlan: boolean) => {
     if (!selectedBook) return;
     const meta = BOOKS.find(b => b.id === selectedBook);
-    if (meta?.type === 'epub') {
+    if (selectedIsEpub || meta?.type === 'epub') {
       if (withPlan) {
         if (!endDate) {
           toast({ title: "Selecione uma data", description: "Escolha uma data de término ou comece sem meta." });
