@@ -406,7 +406,7 @@ const EpubReader = () => {
   }, []);
 
   return (
-    <main className={`min-h-screen lg:bg-slate-900 flex flex-col items-center justify-center ${isFullscreen ? '' : 'lg:py-8 lg:px-4'}`}>
+    <main className={`h-screen lg:bg-slate-900 flex flex-col items-center justify-center ${isFullscreen ? '' : 'lg:py-8 lg:px-4'}`}>
       <SEO title={`EPUB — ${epubId}`} description="Leitor EPUB" canonical={`/epub/${epubId}`} />
 
       {/* Header - Hidden on mobile unless showMobileMenu is true */}
@@ -504,9 +504,10 @@ const EpubReader = () => {
         </Button>
 
         {/* Book Pages - Full width on mobile, bordered on desktop */}
-        <div className="relative w-full lg:bg-gradient-to-b lg:from-slate-800 lg:to-slate-900 lg:rounded-2xl lg:p-6 lg:shadow-2xl">
+        <div className={`relative w-full lg:bg-gradient-to-b lg:from-slate-800 lg:to-slate-900 lg:rounded-2xl lg:p-6 lg:shadow-2xl ${isFullscreen ? 'h-screen' : ''}`}>
           <div
-            className="relative bg-white lg:bg-amber-50 lg:rounded-lg lg:shadow-[0_0_60px_rgba(0,0,0,0.5)] overflow-hidden h-screen lg:h-[85vh]"
+            className={`relative bg-white lg:bg-amber-50 lg:rounded-lg lg:shadow-[0_0_60px_rgba(0,0,0,0.5)] overflow-hidden h-screen ${isFullscreen ? '' : 'lg:h-[85vh]'}`}
+            style={isFullscreen ? { height: 'calc(100vh - 3rem)' } : undefined}
             onClick={() => {
               // Toggle mobile menu and fullscreen on tap (mobile only)
               if (window.innerWidth < 1024) {
