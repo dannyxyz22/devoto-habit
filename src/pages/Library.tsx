@@ -15,7 +15,9 @@ import { resolveEpubSource } from "@/lib/utils";
 import ePub from "epubjs";
 import { getCoverObjectUrl, saveCoverBlob } from "@/lib/coverCache";
 import { saveUserEpub, getUserEpubs, deleteUserEpub } from "@/lib/userEpubs";
-import { Upload, Trash2 } from "lucide-react";
+import { getPhysicalBooks, deletePhysicalBook } from "@/lib/physicalBooks";
+import { BookSearchDialog } from "@/components/app/BookSearchDialog";
+import { Upload, Trash2, BookPlus } from "lucide-react";
 
 type Paragraph = { type: string; content: string };
 type Chapter = { chapter_title: string; content: Paragraph[] };
@@ -34,8 +36,10 @@ const Library = () => {
   const [targetChapter, setTargetChapter] = useState<string>("end");
   const [bookParts, setBookParts] = useState<Part[] | null>(null);
   const [selectedIsEpub, setSelectedIsEpub] = useState<boolean>(false);
+  const [selectedIsPhysical, setSelectedIsPhysical] = useState<boolean>(false);
   const [allBooks, setAllBooks] = useState<BookMeta[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [showBookSearch, setShowBookSearch] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const today = new Date().toISOString().slice(0, 10);
@@ -135,27 +139,46 @@ const Library = () => {
     );
   };
 
-  // Load user EPUBs on mount and merge with existing books
+  // Load user EPUBs and physical books on mount and merge with existing books
   useEffect(() => {
     const loadBooks = async () => {
-      const userEpubs = await getUserEpubs();
+      const [userEpubs, physicalBooks] = await Promise.all([
+        getUserEpubs(),
+        getPhysicalBooks(),
+      ]);
 
       // Convert user EPUBs to BookMeta format
-      const userBooks: BookMeta[] = userEpubs.map(epub => ({
+      const userEpubBooks: BookMeta[] = userEpubs.map(epub => ({
         id: epub.id,
         title: epub.title,
         author: epub.author,
-        sourceUrl: URL.createObjectURL(epub.blob), // Create blob URL for reading
+        sourceUrl: URL.createObjectURL(epub.blob),
         description: 'Uploaded by user',
-        coverImage: epub.coverUrl, // Use extracted cover
+        coverImage: epub.coverUrl,
         type: 'epub' as const,
         isUserUpload: true,
         addedDate: epub.addedDate,
       }));
 
-      // Sort user books by date (newest first), then append existing books
-      const sortedUserBooks = userBooks.sort((a, b) => (b.addedDate || 0) - (a.addedDate || 0));
-      setAllBooks([...sortedUserBooks, ...BOOKS]);
+      // Convert physical books to BookMeta format
+      const physicalBooksMeta: BookMeta[] = physicalBooks.map(book => ({
+        id: book.id,
+        title: book.title,
+        author: book.author,
+        description: book.description || '',
+        coverImage: book.coverUrl,
+        type: 'physical' as const,
+        isPhysical: true,
+        totalPages: book.totalPages,
+        currentPage: book.currentPage,
+        addedDate: book.addedDate,
+      }));
+
+      // Sort all user books by date (newest first), then append static books
+      const allUserBooks = [...userEpubBooks, ...physicalBooksMeta]
+        .sort((a, b) => (b.addedDate || 0) - (a.addedDate || 0));
+
+      setAllBooks([...allUserBooks, ...BOOKS]);
     };
 
     loadBooks();
@@ -205,10 +228,15 @@ const Library = () => {
     }
   };
 
-  // Handle delete user EPUB
+  // Handle delete user EPUB or physical book
   const handleDeleteBook = async (bookId: string) => {
     try {
-      await deleteUserEpub(bookId);
+      if (bookId.startsWith('user-')) {
+        await deleteUserEpub(bookId);
+      } else if (bookId.startsWith('physical-')) {
+        await deletePhysicalBook(bookId);
+      }
+
       setAllBooks(prev => prev.filter(book => book.id !== bookId));
       toast({
         title: 'Book deleted',
@@ -222,6 +250,44 @@ const Library = () => {
         variant: 'destructive',
       });
     }
+  };
+
+  // Reload books after adding a physical book
+  const handleBookAdded = async () => {
+    const [userEpubs, physicalBooks] = await Promise.all([
+      getUserEpubs(),
+      getPhysicalBooks(),
+    ]);
+
+    const userEpubBooks: BookMeta[] = userEpubs.map(epub => ({
+      id: epub.id,
+      title: epub.title,
+      author: epub.author,
+      sourceUrl: URL.createObjectURL(epub.blob),
+      description: 'Uploaded by user',
+      coverImage: epub.coverUrl,
+      type: 'epub' as const,
+      isUserUpload: true,
+      addedDate: epub.addedDate,
+    }));
+
+    const physicalBooksMeta: BookMeta[] = physicalBooks.map(book => ({
+      id: book.id,
+      title: book.title,
+      author: book.author,
+      description: book.description || '',
+      coverImage: book.coverUrl,
+      type: 'physical' as const,
+      isPhysical: true,
+      totalPages: book.totalPages,
+      currentPage: book.currentPage,
+      addedDate: book.addedDate,
+    }));
+
+    const allUserBooks = [...userEpubBooks, ...physicalBooksMeta]
+      .sort((a, b) => (b.addedDate || 0) - (a.addedDate || 0));
+
+    setAllBooks([...allUserBooks, ...BOOKS]);
   };
 
   const onChooseBook = async (bookId: string) => {
@@ -241,10 +307,15 @@ const Library = () => {
 
     // Load book structure for chapter selection
     const book = allBooks.find(b => b.id === bookId);
-    setSelectedIsEpub(book?.type === 'epub');
+    const isEpub = book?.type === 'epub';
+    const isPhysical = book?.type === 'physical';
+
+    setSelectedIsEpub(isEpub);
+    setSelectedIsPhysical(isPhysical);
+
     if (book) {
-      if (book.type === 'epub') {
-        // EPUB: no JSON structure; skip fetch and open dialog with date only
+      if (isEpub || isPhysical) {
+        // EPUB/Physical: no JSON structure; skip fetch and open dialog with date only
         setBookParts(null);
         setOpen(true);
         return;
@@ -255,7 +326,7 @@ const Library = () => {
           if (cached) {
             setBookParts(JSON.parse(cached));
           } else {
-            const response = await fetch(book.sourceUrl);
+            const response = await fetch(book.sourceUrl!);
             const data = await response.json();
             setBookParts(data);
             localStorage.setItem(cacheKey, JSON.stringify(data));
@@ -271,8 +342,9 @@ const Library = () => {
 
   const startReading = async (withPlan: boolean) => {
     if (!selectedBook) return;
-    const meta = BOOKS.find(b => b.id === selectedBook);
-    if (selectedIsEpub || meta?.type === 'epub') {
+    const meta = allBooks.find(b => b.id === selectedBook);
+
+    if (selectedIsEpub || selectedIsPhysical || meta?.type === 'epub') {
       if (withPlan) {
         if (!endDate) {
           toast({ title: "Selecione uma data", description: "Escolha uma data de término ou comece sem meta." });
@@ -291,9 +363,14 @@ const Library = () => {
         setReadingPlan(selectedBook, null);
         // Don't initialize baseline here for EPUBs - let EpubReader do it when user actually starts reading
       }
-      // For EPUBs, just navigate to the EPUB reader
+
+      // Navigate based on type
       setOpen(false);
-      navigate(`/epub/${selectedBook}`);
+      if (selectedIsPhysical || meta?.type === 'physical') {
+        navigate(`/physical/${selectedBook}`);
+      } else {
+        navigate(`/epub/${selectedBook}`);
+      }
       return;
     }
     // Parse current position from selection
@@ -401,23 +478,54 @@ const Library = () => {
           onChange={handleFileUpload}
           className="hidden"
         />
-        <Button
-          onClick={() => fileInputRef.current?.click()}
-          disabled={isUploading}
-          className="lg:bg-slate-800 lg:text-white lg:hover:bg-slate-700"
-        >
-          <Upload className="h-4 w-4 mr-2" />
-          {isUploading ? 'Uploading...' : 'Upload EPUB'}
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+            className="lg:bg-slate-800 lg:text-white lg:hover:bg-slate-700"
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            {isUploading ? 'Uploading...' : 'Upload EPUB'}
+          </Button>
+          <Button
+            onClick={() => setShowBookSearch(true)}
+            variant="outline"
+            className="lg:bg-slate-800 lg:text-white lg:hover:bg-slate-700 lg:border-slate-600"
+          >
+            <BookPlus className="h-4 w-4 mr-2" />
+            Adicionar livro físico
+          </Button>
+        </div>
       </div>
+
+      <BookSearchDialog
+        open={showBookSearch}
+        onOpenChange={setShowBookSearch}
+        onBookAdded={handleBookAdded}
+      />
       <section className="container mx-auto grid md:grid-cols-2 gap-6">
         {allBooks.map((book) => (
           <Card key={book.id} className="hover:shadow-lg transition-shadow">
             <div
               role="button"
               tabIndex={0}
-              onClick={() => navigate(book.type === 'epub' ? `/epub/${book.id}` : `/leitor/${book.id}`)}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(book.type === 'epub' ? `/epub/${book.id}` : `/leitor/${book.id}`); } }}
+              onClick={() => {
+                if (book.isPhysical) {
+                  navigate(`/physical/${book.id}`);
+                } else {
+                  navigate(book.type === 'epub' ? `/epub/${book.id}` : `/leitor/${book.id}`);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  if (book.isPhysical) {
+                    navigate(`/physical/${book.id}`);
+                  } else {
+                    navigate(book.type === 'epub' ? `/epub/${book.id}` : `/leitor/${book.id}`);
+                  }
+                }
+              }}
               className="cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2"
             >
               {book.coverImage ? (
@@ -426,7 +534,7 @@ const Library = () => {
                   alt={`Capa do livro ${book.title}`}
                 />
               ) : book.type === 'epub' ? (
-                <EpubCoverLoader id={book.id} title={book.title} sourceUrl={book.sourceUrl} />
+                <EpubCoverLoader id={book.id} title={book.title} sourceUrl={book.sourceUrl!} />
               ) : null}
             </div>
             <CardHeader>
@@ -434,7 +542,7 @@ const Library = () => {
                 <span>{book.title}</span>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-muted-foreground">{book.author}</span>
-                  {book.isUserUpload && (
+                  {(book.isUserUpload || book.isPhysical) && (
                     <Button
                       variant="ghost"
                       size="icon"
@@ -453,11 +561,36 @@ const Library = () => {
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground mb-4">{book.description}</p>
+              {book.isPhysical && book.totalPages && (
+                <div className="mb-4">
+                  <div className="flex justify-between text-sm text-muted-foreground mb-1">
+                    <span>Progresso</span>
+                    <span>{book.currentPage || 0} / {book.totalPages} páginas</span>
+                  </div>
+                  <div className="w-full bg-secondary rounded-full h-2">
+                    <div
+                      className="bg-primary h-2 rounded-full transition-all"
+                      style={{ width: `${Math.round(((book.currentPage || 0) / book.totalPages) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+              )}
               <div className="flex items-center gap-2">
-                <Button onClick={() => navigate(book.type === 'epub' ? `/epub/${book.id}` : `/leitor/${book.id}`)}>
+                <Button onClick={() => {
+                  if (book.isPhysical) {
+                    navigate(`/physical/${book.id}`);
+                  } else {
+                    navigate(book.type === 'epub' ? `/epub/${book.id}` : `/leitor/${book.id}`);
+                  }
+                }}>
                   Continuar leitura
                 </Button>
-                <Button variant="secondary" onClick={() => onChooseBook(book.id)}>Definir meta</Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => onChooseBook(book.id)}
+                >
+                  Definir meta
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -470,7 +603,7 @@ const Library = () => {
             <DialogTitle>Definir meta de término (opcional)</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            {!selectedIsEpub && (
+            {!selectedIsEpub && !selectedIsPhysical && (
               <>
                 <div>
                   <label htmlFor="currentPosition" className="text-sm font-medium">Posição atual</label>
@@ -524,7 +657,9 @@ const Library = () => {
             <p className="text-xs text-muted-foreground">
               {selectedIsEpub
                 ? "Defina uma data para concluir o EPUB. Calcularemos metas diárias em porcentagem lida."
-                : "Defina uma meta específica e uma data. Calcularemos uma meta diária a partir do seu ponto atual de leitura."}
+                : selectedIsPhysical
+                  ? "Defina uma data para concluir o livro. Calcularemos metas diárias em páginas."
+                  : "Defina uma meta específica e uma data. Calcularemos uma meta diária a partir do seu ponto atual de leitura."}
             </p>
           </div>
           <DialogFooter>

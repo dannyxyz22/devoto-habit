@@ -24,15 +24,16 @@ export async function performDailyWidgetRefresh() {
 
     const meta = BOOKS.find(b => b.id === activeBookId);
     const isUserEpub = activeBookId.startsWith('user-');
+    const isPhysical = activeBookId.startsWith('physical-');
 
-    if (!meta && !isUserEpub) return;
+    if (!meta && !isUserEpub && !isPhysical) return;
 
     const progress = getProgress(activeBookId);
     let dailyProgressPercent: number | null = null;
     let hasGoal = false;
 
-    if (isUserEpub || meta?.type === 'epub') {
-      // EPUB: percent based logic
+    if (isUserEpub || isPhysical || meta?.type === 'epub') {
+      // EPUB/Physical: percent based logic
       const base = getDailyBaseline(activeBookId, todayISO);
       if (!base && (progress.percent || 0) > 0) {
         setDailyBaseline(activeBookId, todayISO, { words: 0, percent: progress.percent });

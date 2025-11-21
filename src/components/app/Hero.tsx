@@ -40,7 +40,9 @@ export const Hero = () => {
         setCtaLabel("Continuar");
         const last = ls.getItem('lastBookId');
         if (last) {
-          if (last.startsWith('user-')) {
+          if (last.startsWith('physical-')) {
+            setCtaHref(`/physical/${last}`);
+          } else if (last.startsWith('user-')) {
             setCtaHref(`/epub/${last}`);
           } else {
             const meta = BOOKS.find(b => b.id === last);

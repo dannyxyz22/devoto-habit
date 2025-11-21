@@ -19,6 +19,8 @@ export type Progress = {
   partIndex: number;
   chapterIndex: number;
   percent: number;
+  currentPage?: number;    // For physical books
+  totalPages?: number;     // For physical books
 };
 
 export const getProgress = (bookId: string): Progress =>
@@ -106,7 +108,7 @@ export const hasReadToday = () => {
 };
 
 // Reading plan per book (optional target end date and chapter)
-export type ReadingPlan = { 
+export type ReadingPlan = {
   targetDateISO: string | null;
   targetPartIndex?: number;
   targetChapterIndex?: number;

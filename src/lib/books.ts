@@ -2,24 +2,32 @@ export type BookMeta = {
   id: string;
   title: string;
   author: string;
-  sourceUrl: string;
+  sourceUrl?: string;          // Optional for physical books
   description: string;
   coverImage?: string;
-  type?: 'json' | 'epub';
-  isUserUpload?: boolean;  // Flag for user-uploaded books
-  addedDate?: number;      // Timestamp for sorting
+  type?: 'json' | 'epub' | 'physical';  // Add 'physical' type
+  isUserUpload?: boolean;      // Flag for user-uploaded books
+  isPhysical?: boolean;        // Flag for physical books
+  totalPages?: number;         // For physical books
+  currentPage?: number;        // For physical books
+  addedDate?: number;          // Timestamp for sorting
 };
 
 // Import asset via Vite so the URL is correctly handled in build
 // Note: keep using JPG that exists in src/assets. If you switch to PNG, ensure the file exists.
 import filoteiaCover from "@/assets/book-cover-filoteia.jpg";
 
-// Validate that no static book IDs start with 'user-' to prevent collision with user uploads
+// Validate that no static book IDs start with reserved prefixes
 const validateBookIds = (books: BookMeta[]): BookMeta[] => {
   books.forEach(book => {
     if (book.id.startsWith('user-')) {
       throw new Error(
         `Static book IDs cannot start with 'user-' (reserved for user uploads): ${book.id}`
+      );
+    }
+    if (book.id.startsWith('physical-')) {
+      throw new Error(
+        `Static book IDs cannot start with 'physical-' (reserved for physical books): ${book.id}`
       );
     }
   });
