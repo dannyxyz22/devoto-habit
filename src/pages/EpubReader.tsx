@@ -464,15 +464,28 @@ const EpubReader = () => {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => {
+            onClick={async () => {
               if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen().catch(() => { });
-                toast({
-                  description: "Pressione ESC para sair da tela cheia",
-                  duration: 4000,
-                });
+                try {
+                  await document.documentElement.requestFullscreen();
+                  toast({
+                    description: "Pressione ESC para sair da tela cheia",
+                    duration: 4000,
+                  });
+                } catch (err) {
+                  console.error('Fullscreen error:', err);
+                  toast({
+                    description: "Não foi possível entrar em tela cheia. Tente pressionar F11.",
+                    duration: 4000,
+                    variant: "destructive",
+                  });
+                }
               } else {
-                document.exitFullscreen().catch(() => { });
+                try {
+                  await document.exitFullscreen();
+                } catch (err) {
+                  console.error('Exit fullscreen error:', err);
+                }
               }
             }}
             className="hidden lg:flex text-slate-300 hover:text-white hover:bg-slate-800"
