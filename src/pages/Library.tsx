@@ -147,6 +147,7 @@ const Library = () => {
         author: epub.author,
         sourceUrl: URL.createObjectURL(epub.blob), // Create blob URL for reading
         description: 'Uploaded by user',
+        coverImage: epub.coverUrl, // Use extracted cover
         type: 'epub' as const,
         isUserUpload: true,
         addedDate: epub.addedDate,
@@ -176,6 +177,7 @@ const Library = () => {
         author: userEpub.author,
         sourceUrl: URL.createObjectURL(userEpub.blob),
         description: 'Uploaded by user',
+        coverImage: userEpub.coverUrl, // Use extracted cover
         type: 'epub',
         isUserUpload: true,
         addedDate: userEpub.addedDate,
@@ -427,14 +429,14 @@ const Library = () => {
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(book.type === 'epub' ? `/epub/${book.id}` : `/leitor/${book.id}`); } }}
               className="cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2"
             >
-              {book.type === 'epub'
-                ? (<EpubCoverLoader id={book.id} title={book.title} sourceUrl={book.sourceUrl} />)
-                : (book.coverImage && (
-                  <Cover
-                    src={book.coverImage}
-                    alt={`Capa do livro ${book.title}`}
-                  />
-                ))}
+              {book.coverImage ? (
+                <Cover
+                  src={book.coverImage}
+                  alt={`Capa do livro ${book.title}`}
+                />
+              ) : book.type === 'epub' ? (
+                <EpubCoverLoader id={book.id} title={book.title} sourceUrl={book.sourceUrl} />
+              ) : null}
             </div>
             <CardHeader>
               <CardTitle className="flex items-center justify-between">

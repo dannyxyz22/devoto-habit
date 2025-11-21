@@ -5,6 +5,7 @@ export interface UserEpub {
     title: string;
     author: string;
     blob: Blob;
+    coverUrl?: string;  // Data URL for cover image
     addedDate: number;
 }
 
@@ -48,6 +49,37 @@ export const saveUserEpub = async (file: File): Promise<UserEpub> => {
     const title = metadata.title || file.name.replace('.epub', '');
     const author = metadata.creator || 'Unknown Author';
 
+    // Extract cover image
+    let coverUrl: string | undefined;
+    try {
+        console.log('[Cover] Starting extraction...');
+
+        // Wait for cover to be loaded
+        await book.loaded.cover;
+
+        // Get cover URL
+        const coverUrlFromBook = await book.coverUrl();
+        console.log('[Cover] URL from book:', coverUrlFromBook);
+
+        if (coverUrlFromBook) {
+            // Fetch and convert to data URL
+            const response = await fetch(coverUrlFromBook);
+            const coverBlob = await response.blob();
+            console.log('[Cover] Blob size:', coverBlob.size, 'type:', coverBlob.type);
+
+            const reader = new FileReader();
+            coverUrl = await new Promise((resolve) => {
+                reader.onloadend = () => resolve(reader.result as string);
+                reader.readAsDataURL(coverBlob);
+            });
+            console.log('[Cover] Successfully extracted, length:', coverUrl?.length);
+        } else {
+            console.log('[Cover] No cover URL returned from book');
+        }
+    } catch (error) {
+        console.error('[Cover] Extraction failed:', error);
+    }
+
     // Generate unique ID
     const id = `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
@@ -56,8 +88,11 @@ export const saveUserEpub = async (file: File): Promise<UserEpub> => {
         title,
         author,
         blob,
+        coverUrl,
         addedDate: Date.now(),
     };
+
+    console.log('[Upload] Saving EPUB:', { id, title, author, hasCover: !!coverUrl });
 
     // Save to IndexedDB
     const db = await openDB();
