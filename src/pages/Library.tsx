@@ -56,7 +56,7 @@ const Library = () => {
               const match = await cache.match(url);
               if (match && match.ok) ab = await match.arrayBuffer();
             }
-          } catch {}
+          } catch { }
           if (!ab) {
             const resp = await fetch(url);
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -65,7 +65,7 @@ const Library = () => {
                 const cache = await caches.open('epub-cache-v1');
                 await cache.put(url, resp.clone());
               }
-            } catch {}
+            } catch { }
             ab = await resp.arrayBuffer();
           }
           if (cancelled || !ab) return;
@@ -73,14 +73,14 @@ const Library = () => {
           await book.ready;
           // Try epub.js coverUrl API first
           let coverUrl: string | null = null;
-          try { coverUrl = await (book as any).coverUrl?.(); } catch {}
+          try { coverUrl = await (book as any).coverUrl?.(); } catch { }
           // Fallback: derive from metadata/manifest and extract blob
           if (!coverUrl) {
             let href: string | null = null;
             try {
               const metadata = await (book as any).loaded?.metadata;
               href = metadata?.cover || null;
-            } catch {}
+            } catch { }
             if (!href) {
               try {
                 const manifest = await (book as any).loaded?.manifest;
@@ -91,13 +91,13 @@ const Library = () => {
                     || items.find((it) => (it?.href || '').toLowerCase().includes('cover'));
                   href = item?.href || null;
                 }
-              } catch {}
+              } catch { }
             }
             if (href) {
               try {
                 const blob = await (book as any).archive?.getBlob?.(href);
                 if (blob) coverUrl = URL.createObjectURL(blob);
-              } catch {}
+              } catch { }
             }
           }
           // Cache the cover blob for reuse
@@ -109,7 +109,7 @@ const Library = () => {
                 const objUrl = URL.createObjectURL(blob);
                 setSrc(objUrl);
               }
-              try { URL.revokeObjectURL(coverUrl!); } catch {}
+              try { URL.revokeObjectURL(coverUrl!); } catch { }
             } catch {
               if (!cancelled) setSrc(null);
             }
@@ -134,17 +134,17 @@ const Library = () => {
     setSelectedBook(bookId);
     const plan = getReadingPlan(bookId);
     setEndDate(plan.targetDateISO ?? "");
-  // Default current position from saved progress or start
-  const prog = getProgress(bookId);
-  setCurrentPosition(`${prog.partIndex}-${prog.chapterIndex}`);
-    
+    // Default current position from saved progress or start
+    const prog = getProgress(bookId);
+    setCurrentPosition(`${prog.partIndex}-${prog.chapterIndex}`);
+
     // Set target chapter from plan
     if (plan.targetPartIndex !== undefined && plan.targetChapterIndex !== undefined) {
       setTargetChapter(`${plan.targetPartIndex}-${plan.targetChapterIndex}`);
     } else {
       setTargetChapter("end");
     }
-    
+
     // Load book structure for chapter selection
     const book = BOOKS.find(b => b.id === bookId);
     setSelectedIsEpub(book?.type === 'epub');
@@ -171,7 +171,7 @@ const Library = () => {
         }
       }
     }
-    
+
     setOpen(true);
   };
 
@@ -192,7 +192,7 @@ const Library = () => {
             `planStart:${selectedBook}`,
             JSON.stringify({ startPercent: prog?.percent || 0 })
           );
-        } catch {}
+        } catch { }
       } else {
         setReadingPlan(selectedBook, null);
         // Initialize baseline from current percent if missing
@@ -202,9 +202,9 @@ const Library = () => {
           const existing = getDailyBaseline(selectedBook, todayISO);
           if (!existing) {
             setDailyBaseline(selectedBook, todayISO, { words: 0, percent: prog?.percent || 0 });
-            try { console.log('[Baseline] persistida', { scope: 'Library', bookId: selectedBook, todayISO, words: 0, percent: prog?.percent || 0 }); } catch {}
+            try { console.log('[Baseline] persistida', { scope: 'Library', bookId: selectedBook, todayISO, words: 0, percent: prog?.percent || 0 }); } catch { }
           }
-        } catch {}
+        } catch { }
       }
       // For EPUBs, just navigate to the EPUB reader
       setOpen(false);
@@ -224,17 +224,17 @@ const Library = () => {
         toast({ title: "Selecione uma data", description: "Escolha uma data de término ou comece sem meta." });
         return;
       }
-      
+
       // Parse target chapter
       let targetPartIndex: number | undefined;
       let targetChapterIndex: number | undefined;
-      
+
       if (targetChapter !== "end") {
         const [partIdx, chapterIdx] = targetChapter.split("-").map(Number);
         targetPartIndex = partIdx;
         targetChapterIndex = chapterIdx;
       }
-      
+
       setReadingPlan(selectedBook, endDate, targetPartIndex, targetChapterIndex);
 
       // Set progress to chosen current position and reset daily baseline accordingly
@@ -257,15 +257,15 @@ const Library = () => {
           });
         });
         const todayISO = formatISO(new Date(), { representation: "date" });
-  setDailyBaseline(selectedBook, todayISO, { words: wordsUpToCurrent, percent });
-  try { console.log('[Baseline] persistida', { scope: 'Library', bookId: selectedBook, todayISO, words: wordsUpToCurrent, percent }); } catch {}
+        setDailyBaseline(selectedBook, todayISO, { words: wordsUpToCurrent, percent });
+        try { console.log('[Baseline] persistida', { scope: 'Library', bookId: selectedBook, todayISO, words: wordsUpToCurrent, percent }); } catch { }
         // Persist plan start for plan progress calculations (start indexes and words)
         try {
           localStorage.setItem(
             `planStart:${selectedBook}`,
             JSON.stringify({ startPartIndex: curPartIndex, startChapterIndex: curChapterIndex, startWords: wordsUpToCurrent })
           );
-        } catch {}
+        } catch { }
       }
     } else {
       setReadingPlan(selectedBook, null);
@@ -287,8 +287,8 @@ const Library = () => {
           });
         });
         const todayISO = formatISO(new Date(), { representation: "date" });
-  setDailyBaseline(selectedBook, todayISO, { words: wordsUpToCurrent, percent });
-  try { console.log('[Baseline] persistida', { scope: 'Library', bookId: selectedBook, todayISO, words: wordsUpToCurrent, percent }); } catch {}
+        setDailyBaseline(selectedBook, todayISO, { words: wordsUpToCurrent, percent });
+        try { console.log('[Baseline] persistida', { scope: 'Library', bookId: selectedBook, todayISO, words: wordsUpToCurrent, percent }); } catch { }
       }
     }
     setOpen(false);
@@ -296,17 +296,19 @@ const Library = () => {
   };
 
   return (
-    <main className="container mx-auto py-10">
+    <main className="min-h-screen lg:bg-slate-900 py-10">
       <SEO
         title="Biblioteca Católica — Leitura Devota"
         description="Escolha um clássico católico em português e comece sua leitura devocional."
         canonical="/biblioteca"
       />
-      <nav className="mb-4 text-sm">
-        <BackLink to="/" label="Início" />
-      </nav>
-      <h1 className="text-3xl font-bold mb-6">Biblioteca</h1>
-      <section className="grid md:grid-cols-2 gap-6">
+      <div className="container mx-auto">
+        <nav className="mb-4 text-sm">
+          <BackLink to="/" label="Início" className="lg:text-slate-300 hover:lg:text-white" />
+        </nav>
+        <h1 className="text-3xl font-bold mb-6 lg:text-white">Biblioteca</h1>
+      </div>
+      <section className="container mx-auto grid md:grid-cols-2 gap-6">
         {BOOKS.map((book) => (
           <Card key={book.id} className="hover:shadow-lg transition-shadow">
             <div
@@ -319,11 +321,11 @@ const Library = () => {
               {book.type === 'epub'
                 ? (<EpubCoverLoader id={book.id} title={book.title} sourceUrl={book.sourceUrl} />)
                 : (book.coverImage && (
-                    <Cover
-                      src={book.coverImage}
-                      alt={`Capa do livro ${book.title}`}
-                    />
-                  ))}
+                  <Cover
+                    src={book.coverImage}
+                    alt={`Capa do livro ${book.title}`}
+                  />
+                ))}
             </div>
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
@@ -400,7 +402,7 @@ const Library = () => {
                 onChange={(e) => setEndDate(e.target.value)}
               />
             </div>
-            
+
             <p className="text-xs text-muted-foreground">
               {selectedIsEpub
                 ? "Defina uma data para concluir o EPUB. Calcularemos metas diárias em porcentagem lida."
