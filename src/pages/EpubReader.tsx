@@ -13,7 +13,7 @@ import { format } from "date-fns";
 import { computeDaysRemaining, computeDailyProgressPercent } from "@/lib/reading";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
-import { Settings, BookOpen, BookOpenCheck } from "lucide-react";
+import { Settings, BookOpen, BookOpenCheck, Maximize, Minimize } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 
 type LayoutMode = "auto" | "single" | "double";
@@ -41,6 +41,7 @@ const EpubReader = () => {
     }
   });
   const [showMobileMenu, setShowMobileMenu] = useState<boolean>(true);
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
   // Persist layout mode preference
   useEffect(() => {
@@ -394,7 +395,9 @@ const EpubReader = () => {
   useEffect(() => {
     const onFullscreenChange = () => {
       // If user exits fullscreen (via ESC or system gesture), show the menu
-      if (!document.fullscreenElement) {
+      const isFull = !!document.fullscreenElement;
+      setIsFullscreen(isFull);
+      if (!isFull) {
         setShowMobileMenu(true);
       }
     };
@@ -403,7 +406,7 @@ const EpubReader = () => {
   }, []);
 
   return (
-    <main className="min-h-screen lg:bg-slate-900 flex flex-col items-center justify-center lg:py-8 lg:px-4">
+    <main className={`min-h-screen lg:bg-slate-900 flex flex-col items-center justify-center ${isFullscreen ? '' : 'lg:py-8 lg:px-4'}`}>
       <SEO title={`EPUB — ${epubId}`} description="Leitor EPUB" canonical={`/epub/${epubId}`} />
 
       {/* Header - Hidden on mobile unless showMobileMenu is true */}
@@ -413,45 +416,71 @@ const EpubReader = () => {
           transition-all duration-300 fixed top-0 left-0 right-0 p-4 z-50 bg-white/90 backdrop-blur lg:static lg:bg-transparent lg:p-0
           lg:opacity-100 lg:translate-y-0
           ${showMobileMenu ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-full pointer-events-none'}
+          ${isFullscreen ? 'hidden' : ''}
         `}
       >
-        <nav className="text-sm lg:block">
+        <nav className={`text-sm lg:block transition-opacity duration-300 ${isFullscreen ? 'lg:opacity-0 lg:pointer-events-none' : 'lg:opacity-100'}`}>
           <BackLink to="/biblioteca" label="Biblioteca" className="text-slate-900 lg:text-slate-300 hover:text-slate-700 lg:hover:text-white" />
         </nav>
 
-        {/* Settings Panel - Compact version */}
-        <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen}>
-          <CollapsibleTrigger asChild>
-            <Button variant="ghost" size="icon" className="text-slate-900 lg:text-slate-300 hover:text-slate-700 lg:hover:text-white lg:hover:bg-slate-800">
-              <Settings className="h-5 w-5" />
-            </Button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="absolute right-4 top-16 z-50">
-            <div className="bg-white lg:bg-slate-800 border border-slate-200 lg:border-slate-700 rounded-lg p-4 shadow-xl min-w-[280px]">
-              <p className="text-sm font-medium text-slate-900 lg:text-slate-200 mb-3">Modo de layout</p>
-              <ToggleGroup type="single" value={layoutMode} onValueChange={(v) => v && setLayoutMode(v as LayoutMode)}>
-                <ToggleGroupItem value="auto" aria-label="Layout automático" title="Automático" className="data-[state=on]:bg-slate-100 lg:data-[state=on]:bg-slate-700">
-                  <Settings className="h-4 w-4 mr-2" />
-                  Auto
-                </ToggleGroupItem>
-                <ToggleGroupItem value="single" aria-label="Página única" title="Página Única" className="data-[state=on]:bg-slate-100 lg:data-[state=on]:bg-slate-700">
-                  <BookOpen className="h-4 w-4 mr-2" />
-                  1 Página
-                </ToggleGroupItem>
-                <ToggleGroupItem value="double" aria-label="Duas páginas" title="Duas Páginas" className="data-[state=on]:bg-slate-100 lg:data-[state=on]:bg-slate-700">
-                  <BookOpenCheck className="h-4 w-4 mr-2" />
-                  2 Páginas
-                </ToggleGroupItem>
-              </ToggleGroup>
-              <p className="text-xs text-slate-600 lg:text-slate-400 mt-3">
-                {layoutMode === "auto" && containerWidth >= 900 && "Modo atual: duas páginas (tela larga)"}
-                {layoutMode === "auto" && containerWidth < 900 && "Modo atual: página única (tela estreita)"}
-                {layoutMode === "single" && "Modo atual: sempre página única"}
-                {layoutMode === "double" && "Modo atual: sempre duas páginas"}
-              </p>
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
+        <div className="flex items-center gap-2">
+          {/* Settings Panel - Compact version */}
+          <div className={`transition-opacity duration-300 ${isFullscreen ? 'lg:opacity-0 lg:pointer-events-none' : 'lg:opacity-100'}`}>
+            <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen}>
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="icon" className="text-slate-900 lg:text-slate-300 hover:text-slate-700 lg:hover:text-white lg:hover:bg-slate-800">
+                  <Settings className="h-5 w-5" />
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="absolute right-4 top-16 z-50">
+                <div className="bg-white lg:bg-slate-800 border border-slate-200 lg:border-slate-700 rounded-lg p-4 shadow-xl min-w-[280px]">
+                  <p className="text-sm font-medium text-slate-900 lg:text-slate-200 mb-3">Modo de layout</p>
+                  <ToggleGroup type="single" value={layoutMode} onValueChange={(v) => v && setLayoutMode(v as LayoutMode)}>
+                    <ToggleGroupItem value="auto" aria-label="Layout automático" title="Automático" className="data-[state=on]:bg-slate-100 lg:data-[state=on]:bg-slate-700">
+                      <Settings className="h-4 w-4 mr-2" />
+                      Auto
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="single" aria-label="Página única" title="Página Única" className="data-[state=on]:bg-slate-100 lg:data-[state=on]:bg-slate-700">
+                      <BookOpen className="h-4 w-4 mr-2" />
+                      1 Página
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="double" aria-label="Duas páginas" title="Duas Páginas" className="data-[state=on]:bg-slate-100 lg:data-[state=on]:bg-slate-700">
+                      <BookOpenCheck className="h-4 w-4 mr-2" />
+                      2 Páginas
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+                  <p className="text-xs text-slate-600 lg:text-slate-400 mt-3">
+                    {layoutMode === "auto" && containerWidth >= 900 && "Modo atual: duas páginas (tela larga)"}
+                    {layoutMode === "auto" && containerWidth < 900 && "Modo atual: página única (tela estreita)"}
+                    {layoutMode === "single" && "Modo atual: sempre página única"}
+                    {layoutMode === "double" && "Modo atual: sempre duas páginas"}
+                  </p>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          </div>
+
+          {/* Desktop Fullscreen Toggle */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(() => { });
+                toast({
+                  description: "Pressione ESC para sair da tela cheia",
+                  duration: 4000,
+                });
+              } else {
+                document.exitFullscreen().catch(() => { });
+              }
+            }}
+            className="hidden lg:flex text-slate-300 hover:text-white hover:bg-slate-800"
+            title={isFullscreen ? "Sair da tela cheia" : "Tela cheia"}
+          >
+            {isFullscreen ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
+          </Button>
+        </div>
       </div>
 
       {err && (
