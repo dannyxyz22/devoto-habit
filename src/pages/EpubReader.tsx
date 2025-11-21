@@ -6,7 +6,7 @@ import { SEO } from "@/components/app/SEO";
 import ePub, { Rendition } from "epubjs";
 import { BOOKS } from "@/lib/books";
 import { resolveEpubSource } from "@/lib/utils";
-import { getDailyBaseline, setDailyBaseline, setProgress, getReadingPlan } from "@/lib/storage";
+import { getDailyBaseline, setDailyBaseline, setProgress, getProgress, getReadingPlan } from "@/lib/storage";
 import { updateDailyProgressWidget } from "@/main";
 import { WidgetUpdater, canUseNative } from "@/lib/widgetUpdater";
 import { format } from "date-fns";
@@ -16,6 +16,7 @@ import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/component
 import { Settings, BookOpen, BookOpenCheck, Maximize, Minimize } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { getUserEpubBlob } from "@/lib/userEpubs";
+import { loadLocationsFromCache, saveLocationsToCache } from "@/lib/locationsCache";
 
 type LayoutMode = "auto" | "single" | "double";
 
@@ -338,12 +339,42 @@ const EpubReader = () => {
             try { saved = localStorage.getItem(`epubLoc:${epubId}`); } catch { }
             rendition.display(saved || undefined);
 
-            // ⚡ Gera locations em segundo plano (não trava exibição inicial)
+            // ⚡ Gera locations em segundo plano (ou restaura do cache LRU)
             try {
-              book.locations.generate(500).then(() => {
-                // força um relocated para recalcular percentuais com base nas novas locations
-                try { rendition.currentLocation() && rendition.emit("relocated", rendition.currentLocation()); } catch { }
-              });
+              // Tenta carregar locations do cache LRU
+              const cachedLocations = loadLocationsFromCache(epubId);
+
+              if (cachedLocations) {
+                // Restaura locations do cache
+                try {
+                  const locations = JSON.parse(cachedLocations);
+                  book.locations.load(locations);
+                  console.log('[Locations] Restauradas do cache LRU:', book.locations.length);
+                  // Força recalcular percentuais com locations restauradas
+                  try { rendition.currentLocation() && rendition.emit("relocated", rendition.currentLocation()); } catch { }
+                } catch (err) {
+                  console.error('[Locations] Erro ao restaurar cache:', err);
+                  // Se falhar, gera novamente
+                  generateAndCacheLocations();
+                }
+              } else {
+                // Não tem cache, gera pela primeira vez
+                generateAndCacheLocations();
+              }
+
+              function generateAndCacheLocations() {
+                book.locations.generate(500).then(() => {
+                  // Salva locations no cache LRU
+                  try {
+                    const locationsData = book.locations.save();
+                    saveLocationsToCache(epubId, locationsData);
+                  } catch (err) {
+                    console.error('[Locations] Erro ao salvar cache:', err);
+                  }
+                  // Força recalcular percentuais com base nas novas locations
+                  try { rendition.currentLocation() && rendition.emit("relocated", rendition.currentLocation()); } catch { }
+                });
+              }
             } catch { }
           })
           .catch(() => setErr("Falha ao carregar o EPUB."));
