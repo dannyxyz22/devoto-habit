@@ -12,7 +12,8 @@ export interface BookSearchResult {
     title: string;
     author: string;
     coverUrl?: string;              // Data URL after download (for storage)
-    coverSourceUrl?: string;        // Original API image URL (for lazy loading)
+    coverSourceUrl?: string;        // Thumbnail URL for quick display in search
+    coverHighResUrl?: string;       // Medium/large URL for library storage
     totalPages?: number;
     isbn?: string;
     publisher?: string;
@@ -193,6 +194,18 @@ export async function downloadImageAsDataUrl(url: string): Promise<string | unde
 }
 
 /**
+ * Upgrade Google Books image URL to higher resolution
+ * Changes zoom parameter from 1 (thumbnail) to 3 (medium)
+ */
+function upgradeGoogleBooksImageUrl(thumbnailUrl: string | undefined): string | undefined {
+    if (!thumbnailUrl) return undefined;
+
+    // Replace zoom=1 with zoom=3 for medium quality
+    // zoom=1 is thumbnail, zoom=3 is medium, zoom=5 is large
+    return thumbnailUrl.replace(/zoom=1/, 'zoom=3');
+}
+
+/**
  * Search Google Books API
  * Returns results immediately with coverSourceUrl for lazy loading
  */
@@ -217,11 +230,13 @@ async function searchGoogleBooks(query: string): Promise<BookSearchResult[]> {
         // Return results immediately without waiting for cover downloads
         const results: BookSearchResult[] = data.items.map((item: any) => {
             const volumeInfo = item.volumeInfo;
+            const thumbnailUrl = volumeInfo.imageLinks?.thumbnail;
 
             return {
                 title: volumeInfo.title || 'Unknown Title',
                 author: volumeInfo.authors?.[0] || 'Unknown Author',
-                coverSourceUrl: volumeInfo.imageLinks?.thumbnail,  // Store source URL for lazy loading
+                coverSourceUrl: thumbnailUrl,  // Thumbnail (zoom=1) for search display
+                coverHighResUrl: upgradeGoogleBooksImageUrl(thumbnailUrl),  // Medium (zoom=3) for library
                 totalPages: volumeInfo.pageCount,
                 isbn: volumeInfo.industryIdentifiers?.[0]?.identifier,
                 publisher: volumeInfo.publisher,
