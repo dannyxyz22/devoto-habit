@@ -33,6 +33,8 @@ jobs:
         env:
           # Ensure Vite uses the correct base for project Pages
           VITE_BASE_URL: /devoto-habit/
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: |
           npm ci
           npm run build
