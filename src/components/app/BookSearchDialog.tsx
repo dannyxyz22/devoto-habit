@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, Search, BookPlus } from "lucide-react";
 import { searchBookMetadata, downloadImageAsDataUrl, type BookSearchResult } from "@/lib/bookMetadataSearch";
-import { savePhysicalBook } from "@/lib/physicalBooks";
+import { dataLayer } from "@/services/data/RxDBDataLayer";
 import { useToast } from "@/components/ui/use-toast";
 interface BookSearchDialogProps {
     open: boolean;
@@ -84,16 +84,17 @@ export function BookSearchDialog({ open, onOpenChange, onBookAdded }: BookSearch
             // Fallback to already downloaded thumbnail if high-res failed
             const finalCoverUrl = highResCoverUrl || result.coverUrl;
             console.log('[BookSearch] Saving book:', result.title, 'with cover:', !!finalCoverUrl);
-            await savePhysicalBook({
+            await dataLayer.saveBook({
+                id: `physical-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                 title: result.title,
-                author: result.author,
-                coverUrl: finalCoverUrl,  // ← Agora usando medium/large!
-                totalPages: result.totalPages || 0,
-                currentPage: 0,
-                isbn: result.isbn,
-                publisher: result.publisher,
-                publishedDate: result.publishedDate,
-                description: result.description || "",
+                author: result.author || '',
+                type: 'physical',
+                cover_url: finalCoverUrl,
+                total_pages: result.totalPages || 0,
+                current_page: 0,
+                percentage: 0,
+                updated_at: Date.now(),
+                deleted: false
             });
             console.log('[BookSearch] Book saved successfully');
             toast({
@@ -131,12 +132,16 @@ export function BookSearchDialog({ open, onOpenChange, onBookAdded }: BookSearch
             return;
         }
         try {
-            await savePhysicalBook({
+            await dataLayer.saveBook({
+                id: `physical-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                 title: manualTitle.trim(),
                 author: manualAuthor.trim(),
-                totalPages,
-                currentPage: 0,
-                description: "",
+                type: 'physical',
+                total_pages: totalPages,
+                current_page: 0,
+                percentage: 0,
+                updated_at: Date.now(),
+                deleted: false
             });
             toast({
                 title: "Livro adicionado!",

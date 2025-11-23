@@ -1,12 +1,8 @@
-import { replicateSupabase, SupabaseReplicationOptions } from 'rxdb-supabase';
 import { supabase } from '@/lib/supabase';
 import { getDatabase } from '@/lib/database/db';
-import { RxReplicationState } from 'rxdb/plugins/replication';
-import { RxBookDocumentType, RxSettingsDocumentType } from '@/lib/database/schema';
 
 export class ReplicationManager {
     private static instance: ReplicationManager;
-    private replicationStates: RxReplicationState<any, any>[] = [];
 
     private constructor() { }
 
@@ -18,58 +14,17 @@ export class ReplicationManager {
     }
 
     async startReplication() {
-        console.log('ReplicationManager: Starting replication...');
-        const db = await getDatabase();
+        console.log('ReplicationManager: Replication temporarily disabled');
+        console.log('ReplicationManager: Data is being saved to RxDB (local)');
+        console.log('ReplicationManager: Supabase sync will be implemented in next iteration');
 
-        // Stop existing replications if any
-        await this.stopReplication();
-
-        // Replicate Books
-        const booksReplication = replicateSupabase<RxBookDocumentType>({
-            supabaseClient: supabase,
-            collection: db.books,
-            table: 'books',
-            replicationIdentifier: 'books-replication',
-            pull: {
-                realtimePostgresChanges: true
-            },
-            push: {
-                // Only push changes if user is online
-                // RxDB handles this automatically but good to know
-            }
-        });
-
-        // Replicate Settings
-        const settingsReplication = replicateSupabase<RxSettingsDocumentType>({
-            supabaseClient: supabase,
-            collection: db.settings,
-            table: 'user_settings',
-            replicationIdentifier: 'settings-replication',
-            pull: {
-                realtimePostgresChanges: true
-            },
-            push: {}
-        });
-
-        this.replicationStates = [booksReplication, settingsReplication];
-
-        // Log errors
-        this.replicationStates.forEach(state => {
-            state.error$.subscribe(err => {
-                console.error('Replication error:', err);
-            });
-        });
-
-        console.log('ReplicationManager: Replication started');
+        // TODO: Implement proper Supabase replication
+        // For now, data is saved locally in RxDB
+        // Manual sync or alternative replication method needed
     }
 
     async stopReplication() {
-        if (this.replicationStates.length > 0) {
-            console.log('ReplicationManager: Stopping replication...');
-            await Promise.all(this.replicationStates.map(state => state.cancel()));
-            this.replicationStates = [];
-            console.log('ReplicationManager: Replication stopped');
-        }
+        console.log('ReplicationManager: Stopping replication (no-op for now)');
     }
 }
 

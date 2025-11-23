@@ -1,3 +1,4 @@
+import { dataLayer } from "@/services/data/RxDBDataLayer";
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { BackLink } from "@/components/app/BackLink";
@@ -142,10 +143,22 @@ const Library = () => {
   // Load user EPUBs and physical books on mount and merge with existing books
   useEffect(() => {
     const loadBooks = async () => {
-      const [userEpubs, physicalBooks] = await Promise.all([
-        getUserEpubs(),
-        getPhysicalBooks(),
-      ]);
+      const userEpubs = await getUserEpubs();
+      const rxdbBooks = await dataLayer.getBooks();
+
+      // Separar livros físicos do RxDB
+      const physicalBooks = rxdbBooks
+        .filter(b => b.type === 'physical')
+        .map(b => ({
+          id: b.id,
+          title: b.title,
+          author: b.author || '',
+          coverUrl: b.cover_url,
+          totalPages: b.total_pages || 0,
+          currentPage: b.current_page || 0,
+          addedDate: new Date(b.updated_at).toISOString(),
+          description: ''
+        }));
 
       // Convert user EPUBs to BookMeta format
       const userEpubBooks: BookMeta[] = userEpubs.map(epub => ({
@@ -234,9 +247,8 @@ const Library = () => {
       if (bookId.startsWith('user-')) {
         await deleteUserEpub(bookId);
       } else if (bookId.startsWith('physical-')) {
-        await deletePhysicalBook(bookId);
+        await dataLayer.deleteBook(bookId);
       }
-
       setAllBooks(prev => prev.filter(book => book.id !== bookId));
       toast({
         title: 'Book deleted',
@@ -254,10 +266,21 @@ const Library = () => {
 
   // Reload books after adding a physical book
   const handleBookAdded = async () => {
-    const [userEpubs, physicalBooks] = await Promise.all([
-      getUserEpubs(),
-      getPhysicalBooks(),
-    ]);
+    const userEpubs = await getUserEpubs();
+    const rxdbBooks = await dataLayer.getBooks();
+    // Separar livros físicos do RxDB
+    const physicalBooks = rxdbBooks
+      .filter(b => b.type === 'physical')
+      .map(b => ({
+        id: b.id,
+        title: b.title,
+        author: b.author || '',
+        coverUrl: b.cover_url,
+        totalPages: b.total_pages || 0,
+        currentPage: b.current_page || 0,
+        addedDate: new Date(b.updated_at).toISOString(),
+        description: ''
+      }));
 
     const userEpubBooks: BookMeta[] = userEpubs.map(epub => ({
       id: epub.id,

@@ -32,7 +32,10 @@ class RxDBDataLayerImpl implements DataLayer {
 
     private async getUserId(): Promise<string> {
         const { user } = await authService.getUser();
-        if (!user) throw new Error('User not authenticated');
+        if (!user) {
+            console.log('DataLayer: No user logged in, using local-user ID');
+            return 'local-user';
+        }
         return user.id;
     }
 
@@ -43,7 +46,7 @@ class RxDBDataLayerImpl implements DataLayer {
         const books = await db.books.find({
             selector: {
                 user_id: userId,
-                deleted: { $eq: false }
+                is_deleted: { $eq: false }
             }
         }).exec();
 
@@ -65,7 +68,7 @@ class RxDBDataLayerImpl implements DataLayer {
             ...bookData,
             user_id: userId,
             updated_at: Date.now(),
-            deleted: false
+            is_deleted: false
         } as RxBookDocumentType;
 
         const existingBook = await db.books.findOne(dataToSave.id).exec();
@@ -86,7 +89,7 @@ class RxDBDataLayerImpl implements DataLayer {
         if (book) {
             // Soft delete
             await book.patch({
-                deleted: true,
+                is_deleted: true,
                 updated_at: Date.now()
             });
         }

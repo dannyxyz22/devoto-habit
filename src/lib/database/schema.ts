@@ -48,7 +48,7 @@ export const bookSchemaLiteral = {
         updated_at: {
             type: 'number'
         },
-        deleted: {
+        is_deleted: {
             type: 'boolean'
         }
     },

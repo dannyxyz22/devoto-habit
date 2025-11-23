@@ -2,9 +2,6 @@ import { createRxDatabase, RxDatabase, RxCollection } from 'rxdb';
 import { getRxStorageDexie } from 'rxdb/plugins/storage-dexie';
 import { bookSchema, settingsSchema, RxBookDocumentType, RxSettingsDocumentType } from './schema';
 
-// Add plugins
-import { wrappedValidateAjvStorage } from 'rxdb/plugins/validate-ajv';
-
 // Define the database type
 export type DevotoDatabaseCollections = {
     books: RxCollection<RxBookDocumentType>;
@@ -20,10 +17,15 @@ const _createDatabase = async (): Promise<DevotoDatabase> => {
 
     const db = await createRxDatabase<DevotoDatabaseCollections>({
         name: 'devotodb',
-        storage: wrappedValidateAjvStorage({
-            storage: getRxStorageDexie()
-        }),
-        ignoreDuplicate: true
+        storage: getRxStorageDexie(),
+        hashFunction: (input: string) => {
+            let hash = 0;
+            for (let i = 0; i < input.length; i++) {
+                hash = ((hash << 5) - hash) + input.charCodeAt(i);
+                hash = hash & hash;
+            }
+            return Promise.resolve(Math.abs(hash).toString(16));
+        }
     });
 
     console.log('DatabaseService: Adding collections...');
