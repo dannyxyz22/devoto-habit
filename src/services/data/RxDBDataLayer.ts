@@ -46,7 +46,7 @@ class RxDBDataLayerImpl implements DataLayer {
         const books = await db.books.find({
             selector: {
                 user_id: userId,
-                is_deleted: { $eq: false }
+                _deleted: { $eq: false }
             }
         }).exec();
 
@@ -67,8 +67,8 @@ class RxDBDataLayerImpl implements DataLayer {
         const dataToSave = {
             ...bookData,
             user_id: userId,
-            updated_at: Date.now(),
-            is_deleted: false
+            _modified: Date.now(),
+            _deleted: false
         } as RxBookDocumentType;
 
         const existingBook = await db.books.findOne(dataToSave.id).exec();
@@ -89,8 +89,8 @@ class RxDBDataLayerImpl implements DataLayer {
         if (book) {
             // Soft delete
             await book.patch({
-                is_deleted: true,
-                updated_at: Date.now()
+                _deleted: true,
+                _modified: Date.now()
             });
         }
     }
@@ -110,7 +110,7 @@ class RxDBDataLayerImpl implements DataLayer {
         const dataToSave = {
             ...settingsData,
             user_id: userId,
-            updated_at: Date.now()
+            _modified: Date.now()
         } as RxSettingsDocumentType;
 
         const existingSettings = await db.settings.findOne(userId).exec();

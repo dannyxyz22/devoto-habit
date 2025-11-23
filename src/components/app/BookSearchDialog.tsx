@@ -93,8 +93,8 @@ export function BookSearchDialog({ open, onOpenChange, onBookAdded }: BookSearch
                 total_pages: result.totalPages || 0,
                 current_page: 0,
                 percentage: 0,
-                updated_at: Date.now(),
-                deleted: false
+                _modified: Date.now(),
+                _deleted: false
             });
             console.log('[BookSearch] Book saved successfully');
             toast({
@@ -140,8 +140,8 @@ export function BookSearchDialog({ open, onOpenChange, onBookAdded }: BookSearch
                 total_pages: totalPages,
                 current_page: 0,
                 percentage: 0,
-                updated_at: Date.now(),
-                deleted: false
+                _modified: Date.now(),
+                _deleted: false
             });
             toast({
                 title: "Livro adicionado!",

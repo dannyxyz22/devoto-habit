@@ -45,14 +45,14 @@ export const bookSchemaLiteral = {
         file_hash: {
             type: 'string'
         },
-        updated_at: {
+        _modified: {
             type: 'number'
         },
-        is_deleted: {
+        _deleted: {
             type: 'boolean'
         }
     },
-    required: ['id', 'title', 'updated_at']
+    required: ['id', 'title', '_modified']
 } as const;
 
 const schemaTyped = toTypedRxJsonSchema(bookSchemaLiteral);
@@ -84,11 +84,11 @@ export const settingsSchemaLiteral = {
         last_active_book_id: {
             type: 'string'
         },
-        updated_at: {
+        _modified: {
             type: 'number'
         }
     },
-    required: ['user_id', 'updated_at']
+    required: ['user_id', '_modified']
 } as const;
 
 const settingsSchemaTyped = toTypedRxJsonSchema(settingsSchemaLiteral);

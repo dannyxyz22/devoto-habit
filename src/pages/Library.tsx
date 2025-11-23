@@ -278,7 +278,7 @@ const Library = () => {
         coverUrl: b.cover_url,
         totalPages: b.total_pages || 0,
         currentPage: b.current_page || 0,
-        addedDate: new Date(b.updated_at).toISOString(),
+        addedDate: new Date(b._modified).toISOString(),
         description: ''
       }));
 
