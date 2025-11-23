@@ -9,7 +9,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Progress } from "@/components/ui/progress";
 import { BOOKS, type BookMeta } from "@/lib/books";
 import { getUserEpubs } from "@/lib/userEpubs";
-import { getPhysicalBooks } from "@/lib/physicalBooks";
+import { dataLayer } from "@/services/data/RxDBDataLayer";
 import { differenceInCalendarDays, formatISO, parseISO } from "date-fns";
 import { useTodayISO } from "@/hooks/use-today";
 import { getStreak, getReadingPlan, getProgress, getDailyBaseline, setDailyBaseline, getStats, type Streak } from "@/lib/storage";
@@ -76,9 +76,9 @@ const Index = () => {
   // Load user books (EPUBs and Physical)
   useEffect(() => {
     const loadBooks = async () => {
-      const [userEpubs, physicalBooks] = await Promise.all([
+      const [userEpubs, rxdbBooks] = await Promise.all([
         getUserEpubs(),
-        getPhysicalBooks(),
+        dataLayer.getBooks(),
       ]);
 
       const userBooks: BookMeta[] = userEpubs.map(epub => ({
@@ -93,18 +93,20 @@ const Index = () => {
         addedDate: epub.addedDate,
       }));
 
-      const physicalBooksMeta: BookMeta[] = physicalBooks.map(book => ({
-        id: book.id,
-        title: book.title,
-        author: book.author,
-        description: book.description || '',
-        coverImage: book.coverUrl,
-        type: 'physical' as const,
-        isPhysical: true,
-        totalPages: book.totalPages,
-        currentPage: book.currentPage,
-        addedDate: book.addedDate,
-      }));
+      const physicalBooksMeta: BookMeta[] = rxdbBooks
+        .filter(b => b.type === 'physical')
+        .map(book => ({
+          id: book.id,
+          title: book.title,
+          author: book.author || '',
+          description: '', // Add if needed
+          coverImage: book.cover_url,
+          type: 'physical' as const,
+          isPhysical: true,
+          totalPages: book.total_pages || 0,
+          currentPage: book.current_page || 0,
+          addedDate: book._modified,
+        }));
 
       setAllBooks([...userBooks, ...physicalBooksMeta, ...BOOKS]);
     };

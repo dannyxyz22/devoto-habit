@@ -16,7 +16,6 @@ import { resolveEpubSource } from "@/lib/utils";
 import ePub from "epubjs";
 import { getCoverObjectUrl, saveCoverBlob } from "@/lib/coverCache";
 import { saveUserEpub, getUserEpubs, deleteUserEpub } from "@/lib/userEpubs";
-import { getPhysicalBooks, deletePhysicalBook } from "@/lib/physicalBooks";
 import { BookSearchDialog } from "@/components/app/BookSearchDialog";
 import { Upload, Trash2, BookPlus } from "lucide-react";
 

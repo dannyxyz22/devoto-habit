@@ -1,4 +1,3 @@
-// src/pages/PhysicalBookTracker.tsx
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { BackLink } from "@/components/app/BackLink";
@@ -6,12 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SEO } from "@/components/app/SEO";
-import { getPhysicalBook, updatePhysicalBookProgress } from "@/lib/physicalBooks";
 import { setProgress, getProgress, getDailyBaseline, setDailyBaseline } from "@/lib/storage";
 import { useToast } from "@/components/ui/use-toast";
 import { format } from "date-fns";
 import { BookOpen, Plus } from "lucide-react";
 import type { PhysicalBook } from "@/lib/physicalBooks";
+import { dataLayer } from "@/services/data/RxDBDataLayer";
 
 export default function PhysicalBookTracker() {
     const { bookId } = useParams<{ bookId: string }>();
@@ -30,9 +29,9 @@ export default function PhysicalBookTracker() {
             }
 
             try {
-                const physicalBook = await getPhysicalBook(bookId);
+                const rxBook = await dataLayer.getBook(bookId);
 
-                if (!physicalBook) {
+                if (!rxBook) {
                     toast({
                         title: "Livro não encontrado",
                         description: "Este livro não existe na sua biblioteca",
@@ -41,6 +40,19 @@ export default function PhysicalBookTracker() {
                     navigate("/biblioteca");
                     return;
                 }
+
+                const physicalBook: PhysicalBook = {
+                    id: rxBook.id,
+                    title: rxBook.title,
+                    author: rxBook.author || "",
+                    coverUrl: rxBook.cover_url,
+                    totalPages: rxBook.total_pages || 0,
+                    currentPage: rxBook.current_page || 0,
+                    isPhysical: true,
+                    addedDate: rxBook._modified,
+                    description: "", // Add if needed
+                    publisher: "", // Add if needed
+                };
 
                 setBook(physicalBook);
                 setCurrentPage(physicalBook.currentPage.toString());
@@ -99,7 +111,15 @@ export default function PhysicalBookTracker() {
         }
 
         try {
-            await updatePhysicalBookProgress(bookId, newPage);
+            // Update via DataLayer
+            const rxBook = await dataLayer.getBook(bookId);
+            if (rxBook) {
+                await dataLayer.saveBook({
+                    ...rxBook,
+                    current_page: newPage,
+                    _modified: Date.now()
+                });
+            }
 
             const percent = Math.round((newPage / book.totalPages) * 100);
             setProgress(bookId, {
@@ -136,7 +156,16 @@ export default function PhysicalBookTracker() {
         setCurrentPage(newPage.toString());
         // Persist the new page count
         try {
-            await updatePhysicalBookProgress(bookId, newPage);
+            // Update via DataLayer
+            const rxBook = await dataLayer.getBook(bookId);
+            if (rxBook) {
+                await dataLayer.saveBook({
+                    ...rxBook,
+                    current_page: newPage,
+                    _modified: Date.now()
+                });
+            }
+
             const percent = Math.round((newPage / book.totalPages) * 100);
             setProgress(bookId, {
                 partIndex: 0,
