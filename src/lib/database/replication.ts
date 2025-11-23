@@ -1,4 +1,4 @@
-import { replicateSupabase } from 'rxdb-supabase';
+import { replicateSupabase } from 'rxdb/plugins/replication-supabase';
 import { supabase } from '@/lib/supabase';
 import { getDatabase } from '@/lib/database/db';
 import { RxReplicationState } from 'rxdb/plugins/replication';
