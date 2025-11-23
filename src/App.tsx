@@ -7,6 +7,7 @@ import { usePWA } from "@/hooks/usePWA";
 import { InstallPWA } from "@/components/app/InstallPWA";
 
 import Index from "./pages/Index";
+import Login from "./pages/Login";
 import Library from "./pages/Library";
 import Reader from "./pages/Reader";
 import EpubReader from "./pages/EpubReader";
@@ -34,6 +35,7 @@ const App = () => {
           <BrowserRouter basename={baseName}>
             <Routes>
               <Route path="/" element={<Index />} />
+              <Route path="/login" element={<Login />} />
               <Route path="/biblioteca" element={<Library />} />
               <Route path="/leitor/:bookId" element={<Reader />} />
               <Route path="/epub/:epubId" element={<EpubReader />} />

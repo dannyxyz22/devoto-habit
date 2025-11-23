@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import hero from "@/assets/hero-devota.jpg";
 import { Button } from "@/components/ui/button";
 import { BOOKS } from "@/lib/books";
+import { UserMenu } from "./UserMenu";
 
 
 export const Hero = () => {
@@ -62,6 +63,9 @@ export const Hero = () => {
         className="w-full h-72 md:h-96 object-cover"
         loading="eager"
       />
+      <div className="absolute top-4 right-4 z-10">
+        <UserMenu />
+      </div>
       <div className="absolute inset-0 flex items-center">
         <div className="p-6 md:p-10">
           <p className="text-sm text-muted-foreground">Clássicos católicos</p>
