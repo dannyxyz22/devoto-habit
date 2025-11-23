@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { usePWA } from "@/hooks/usePWA";
 import { InstallPWA } from "@/components/app/InstallPWA";
+import { AuthCallbackHandler } from "@/components/auth/AuthCallbackHandler";
 
 import Index from "./pages/Index";
 import Login from "./pages/Login";
@@ -33,6 +34,7 @@ const App = () => {
         <Sonner />
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <BrowserRouter basename={baseName}>
+            <AuthCallbackHandler />
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/login" element={<Login />} />
