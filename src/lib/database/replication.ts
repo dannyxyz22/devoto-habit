@@ -45,7 +45,9 @@ export class ReplicationManager {
                 push: {
                     batchSize: 50,
                     modifier: (doc) => {
+                        console.log('[Push Modifier] Original:', doc);
                         const { created_at, updated_at, cover_url, ...rest } = doc as any;
+                        console.log('[Push Modifier] Sanitized:', rest);
                         return rest;
                     }
                 }
