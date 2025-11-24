@@ -13,7 +13,7 @@ const _createDatabase = async (): Promise<DevotoDatabase> => {
     console.log('DatabaseService: Creating database...');
 
     const db = await createRxDatabase<DevotoDatabaseCollections>({
-        name: 'devotodb_v4',
+        name: 'devotodb_v5',
         storage: getRxStorageDexie(),
         hashFunction: (input: string) => {
             let hash = 0;
