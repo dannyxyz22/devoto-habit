@@ -63,9 +63,11 @@ class RxDBDataLayerImpl implements DataLayer {
         const db = await getDatabase();
         const userId = await this.getUserId();
 
-        // Ensure user_id is set
+        // Ensure user_id is set and sanitize data
+        const { cover_url, ...sanitizedBookData } = bookData as any;
+
         const dataToSave = {
-            ...bookData,
+            ...sanitizedBookData,
             user_id: userId,
             _modified: Date.now(),
             _deleted: false,
