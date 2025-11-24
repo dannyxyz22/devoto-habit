@@ -39,6 +39,17 @@ export const bookSchemaLiteral = {
             minimum: 0,
             maximum: 100
         },
+        part_index: {
+            type: 'number',
+            minimum: 0
+        },
+        chapter_index: {
+            type: 'number',
+            minimum: 0
+        },
+        last_location_cfi: {
+            type: 'string'
+        },
         cover_url: {
             type: 'string'
         },

@@ -68,7 +68,11 @@ class RxDBDataLayerImpl implements DataLayer {
             ...bookData,
             user_id: userId,
             _modified: Date.now(),
-            _deleted: false
+            _deleted: false,
+            // Ensure progress fields are preserved or defaulted
+            part_index: bookData.part_index ?? 0,
+            chapter_index: bookData.chapter_index ?? 0,
+            last_location_cfi: bookData.last_location_cfi ?? undefined
         } as RxBookDocumentType;
 
         const existingBook = await db.books.findOne(dataToSave.id).exec();

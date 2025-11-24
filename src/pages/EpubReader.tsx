@@ -17,6 +17,7 @@ import { Settings, BookOpen, BookOpenCheck, Maximize, Minimize } from "lucide-re
 import { useToast } from "@/components/ui/use-toast";
 import { getUserEpubBlob } from "@/lib/userEpubs";
 import { loadLocationsFromCache, saveLocationsToCache } from "@/lib/locationsCache";
+import { dataLayer } from "@/services/data/RxDBDataLayer";
 
 type LayoutMode = "auto" | "single" | "double";
 
@@ -225,6 +226,23 @@ const EpubReader = () => {
 
                 setProgress(epubId, { partIndex: 0, chapterIndex: 0, percent });
 
+                // Sync with DataLayer (including CFI)
+                (async () => {
+                  try {
+                    const book = await dataLayer.getBook(epubId);
+                    if (book) {
+                      await dataLayer.saveBook({
+                        ...book,
+                        percentage: percent,
+                        last_location_cfi: cfi,
+                        _modified: Date.now()
+                      });
+                    }
+                  } catch (error) {
+                    console.error("Error syncing EPUB progress:", error);
+                  }
+                })();
+
                 // Ensure today's baseline exists (based on percent) and compute daily goal percent
                 const base = getDailyBaseline(epubId, todayISO);
                 const baselinePercent = base ? base.percent : percent;
@@ -336,7 +354,22 @@ const EpubReader = () => {
 
             // Exibe a posição salva (ou início)
             let saved: string | null = null;
-            try { saved = localStorage.getItem(`epubLoc:${epubId}`); } catch { }
+            try {
+              // Try local storage first for immediate feedback
+              saved = localStorage.getItem(`epubLoc:${epubId}`);
+
+              // If not local, or if we want to ensure sync, check DataLayer
+              // Note: This is async, so we might need a better strategy if we want to wait
+              // For now, let's try to fetch it before rendering if possible, but here we are inside .then()
+              // We can fire a background check
+              dataLayer.getBook(epubId).then(book => {
+                if (book && book.last_location_cfi && book.last_location_cfi !== saved) {
+                  console.log('Found newer cloud location:', book.last_location_cfi);
+                  rendition.display(book.last_location_cfi);
+                  saved = book.last_location_cfi;
+                }
+              });
+            } catch { }
             rendition.display(saved || undefined);
 
             // ⚡ Gera locations em segundo plano (ou restaura do cache LRU)

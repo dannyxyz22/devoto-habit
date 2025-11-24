@@ -43,6 +43,7 @@ import {
 } from "@/lib/reading";
 
 // Types now shared via lib/reading
+import { dataLayer } from "@/services/data/RxDBDataLayer";
 
 const Reader = () => {
   const { bookId = "" } = useParams();
@@ -55,6 +56,28 @@ const Reader = () => {
   const [streak, setStreak] = useState<Streak>(() => getStreak());
   const startRef = useRef<number | null>(null);
   const { theme, setTheme } = useTheme();
+
+  // Load initial progress from DataLayer
+  useEffect(() => {
+    const loadCloudProgress = async () => {
+      if (!bookId) return;
+      try {
+        const book = await dataLayer.getBook(bookId);
+        if (book) {
+          setP({
+            partIndex: book.part_index || 0,
+            chapterIndex: book.chapter_index || 0,
+            percent: book.percentage || 0,
+            currentPage: book.current_page,
+            totalPages: book.total_pages
+          });
+        }
+      } catch (error) {
+        console.error("Error loading cloud progress:", error);
+      }
+    };
+    loadCloudProgress();
+  }, [bookId]);
   const [lineSpacing, setLineSpacing] = useState<"compact" | "normal" | "relaxed">(() => {
     try {
       return (localStorage.getItem("lineSpacing") as any) || "compact";
@@ -70,10 +93,10 @@ const Reader = () => {
     }
   });
   useEffect(() => {
-    try { localStorage.setItem("textAlign", textAlign); } catch {}
+    try { localStorage.setItem("textAlign", textAlign); } catch { }
   }, [textAlign]);
   useEffect(() => {
-    try { localStorage.setItem("lineSpacing", lineSpacing); } catch {}
+    try { localStorage.setItem("lineSpacing", lineSpacing); } catch { }
   }, [lineSpacing]);
   const [settingsOpen, setSettingsOpen] = useState<boolean>(() => {
     try {
@@ -82,7 +105,7 @@ const Reader = () => {
     } catch { return false; }
   });
   useEffect(() => {
-    try { localStorage.setItem("readerSettingsOpen", JSON.stringify(settingsOpen)); } catch {}
+    try { localStorage.setItem("readerSettingsOpen", JSON.stringify(settingsOpen)); } catch { }
   }, [settingsOpen]);
 
   useEffect(() => {
@@ -93,7 +116,7 @@ const Reader = () => {
       try {
         setParts(JSON.parse(cached));
         return;
-      } catch {}
+      } catch { }
     }
     setLoading(true);
     fetch(meta.sourceUrl)
@@ -109,7 +132,7 @@ const Reader = () => {
   // Remember last opened book for quick resume from Hero CTA
   useEffect(() => {
     if (bookId) {
-      try { localStorage.setItem('lastBookId', bookId); } catch {}
+      try { localStorage.setItem('lastBookId', bookId); } catch { }
     }
   }, [bookId]);
 
@@ -192,22 +215,22 @@ const Reader = () => {
   useEffect(() => {
     const base = getDailyBaseline(bookId, todayISO);
     if (base) {
-      try { console.log('[Baseline] existente', { scope: 'Reader', bookId, todayISO, base }); } catch {}
+      try { console.log('[Baseline] existente', { scope: 'Reader', bookId, todayISO, base }); } catch { }
       return;
     }
     // Avoid persisting zero before parts/progress are ready
     const hasProgress = (p?.percent ?? 0) > 0 || p.partIndex > 0 || p.chapterIndex > 0 || wordsUpToCurrent > 0;
     if (!parts) {
-      try { console.log('[Baseline] skip persist: parts não carregadas', { scope: 'Reader', bookId, todayISO, wordsUpToCurrent, p }); } catch {}
+      try { console.log('[Baseline] skip persist: parts não carregadas', { scope: 'Reader', bookId, todayISO, wordsUpToCurrent, p }); } catch { }
       return;
     }
     if (!hasProgress) {
-      try { console.log('[Baseline] skip persist: sem progresso ainda', { scope: 'Reader', bookId, todayISO, wordsUpToCurrent, p }); } catch {}
+      try { console.log('[Baseline] skip persist: sem progresso ainda', { scope: 'Reader', bookId, todayISO, wordsUpToCurrent, p }); } catch { }
       return;
     }
     // Persist percent aligned to the words-based total book progress for consistency
     setDailyBaseline(bookId, todayISO, { words: wordsUpToCurrent, percent: totalBookProgressPercent });
-    try { console.log('[Baseline] persistida', { scope: 'Reader', bookId, todayISO, words: wordsUpToCurrent, percent: totalBookProgressPercent }); } catch {}
+    try { console.log('[Baseline] persistida', { scope: 'Reader', bookId, todayISO, words: wordsUpToCurrent, percent: totalBookProgressPercent }); } catch { }
   }, [bookId, todayISO, parts, wordsUpToCurrent, p.partIndex, p.chapterIndex, p.percent, totalBookProgressPercent]);
 
   const daysRemaining = useMemo(() => computeDaysRemaining(plan?.targetDateISO), [plan]);
@@ -241,17 +264,17 @@ const Reader = () => {
     (async () => {
       try {
         await updateDailyProgressWidget(percent, hasGoal);
-         console.log("[Widget] Preferences set OK");
+        console.log("[Widget] Preferences set OK");
         // Trigger native refresh
-  await WidgetUpdater.update?.();
-   console.log("[Widget] Plugin update invoked");
+        await WidgetUpdater.update?.();
+        console.log("[Widget] Plugin update invoked");
       } catch (err) {
-      console.error("[Widget] erro ao atualizar widget:", err);
-    }
+        console.error("[Widget] erro ao atualizar widget:", err);
+      }
     })();
 
   }, [dailyProgressPercent, dailyTargetWords]);
-  
+
   // Check if daily goal was just completed and auto-mark reading
   const [wasGoalCompleted, setWasGoalCompleted] = useState(false);
   useEffect(() => {
@@ -263,9 +286,27 @@ const Reader = () => {
     }
   }, [dailyProgressPercent, wasGoalCompleted]);
 
-  const updateProgress = (np: typeof p) => {
+  const updateProgress = async (np: typeof p) => {
     setP(np);
     setProgress(bookId, np);
+
+    // Sync with DataLayer
+    try {
+      const book = await dataLayer.getBook(bookId);
+      if (book) {
+        await dataLayer.saveBook({
+          ...book,
+          part_index: np.partIndex,
+          chapter_index: np.chapterIndex,
+          percentage: np.percent,
+          current_page: np.currentPage || 0,
+          total_pages: np.totalPages || 0,
+          _modified: Date.now()
+        });
+      }
+    } catch (error) {
+      console.error("Error syncing progress:", error);
+    }
   };
   const concludeChapter = () => {
     if (!parts) return;
@@ -299,18 +340,18 @@ const Reader = () => {
 
   const onReadToday = () => {
     if (hasReadToday()) {
-      toast({ 
-        title: "Já marcado", 
-        description: "Você já marcou a leitura de hoje.", 
-        variant: "default" 
+      toast({
+        title: "Já marcado",
+        description: "Você já marcou a leitura de hoje.",
+        variant: "default"
       });
       return;
     }
-    
+
     const before = getStreak();
     const after = markReadToday();
     setStreak(after);
-    
+
     if (after.current > before.current) {
       celebrate("Leitura do dia registrada! Streak +1");
     } else {
@@ -320,7 +361,7 @@ const Reader = () => {
 
   const celebrate = (message: string) => {
     toast({ title: message });
-    try { navigator.vibrate?.(150); } catch {}
+    try { navigator.vibrate?.(150); } catch { }
     confetti({ particleCount: 90, spread: 70, origin: { y: 0.7 } });
   };
 
@@ -336,7 +377,7 @@ const Reader = () => {
   }
 
   return (
-  <main className="container mx-auto py-10">
+    <main className="container mx-auto py-10">
       <SEO
         title={`${meta.title} — Leitura Devota`}
         description={`Leia ${meta.title} de ${meta.author} em português com progresso e streak.`}
@@ -372,7 +413,7 @@ const Reader = () => {
               <CollapsibleContent className="space-y-4">
                 <div>
                   <p className="text-sm font-medium mb-2">Aparência</p>
-                  <ToggleGroup type="single" value={theme || "system"} onValueChange={(v)=> v && setTheme(v)}>
+                  <ToggleGroup type="single" value={theme || "system"} onValueChange={(v) => v && setTheme(v)}>
                     <ToggleGroupItem value="system" aria-label="Usar tema do sistema" title="Sistema">
                       <Monitor className="h-4 w-4" />
                     </ToggleGroupItem>
@@ -396,7 +437,7 @@ const Reader = () => {
                 </div>
                 <div>
                   <p className="text-sm font-medium mb-2">Espaçamento entre linhas</p>
-                  <ToggleGroup type="single" value={lineSpacing} onValueChange={(v)=> v && setLineSpacing(v as any)}>
+                  <ToggleGroup type="single" value={lineSpacing} onValueChange={(v) => v && setLineSpacing(v as any)}>
                     <ToggleGroupItem value="compact" aria-label="Espaçamento compacto" title="Compacto">1.2×</ToggleGroupItem>
                     <ToggleGroupItem value="normal" aria-label="Espaçamento normal" title="Normal">1.5×</ToggleGroupItem>
                     <ToggleGroupItem value="relaxed" aria-label="Espaçamento relaxado" title="Relaxado">1.75×</ToggleGroupItem>
@@ -404,7 +445,7 @@ const Reader = () => {
                 </div>
                 <div>
                   <p className="text-sm font-medium mb-2">Alinhamento do texto</p>
-                  <ToggleGroup type="single" value={textAlign} onValueChange={(v)=> v && setTextAlign(v as any)}>
+                  <ToggleGroup type="single" value={textAlign} onValueChange={(v) => v && setTextAlign(v as any)}>
                     <ToggleGroupItem value="justify" aria-label="Justificado" title="Justificado">
                       <AlignJustify className="h-4 w-4" />
                     </ToggleGroupItem>
@@ -452,16 +493,16 @@ const Reader = () => {
                       // Visual feedback when concluding via bottom button
                       try {
                         confetti({ particleCount: 60, spread: 70, origin: { y: 0.7 } });
-                      } catch {}
+                      } catch { }
                       concludeChapter();
                     }}
                   >
                     Concluir capítulo
                   </Button>
                   {(!hasReadToday() && (dailyProgressPercent == null || dailyProgressPercent < 100)) && (
-                    <Button 
-                      className="w-full md:w-auto" 
-                      onClick={onReadToday} 
+                    <Button
+                      className="w-full md:w-auto"
+                      onClick={onReadToday}
                       variant="secondary"
                     >
                       Marcar leitura de hoje
@@ -484,9 +525,8 @@ const Reader = () => {
             {flatChapters.map((c, idx) => (
               <li key={`${c.partIndex}-${c.chapterIndex}`}>
                 <button
-                  className={`text-left w-full rounded px-2 py-1 hover:bg-accent/30 ${
-                    c.partIndex === p.partIndex && c.chapterIndex === p.chapterIndex ? "bg-accent/40" : ""
-                  }`}
+                  className={`text-left w-full rounded px-2 py-1 hover:bg-accent/30 ${c.partIndex === p.partIndex && c.chapterIndex === p.chapterIndex ? "bg-accent/40" : ""
+                    }`}
                   onClick={() => {
                     updateProgress({ partIndex: c.partIndex, chapterIndex: c.chapterIndex, percent: Math.round(((idx + 1) / flatChapters.length) * 100) });
                   }}
