@@ -43,7 +43,11 @@ export class ReplicationManager {
                     }
                 },
                 push: {
-                    batchSize: 50
+                    batchSize: 50,
+                    modifier: (doc) => {
+                        const { created_at, updated_at, cover_url, ...rest } = doc as any;
+                        return rest;
+                    }
                 }
             });
 

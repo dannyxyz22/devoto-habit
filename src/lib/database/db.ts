@@ -1,22 +1,19 @@
 import { createRxDatabase, RxDatabase, RxCollection } from 'rxdb';
 import { getRxStorageDexie } from 'rxdb/plugins/storage-dexie';
 import { bookSchema, settingsSchema, RxBookDocumentType, RxSettingsDocumentType } from './schema';
-
 // Define the database type
 export type DevotoDatabaseCollections = {
     books: RxCollection<RxBookDocumentType>;
     settings: RxCollection<RxSettingsDocumentType>;
 };
-
 export type DevotoDatabase = RxDatabase<DevotoDatabaseCollections>;
-
 let dbPromise: Promise<DevotoDatabase> | null = null;
 
 const _createDatabase = async (): Promise<DevotoDatabase> => {
     console.log('DatabaseService: Creating database...');
 
     const db = await createRxDatabase<DevotoDatabaseCollections>({
-        name: 'devotodb_v3',
+        name: 'devotodb_v4',
         storage: getRxStorageDexie(),
         hashFunction: (input: string) => {
             let hash = 0;
@@ -41,7 +38,6 @@ const _createDatabase = async (): Promise<DevotoDatabase> => {
     console.log('DatabaseService: Database created');
     return db;
 };
-
 export const getDatabase = (): Promise<DevotoDatabase> => {
     if (!dbPromise) {
         dbPromise = _createDatabase();
