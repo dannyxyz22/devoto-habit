@@ -39,16 +39,25 @@ export class ReplicationManager {
                         if (!doc.author) delete doc.author;
                         if (!doc.cover_url) delete doc.cover_url;
                         if (!doc.file_hash) delete doc.file_hash;
-                        return doc;
+
+                        // Convert _modified to number
+                        return {
+                            ...doc,
+                            _modified: new Date(doc._modified).getTime()
+                        };
                     }
                 },
                 push: {
                     batchSize: 50,
                     modifier: (doc) => {
                         console.log('[Push Modifier] Original:', doc);
-                        const { created_at, updated_at, cover_url, ...rest } = doc as any;
-                        console.log('[Push Modifier] Sanitized:', rest);
-                        return rest;
+                        const { created_at, updated_at, cover_url, _modified, ...rest } = doc as any;
+                        const sanitized = {
+                            ...rest,
+                            _modified: new Date(_modified).toISOString()
+                        };
+                        console.log('[Push Modifier] Sanitized:', sanitized);
+                        return sanitized;
                     }
                 }
             });
