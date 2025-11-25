@@ -40,24 +40,17 @@ export class ReplicationManager {
                         if (!doc.cover_url) delete doc.cover_url;
                         if (!doc.file_hash) delete doc.file_hash;
 
-                        // Convert _modified to number
-                        return {
-                            ...doc,
-                            _modified: new Date(doc._modified).getTime()
-                        };
+                        // _modified is already BIGINT in Supabase, no conversion needed
+                        return doc;
                     }
                 },
                 push: {
                     batchSize: 50,
                     modifier: (doc) => {
                         console.log('[Push Modifier] Original:', doc);
-                        const { created_at, updated_at, cover_url, _modified, ...rest } = doc as any;
-                        const sanitized = {
-                            ...rest,
-                            _modified: new Date(_modified).toISOString()
-                        };
-                        console.log('[Push Modifier] Sanitized:', sanitized);
-                        return sanitized;
+                        const { created_at, updated_at, cover_url, ...rest } = doc as any;
+                        console.log('[Push Modifier] Sanitized:', rest);
+                        return rest;
                     }
                 }
             });
