@@ -37,7 +37,6 @@ export class ReplicationManager {
                     modifier: (doc) => {
                         // Map nullable fields
                         if (!doc.author) delete doc.author;
-                        if (!doc.cover_url) delete doc.cover_url;
                         if (!doc.file_hash) delete doc.file_hash;
 
                         // _modified is already BIGINT in Supabase, no conversion needed
@@ -48,7 +47,13 @@ export class ReplicationManager {
                     batchSize: 50,
                     modifier: (doc) => {
                         console.log('[Push Modifier] Original:', doc);
-                        const { created_at, updated_at, cover_url, ...rest } = doc as any;
+                        const { created_at, updated_at, ...rest } = doc as any;
+
+                        // Filter out base64 cover_url, but keep external URLs
+                        if (rest.cover_url && rest.cover_url.startsWith('data:')) {
+                            delete rest.cover_url;
+                        }
+
                         console.log('[Push Modifier] Sanitized:', rest);
                         return rest;
                     }

@@ -64,6 +64,8 @@ class RxDBDataLayerImpl implements DataLayer {
         const userId = await this.getUserId();
 
         // Ensure user_id is set and sanitize data
+        // If cover_url is a base64 data URL, don't save it to the database
+        // Only save external URLs (http/https)
         const { cover_url, ...sanitizedBookData } = bookData as any;
 
         const dataToSave = {
@@ -71,6 +73,8 @@ class RxDBDataLayerImpl implements DataLayer {
             user_id: userId,
             _modified: Date.now(),
             _deleted: false,
+            // Only save cover_url if it's an external URL, not base64
+            cover_url: cover_url && !cover_url.startsWith('data:') ? cover_url : undefined,
             // Ensure progress fields are preserved or defaulted
             part_index: bookData.part_index ?? 0,
             chapter_index: bookData.chapter_index ?? 0,

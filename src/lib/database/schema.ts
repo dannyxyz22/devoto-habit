@@ -50,7 +50,9 @@ export const bookSchemaLiteral = {
         last_location_cfi: {
             type: 'string'
         },
-
+        cover_url: {
+            type: 'string'
+        },
         file_hash: {
             type: 'string'
         },

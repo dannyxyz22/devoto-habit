@@ -1,4 +1,6 @@
 import Hero from "@/components/app/Hero";
+import { BookCover } from "@/components/book/BookCover";
+
 import { updateDailyProgressWidget } from "@/main";
 import { Capacitor } from "@capacitor/core";
 import { WidgetUpdater, canUseNative } from "@/lib/widgetUpdater";

@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { BookCover } from "@/components/book/BookCover";
+
 import { useParams, useNavigate } from "react-router-dom";
 import { BackLink } from "@/components/app/BackLink";
 import { Button } from "@/components/ui/button";
@@ -222,13 +224,12 @@ export default function PhysicalBookTracker() {
                 <Card className="mb-6">
                     <CardHeader>
                         <div className="flex gap-4">
-                            {book.coverUrl && (
-                                <img
-                                    src={book.coverUrl}
-                                    alt={book.title}
-                                    className="w-24 h-36 object-cover rounded"
-                                />
-                            )}
+                            <BookCover
+                                bookId={book.id}
+                                coverUrl={book.coverUrl}
+                                title={book.title}
+                                className="w-full h-48 rounded-t-lg"
+                            />
                             <div className="flex-1">
                                 <CardTitle className="text-2xl mb-2">{book.title}</CardTitle>
                                 <p className="text-muted-foreground">{book.author}</p>

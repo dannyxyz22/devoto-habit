@@ -152,10 +152,10 @@ const Library = () => {
           id: b.id,
           title: b.title,
           author: b.author || '',
-          coverUrl: b.cover_url,
+          coverImage: b.cover_url,
           totalPages: b.total_pages || 0,
           currentPage: b.current_page || 0,
-          addedDate: new Date(b._modified).toISOString(),
+          addedDate: new Date(b._modified).getTime(),
           description: ''
         }));
 
@@ -178,7 +178,7 @@ const Library = () => {
         title: book.title,
         author: book.author,
         description: book.description || '',
-        coverImage: book.coverUrl,
+        coverImage: book.coverImage,
         type: 'physical' as const,
         isPhysical: true,
         totalPages: book.totalPages,
@@ -274,10 +274,10 @@ const Library = () => {
         id: b.id,
         title: b.title,
         author: b.author || '',
-        coverUrl: b.cover_url,
+        coverImage: b.cover_url,
         totalPages: b.total_pages || 0,
         currentPage: b.current_page || 0,
-        addedDate: new Date(b._modified).toISOString(),
+        addedDate: new Date(b._modified).getTime(),
         description: ''
       }));
 
@@ -298,7 +298,7 @@ const Library = () => {
       title: book.title,
       author: book.author,
       description: book.description || '',
-      coverImage: book.coverUrl,
+      coverImage: book.coverImage,
       type: 'physical' as const,
       isPhysical: true,
       totalPages: book.totalPages,

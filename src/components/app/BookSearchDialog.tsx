@@ -74,22 +74,12 @@ export function BookSearchDialog({ open, onOpenChange, onBookAdded }: BookSearch
     };
     const handleSelectBook = async (result: BookSearchResult) => {
         try {
-            // Download high-res cover if available (medium/large instead of thumbnail)
-            let highResCoverUrl: string | undefined;
-            if (result.coverHighResUrl) {
-                console.log('[BookSearch] Downloading high-res cover from:', result.coverHighResUrl);
-                highResCoverUrl = await downloadImageAsDataUrl(result.coverHighResUrl);
-                console.log('[BookSearch] High-res cover downloaded:', !!highResCoverUrl);
-            }
-            // Fallback to already downloaded thumbnail if high-res failed
-            const finalCoverUrl = highResCoverUrl || result.coverUrl;
-            console.log('[BookSearch] Saving book:', result.title, 'with cover:', !!finalCoverUrl);
             await dataLayer.saveBook({
                 id: `physical-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                 title: result.title,
                 author: result.author || '',
                 type: 'physical',
-                cover_url: finalCoverUrl,
+                cover_url: result.coverHighResUrl || result.coverSourceUrl, // Save external URL, not Data URL
                 total_pages: result.totalPages || 0,
                 current_page: 0,
                 percentage: 0,
