@@ -552,7 +552,7 @@ const Library = () => {
               }}
               className="cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2"
             >
-                {book.coverImage ? (
+              {book.coverImage ? (
                 <Cover
                   src={book.coverImage}
                   alt={`Capa do livro ${book.title}`}
@@ -560,7 +560,7 @@ const Library = () => {
               ) : book.type === 'epub' ? (
                 <EpubCoverLoader id={book.id} title={book.title} sourceUrl={book.sourceUrl!} />
               ) : null}
-              
+
             </div>
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
@@ -600,6 +600,23 @@ const Library = () => {
                   </div>
                 </div>
               )}
+              {book.type === 'epub' && (() => {
+                const progress = getProgress(book.id);
+                return progress.percent > 0 ? (
+                  <div className="mb-4">
+                    <div className="flex justify-between text-sm text-muted-foreground mb-1">
+                      <span>Progresso</span>
+                      <span>{Math.round(progress.percent)}%</span>
+                    </div>
+                    <div className="w-full bg-secondary rounded-full h-2">
+                      <div
+                        className="bg-primary h-2 rounded-full transition-all"
+                        style={{ width: `${progress.percent}%` }}
+                      />
+                    </div>
+                  </div>
+                ) : null;
+              })()}
               <div className="flex items-center gap-2">
                 <Button onClick={() => {
                   if (book.isPhysical) {
