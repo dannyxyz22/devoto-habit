@@ -21,13 +21,53 @@ class RxDBDataLayerImpl implements DataLayer {
     private initializeAuthListener() {
         authService.onAuthStateChange(async (event, session) => {
             if (event === 'SIGNED_IN' && session) {
-                console.log('DataLayer: User signed in, starting replication...');
+                console.log('DataLayer: User signed in, migrating local data and starting replication...');
+                await this.migrateLocalUserData(session.user.id);
                 await replicationManager.startReplication();
             } else if (event === 'SIGNED_OUT') {
                 console.log('DataLayer: User signed out, stopping replication...');
                 await replicationManager.stopReplication();
             }
         });
+    }
+
+    /**
+     * Migrate all local-user books to the authenticated user
+     * This ensures offline data is preserved when user logs in
+     */
+    private async migrateLocalUserData(userId: string): Promise<void> {
+        try {
+            const db = await getDatabase();
+
+            // Find all books belonging to 'local-user'
+            const localBooks = await db.books.find({
+                selector: {
+                    user_id: 'local-user',
+                    _deleted: { $eq: false }
+                }
+            }).exec();
+
+            if (localBooks.length === 0) {
+                console.log('DataLayer: No local-user books to migrate');
+                return;
+            }
+
+            console.log(`DataLayer: Migrating ${localBooks.length} local-user books to user ${userId}`);
+
+            // Update each book's user_id to the authenticated user
+            for (const book of localBooks) {
+                await book.update({
+                    $set: {
+                        user_id: userId,
+                        _modified: Date.now()
+                    }
+                });
+            }
+
+            console.log('DataLayer: Migration complete');
+        } catch (error) {
+            console.error('DataLayer: Migration failed:', error);
+        }
     }
 
     private async getUserId(): Promise<string> {
@@ -41,11 +81,15 @@ class RxDBDataLayerImpl implements DataLayer {
 
     async getBooks(): Promise<RxBookDocumentType[]> {
         const db = await getDatabase();
-        const userId = await this.getUserId();
+        const { user } = await authService.getUser();
 
+        // When logged in, show only user's books
+        // When logged out, show ALL locally cached books (for offline access)
         const books = await db.books.find({
-            selector: {
-                user_id: userId,
+            selector: user ? {
+                user_id: user.id,
+                _deleted: { $eq: false }
+            } : {
                 _deleted: { $eq: false }
             }
         }).exec();
