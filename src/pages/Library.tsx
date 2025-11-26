@@ -1,6 +1,7 @@
 import { dataLayer } from "@/services/data/RxDBDataLayer";
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { ensureHttps } from "@/lib/utils";
 import { BackLink } from "@/components/app/BackLink";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ import { getCoverObjectUrl, saveCoverBlob } from "@/lib/coverCache";
 import { saveUserEpub, getUserEpubs, deleteUserEpub } from "@/lib/userEpubs";
 import { BookSearchDialog } from "@/components/app/BookSearchDialog";
 import { Upload, Trash2, BookPlus } from "lucide-react";
+import { BookCover } from "@/components/book/BookCover";
 
 type Paragraph = { type: string; content: string };
 type Chapter = { chapter_title: string; content: Paragraph[] };
@@ -26,7 +28,7 @@ type Part = { part_title: string; chapters: Chapter[] };
 const Library = () => {
   const Cover = ({ src, alt }: { src: string; alt: string }) => (
     <div className="overflow-hidden rounded-t-lg h-56 md:h-64 lg:h-72 bg-muted">
-      <img src={src} alt={alt} className="w-full h-full object-contain object-center" loading="lazy" />
+      <img src={ensureHttps(src)} alt={alt} className="w-full h-full object-contain object-center" loading="lazy" />
     </div>
   );
   const [open, setOpen] = useState(false);
@@ -550,7 +552,7 @@ const Library = () => {
               }}
               className="cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2"
             >
-              {book.coverImage ? (
+                {book.coverImage ? (
                 <Cover
                   src={book.coverImage}
                   alt={`Capa do livro ${book.title}`}
@@ -558,6 +560,7 @@ const Library = () => {
               ) : book.type === 'epub' ? (
                 <EpubCoverLoader id={book.id} title={book.title} sourceUrl={book.sourceUrl!} />
               ) : null}
+              
             </div>
             <CardHeader>
               <CardTitle className="flex items-center justify-between">

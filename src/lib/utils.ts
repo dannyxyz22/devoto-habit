@@ -23,3 +23,9 @@ export function resolveEpubSource(src: string) {
   if (isAbsoluteUrl(src)) return `${import.meta.env.BASE_URL}proxy?url=${encodeURIComponent(src)}`;
   return resolveAppUrl(src);
 }
+
+// Upgrade http scheme to https to avoid mixed-content blocking
+export function ensureHttps(u: string) {
+  if (!u) return u;
+  return u.replace(/^http:\/\//i, 'https://');
+}
