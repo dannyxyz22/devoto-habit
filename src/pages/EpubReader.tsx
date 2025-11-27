@@ -590,7 +590,7 @@ const EpubReader = () => {
           onClick={() => renditionRef.current?.prev()}
           variant="ghost"
           size="icon"
-          className="absolute left-0 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full bg-background/80 hover:bg-accent text-muted-foreground hover:text-foreground shadow-lg backdrop-blur-sm z-50 flex"
+          className="absolute left-0 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full bg-background/80 hover:bg-accent text-muted-foreground hover:text-foreground shadow-lg backdrop-blur-sm z-50 hidden lg:flex"
         >
           <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -643,7 +643,7 @@ const EpubReader = () => {
           onClick={() => renditionRef.current?.next()}
           variant="ghost"
           size="icon"
-          className="absolute right-0 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full bg-background/80 hover:bg-accent text-muted-foreground hover:text-foreground shadow-lg backdrop-blur-sm z-50 flex"
+          className="absolute right-0 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full bg-background/80 hover:bg-accent text-muted-foreground hover:text-foreground shadow-lg backdrop-blur-sm z-50 hidden lg:flex"
         >
           <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
