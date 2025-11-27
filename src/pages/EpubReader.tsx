@@ -584,7 +584,7 @@ const EpubReader = () => {
       )}
 
       {/* Book Container */}
-      <div className="relative w-full max-w-7xl flex-1 flex items-center justify-center">
+      <div className="relative w-full max-w-[1500px] flex-1 flex items-center justify-center">
         {/* Navigation Button - Left (Desktop only) */}
         <Button
           onClick={() => renditionRef.current?.prev()}
@@ -624,7 +624,7 @@ const EpubReader = () => {
             }}
           >
             {/* EPUB Viewer */}
-            <div ref={viewerRef} className="w-full h-full max-w-[1200px] mx-auto" />
+            <div ref={viewerRef} className="w-full h-full max-w-full mx-auto" />
 
             {/* Center Shadow (Book Fold Effect) - Only in double page mode on desktop */}
             {effectiveSpread === 'auto' && (
