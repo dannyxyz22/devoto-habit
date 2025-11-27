@@ -194,9 +194,9 @@ export default function PhysicalBookTracker() {
 
     if (loading) {
         return (
-            <main className="min-h-screen lg:bg-slate-900 py-10">
+            <main className="min-h-screen bg-background py-10">
                 <div className="container mx-auto">
-                    <p className="text-center lg:text-white">Carregando...</p>
+                    <p className="text-center text-foreground">Carregando...</p>
                 </div>
             </main>
         );
@@ -209,7 +209,7 @@ export default function PhysicalBookTracker() {
     const progressPercent = Math.round((book.currentPage / book.totalPages) * 100);
 
     return (
-        <main className="min-h-screen lg:bg-slate-900 py-10">
+        <main className="min-h-screen bg-background py-10">
             <SEO
                 title={`${book.title} — Rastreamento`}
                 description={`Acompanhe seu progresso em ${book.title}`}
@@ -218,7 +218,7 @@ export default function PhysicalBookTracker() {
 
             <div className="container mx-auto max-w-3xl">
                 <nav className="mb-4 text-sm">
-                    <BackLink to="/biblioteca" label="Biblioteca" className="lg:text-slate-300 hover:lg:text-white" />
+                    <BackLink to="/biblioteca" label="Biblioteca" className="text-muted-foreground hover:text-foreground" />
                 </nav>
 
                 <Card className="mb-6">

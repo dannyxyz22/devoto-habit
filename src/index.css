@@ -2,93 +2,100 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
+/* 
+  Design System: Sacral & Premium
+  A harmonious blend of warm parchment tones, deep burgundy, and soft gold.
+  Designed for a distraction-free, spiritual reading experience.
 */
 
 @layer base {
   :root {
-    /* Light theme — sacral, warm parchment with burgundy and gold */
-    --background: 48 40% 97%;
-    --foreground: 222.2 84% 6%;
+    /* Light Theme: Warm Parchment */
+    --background: 40 20% 97%; /* Softer, warmer white */
+    --foreground: 20 10% 15%; /* Deep brownish-grey for text, softer than black */
 
-    --card: 48 40% 98%;
-    --card-foreground: 222.2 84% 6%;
+    --card: 40 20% 98%;
+    --card-foreground: 20 10% 15%;
 
-    --popover: 48 40% 98%;
-    --popover-foreground: 222.2 84% 6%;
+    --popover: 40 20% 98%;
+    --popover-foreground: 20 10% 15%;
 
-    --primary: 350 60% 30%; /* burgundy */
-    --primary-foreground: 0 0% 98%;
+    /* Primary: Deep Burgundy/Wine */
+    --primary: 355 45% 35%;
+    --primary-foreground: 40 20% 97%;
 
-    --secondary: 42 92% 90%; /* soft gold tint */
-    --secondary-foreground: 24 30% 20%;
+    /* Secondary: Soft Gold/Beige */
+    --secondary: 40 30% 90%;
+    --secondary-foreground: 355 45% 25%;
 
-    --muted: 48 30% 92%;
-    --muted-foreground: 215.4 16.3% 34%;
+    /* Muted: Subtle separators and backgrounds */
+    --muted: 40 20% 92%;
+    --muted-foreground: 25 10% 45%;
 
-  /* toned-down gold */
-  --accent: 42 80% 46%;
-  --accent-foreground: 24 30% 16%;
+    /* Accent: Gold for highlights */
+    --accent: 42 60% 55%;
+    --accent-foreground: 20 10% 15%;
 
-    --destructive: 0 70% 45%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive: 0 70% 40%;
+    --destructive-foreground: 40 20% 97%;
 
-    --border: 42 30% 84%;
-    --input: 42 30% 84%;
-  --ring: 42 70% 40%;
+    --border: 40 20% 85%;
+    --input: 40 20% 85%;
+    --ring: 355 45% 35%;
 
-    --radius: 0.65rem;
+    --radius: 0.75rem; /* Slightly more rounded for a friendly, modern feel */
 
-    /* Sidebar tokens */
-    --sidebar-background: 48 40% 97%;
-    --sidebar-foreground: 24 30% 20%;
-    --sidebar-primary: 350 60% 30%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 42 92% 90%;
-    --sidebar-accent-foreground: 24 30% 20%;
-    --sidebar-border: 42 30% 84%;
-    --sidebar-ring: 42 95% 52%;
+    /* Sidebar / Navigation */
+    --sidebar-background: 40 20% 96%;
+    --sidebar-foreground: 20 10% 15%;
+    --sidebar-primary: 355 45% 35%;
+    --sidebar-primary-foreground: 40 20% 97%;
+    --sidebar-accent: 40 30% 90%;
+    --sidebar-accent-foreground: 355 45% 25%;
+    --sidebar-border: 40 20% 85%;
+    --sidebar-ring: 355 45% 35%;
   }
 
   .dark {
-    /* Dark theme — deep slate with golden accents */
-    --background: 222 30% 8%;
-    --foreground: 45 20% 92%;
+    /* Dark Theme: Deep Monastic Slate */
+    --background: 220 15% 10%; /* Very dark slate, almost black */
+    --foreground: 40 20% 90%; /* Warm off-white text */
 
-    --card: 222 30% 10%;
-    --card-foreground: 45 20% 92%;
+    --card: 220 15% 12%;
+    --card-foreground: 40 20% 90%;
 
-    --popover: 222 30% 10%;
-    --popover-foreground: 45 20% 92%;
+    --popover: 220 15% 12%;
+    --popover-foreground: 40 20% 90%;
 
-  /* toned-down gold as primary on dark */
-  --primary: 42 30% 50%;
-    --primary-foreground: 240 8% 10%;
+    /* Primary: Muted Gold on Dark */
+    --primary: 42 50% 50%;
+    --primary-foreground: 220 15% 10%;
 
-    --secondary: 222 22% 16%;
-    --secondary-foreground: 45 20% 92%;
+    /* Secondary: Deep Slate Lighter */
+    --secondary: 220 15% 18%;
+    --secondary-foreground: 40 20% 90%;
 
-    --muted: 222 22% 16%;
-    --muted-foreground: 215 20% 70%;
+    --muted: 220 15% 16%;
+    --muted-foreground: 220 10% 65%;
 
-  --accent: 42 75% 46%;
-    --accent-foreground: 240 8% 10%;
+    --accent: 42 50% 50%;
+    --accent-foreground: 220 15% 10%;
 
-    --destructive: 0 62.8% 38%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 60% 45%;
+    --destructive-foreground: 40 20% 90%;
 
-    --border: 222 22% 18%;
-    --input: 222 22% 18%;
-  --ring: 42 70% 42%;
-    --sidebar-background: 222 30% 8%;
-    --sidebar-foreground: 45 20% 92%;
-  --sidebar-primary: 42 75% 50%;
-    --sidebar-primary-foreground: 240 8% 10%;
-    --sidebar-accent: 222 24% 14%;
-    --sidebar-accent-foreground: 45 20% 92%;
-    --sidebar-border: 222 24% 14%;
-  --sidebar-ring: 42 70% 42%;
+    --border: 220 15% 20%;
+    --input: 220 15% 20%;
+    --ring: 42 50% 50%;
+
+    --sidebar-background: 220 15% 11%;
+    --sidebar-foreground: 40 20% 90%;
+    --sidebar-primary: 42 50% 50%;
+    --sidebar-primary-foreground: 220 15% 10%;
+    --sidebar-accent: 220 15% 18%;
+    --sidebar-accent-foreground: 40 20% 90%;
+    --sidebar-border: 220 15% 20%;
+    --sidebar-ring: 42 50% 50%;
   }
 }
 
@@ -96,9 +103,15 @@ All colors MUST be HSL.
   * {
     @apply border-border;
   }
-
   body {
     @apply bg-background text-foreground;
-    font-family: 'Cardo', ui-serif, Georgia, serif;
+    font-family: 'Cardo', ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  /* Typography enhancements */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold tracking-tight;
   }
 }

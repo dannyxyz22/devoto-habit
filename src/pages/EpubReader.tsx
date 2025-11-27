@@ -487,7 +487,7 @@ const EpubReader = () => {
   }, []);
 
   return (
-    <main className={`h-screen lg:bg-slate-900 flex flex-col items-center justify-center ${isFullscreen ? '' : 'lg:py-8 lg:px-4'}`}>
+    <main className={`h-screen bg-background flex flex-col items-center justify-center ${isFullscreen ? '' : 'lg:py-8 lg:px-4'}`}>
       <SEO title={`EPUB — ${epubId}`} description="Leitor EPUB" canonical={`/epub/${epubId}`} />
 
       {/* Header - Hidden on mobile unless showMobileMenu is true */}
@@ -501,7 +501,7 @@ const EpubReader = () => {
         `}
       >
         <nav className={`text-sm lg:block transition-opacity duration-300 ${isFullscreen ? 'lg:opacity-0 lg:pointer-events-none' : 'lg:opacity-100'}`}>
-          <BackLink to="/biblioteca" label="Biblioteca" className="text-slate-900 lg:text-slate-300 hover:text-slate-700 lg:hover:text-white" />
+          <BackLink to="/biblioteca" label="Biblioteca" className="text-foreground lg:text-muted-foreground hover:text-primary lg:hover:text-foreground" />
         </nav>
 
         <div className="flex items-center gap-2">
@@ -509,28 +509,28 @@ const EpubReader = () => {
           <div className={`transition-opacity duration-300 ${isFullscreen ? 'lg:opacity-0 lg:pointer-events-none' : 'lg:opacity-100'}`}>
             <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen}>
               <CollapsibleTrigger asChild>
-                <Button variant="ghost" size="icon" className="text-slate-900 lg:text-slate-300 hover:text-slate-700 lg:hover:text-white lg:hover:bg-slate-800">
+                <Button variant="ghost" size="icon" className="text-foreground lg:text-muted-foreground hover:text-primary lg:hover:text-foreground lg:hover:bg-accent">
                   <Settings className="h-5 w-5" />
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent className="absolute right-4 top-16 z-50">
-                <div className="bg-white lg:bg-slate-800 border border-slate-200 lg:border-slate-700 rounded-lg p-4 shadow-xl min-w-[280px]">
-                  <p className="text-sm font-medium text-slate-900 lg:text-slate-200 mb-3">Modo de layout</p>
+                <div className="bg-popover border border-border rounded-lg p-4 shadow-xl min-w-[280px]">
+                  <p className="text-sm font-medium text-foreground mb-3">Modo de layout</p>
                   <ToggleGroup type="single" value={layoutMode} onValueChange={(v) => v && setLayoutMode(v as LayoutMode)}>
-                    <ToggleGroupItem value="auto" aria-label="Layout automático" title="Automático" className="data-[state=on]:bg-slate-100 lg:data-[state=on]:bg-slate-700">
+                    <ToggleGroupItem value="auto" aria-label="Layout automático" title="Automático" className="data-[state=on]:bg-accent">
                       <Settings className="h-4 w-4 mr-2" />
                       Auto
                     </ToggleGroupItem>
-                    <ToggleGroupItem value="single" aria-label="Página única" title="Página Única" className="data-[state=on]:bg-slate-100 lg:data-[state=on]:bg-slate-700">
+                    <ToggleGroupItem value="single" aria-label="Página única" title="Página Única" className="data-[state=on]:bg-accent">
                       <BookOpen className="h-4 w-4 mr-2" />
                       1 Página
                     </ToggleGroupItem>
-                    <ToggleGroupItem value="double" aria-label="Duas páginas" title="Duas Páginas" className="data-[state=on]:bg-slate-100 lg:data-[state=on]:bg-slate-700">
+                    <ToggleGroupItem value="double" aria-label="Duas páginas" title="Duas Páginas" className="data-[state=on]:bg-accent">
                       <BookOpenCheck className="h-4 w-4 mr-2" />
                       2 Páginas
                     </ToggleGroupItem>
                   </ToggleGroup>
-                  <p className="text-xs text-slate-600 lg:text-slate-400 mt-3">
+                  <p className="text-xs text-muted-foreground mt-3">
                     {layoutMode === "auto" && containerWidth >= 900 && "Modo atual: duas páginas (tela larga)"}
                     {layoutMode === "auto" && containerWidth < 900 && "Modo atual: página única (tela estreita)"}
                     {layoutMode === "single" && "Modo atual: sempre página única"}
@@ -569,7 +569,7 @@ const EpubReader = () => {
                 }
               }
             }}
-            className="hidden lg:flex text-slate-300 hover:text-white hover:bg-slate-800"
+            className="hidden lg:flex text-muted-foreground hover:text-foreground hover:bg-accent"
             title={isFullscreen ? "Sair da tela cheia" : "Tela cheia"}
           >
             {isFullscreen ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
@@ -590,7 +590,7 @@ const EpubReader = () => {
           onClick={() => renditionRef.current?.prev()}
           variant="ghost"
           size="icon"
-          className="absolute left-0 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white shadow-lg backdrop-blur-sm z-50 flex"
+          className="absolute left-0 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full bg-background/80 hover:bg-accent text-muted-foreground hover:text-foreground shadow-lg backdrop-blur-sm z-50 flex"
         >
           <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -598,9 +598,9 @@ const EpubReader = () => {
         </Button>
 
         {/* Book Pages - Full width on mobile, bordered on desktop */}
-        <div className={`relative w-full lg:bg-gradient-to-b lg:from-slate-800 lg:to-slate-900 lg:rounded-2xl lg:p-6 lg:shadow-2xl ${isFullscreen ? 'h-screen' : ''}`}>
+        <div className={`relative w-full lg:bg-gradient-to-b lg:from-muted lg:to-background lg:rounded-2xl lg:p-6 lg:shadow-2xl ${isFullscreen ? 'h-screen' : ''}`}>
           <div
-            className={`relative bg-white lg:bg-amber-50 lg:rounded-lg lg:shadow-[0_0_60px_rgba(0,0,0,0.5)] overflow-hidden h-screen ${isFullscreen ? '' : 'lg:h-[85vh]'}`}
+            className={`relative bg-card lg:rounded-lg lg:shadow-[0_0_60px_rgba(0,0,0,0.1)] overflow-hidden h-screen ${isFullscreen ? '' : 'lg:h-[85vh]'}`}
             style={isFullscreen ? { height: 'calc(100vh - 3rem)' } : undefined}
             onClick={() => {
               // Toggle mobile menu and fullscreen on tap (mobile only)
@@ -624,7 +624,7 @@ const EpubReader = () => {
             }}
           >
             {/* EPUB Viewer */}
-            <div ref={viewerRef} className="w-full h-full" />
+            <div ref={viewerRef} className="w-full h-full max-w-[1200px] mx-auto" />
 
             {/* Center Shadow (Book Fold Effect) - Only in double page mode on desktop */}
             {effectiveSpread === 'auto' && (
@@ -643,7 +643,7 @@ const EpubReader = () => {
           onClick={() => renditionRef.current?.next()}
           variant="ghost"
           size="icon"
-          className="absolute right-0 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white shadow-lg backdrop-blur-sm z-50 flex"
+          className="absolute right-0 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full bg-background/80 hover:bg-accent text-muted-foreground hover:text-foreground shadow-lg backdrop-blur-sm z-50 flex"
         >
           <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

@@ -76,3 +76,4 @@ class SupabaseAuthServiceImpl implements AuthService {
 }
 
 export const authService = SupabaseAuthServiceImpl.getInstance();
+export type { User };

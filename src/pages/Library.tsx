@@ -482,7 +482,7 @@ const Library = () => {
   };
 
   return (
-    <main className="min-h-screen lg:bg-slate-900 py-10">
+    <main className="min-h-screen bg-background py-10">
       <SEO
         title="Biblioteca Católica — Leitura Devota"
         description="Escolha um clássico católico em português e comece sua leitura devocional."
@@ -490,9 +490,9 @@ const Library = () => {
       />
       <div className="container mx-auto">
         <nav className="mb-4 text-sm">
-          <BackLink to="/" label="Início" className="lg:text-slate-300 hover:lg:text-white" />
+          <BackLink to="/" label="Início" className="text-muted-foreground hover:text-foreground" />
         </nav>
-        <h1 className="text-3xl font-bold mb-6 lg:text-white">Biblioteca</h1>
+        <h1 className="text-3xl font-bold mb-6 text-foreground">Biblioteca</h1>
       </div>
       <div className="container mx-auto mb-6">
         <input
@@ -506,7 +506,7 @@ const Library = () => {
           <Button
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading}
-            className="lg:bg-slate-800 lg:text-white lg:hover:bg-slate-700"
+            className=""
           >
             <Upload className="h-4 w-4 mr-2" />
             {isUploading ? 'Uploading...' : 'Upload EPUB'}
@@ -514,7 +514,7 @@ const Library = () => {
           <Button
             onClick={() => setShowBookSearch(true)}
             variant="outline"
-            className="lg:bg-slate-800 lg:text-white lg:hover:bg-slate-700 lg:border-slate-600"
+            className=""
           >
             <BookPlus className="h-4 w-4 mr-2" />
             Adicionar livro físico
