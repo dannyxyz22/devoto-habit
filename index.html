@@ -1,152 +1,171 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Leitura Devota — Clássicos Católicos</title>
-    <meta name="description" content="Leitura devocional diária com clássicos católicos em português. Streak, metas e lembretes." />
-    <meta name="author" content="Lovable" />
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Leitura Devota — Clássicos Católicos</title>
+  <meta name="description"
+    content="Leitura devocional diária com clássicos católicos em português. Streak, metas e lembretes." />
+  <meta name="author" content="Lovable" />
   <link rel="canonical" href="https://dannyxyz22.github.io/devoto-habit/" />
 
-    <!-- PWA Meta Tags -->
-    <meta name="theme-color" content="#2563eb" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="apple-mobile-web-app-title" content="Leitura Devota" />
+  <!-- PWA Meta Tags -->
+  <meta name="theme-color" content="#2563eb" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Leitura Devota" />
   <link rel="manifest" href="./manifest.json" />
   <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png" />
   <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png" />
   <link rel="apple-touch-icon" href="./icon-192.png" />
 
-    <meta property="og:title" content="Leitura Devota — Clássicos Católicos" />
-    <meta property="og:description" content="Leitura devocional diária com clássicos católicos em português. Streak, metas e lembretes." />
-    <meta property="og:type" content="website" />
-    <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+  <meta property="og:title" content="Leitura Devota — Clássicos Católicos" />
+  <meta property="og:description"
+    content="Leitura devocional diária com clássicos católicos em português. Streak, metas e lembretes." />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
 
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@lovable_dev" />
-    <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cardo:wght@400;700&display=swap" rel="stylesheet">
-  </head>
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:site" content="@lovable_dev" />
+  <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cardo:wght@400;700&display=swap" rel="stylesheet">
+</head>
 
-  <body>
-    <div id="root"></div>
-    <button id="debugToggle" style="position:fixed;bottom:12px;right:12px;z-index:9999;padding:8px 12px;background:#1e293b;color:#fff;border:none;border-radius:6px;font-size:13px;box-shadow:0 2px 6px rgba(0,0,0,.3);cursor:pointer">Debug</button>
-    <div id="debugPanel" style="display:none;position:fixed;bottom:60px;right:12px;z-index:9999;width:340px;max-height:65vh;overflow:auto;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:8px;font:12px system-ui, sans-serif;padding:12px;box-shadow:0 4px 16px rgba(0,0,0,.4)">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:8px;">
-        <strong style="font-size:14px;">Estado Debug</strong>
-        <div style="display:flex;gap:6px;">
-          <button id="btnRefreshDebug" style="background:#2563eb;color:#fff;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:12px;">Reload</button>
-          <button id="btnClearPrefs" style="background:#dc2626;color:#fff;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:12px;">Limpar</button>
-          <button id="btnCloseDebug" style="background:#475569;color:#fff;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:12px;">X</button>
-        </div>
-      </div>
-      <pre id="debugOutput" style="white-space:pre-wrap;word-break:break-word;background:#1e293b;padding:8px;border-radius:6px;line-height:1.25;">(vazio)</pre>
-      <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">
-        <button id="btnUpdateWidget" style="background:#0d9488;color:#fff;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:12px;">Forçar Widget</button>
+<body>
+  <div id="root"></div>
+  <button id="debugToggle"
+    style="display:none;position:fixed;bottom:12px;right:12px;z-index:9999;padding:8px 12px;background:#1e293b;color:#fff;border:none;border-radius:6px;font-size:13px;box-shadow:0 2px 6px rgba(0,0,0,.3);cursor:pointer">Debug</button>
+  <div id="debugPanel"
+    style="display:none;position:fixed;bottom:60px;right:12px;z-index:9999;width:340px;max-height:65vh;overflow:auto;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:8px;font:12px system-ui, sans-serif;padding:12px;box-shadow:0 4px 16px rgba(0,0,0,.4)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:8px;">
+      <strong style="font-size:14px;">Estado Debug</strong>
+      <div style="display:flex;gap:6px;">
+        <button id="btnRefreshDebug"
+          style="background:#2563eb;color:#fff;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:12px;">Reload</button>
+        <button id="btnClearPrefs"
+          style="background:#dc2626;color:#fff;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:12px;">Limpar</button>
+        <button id="btnCloseDebug"
+          style="background:#475569;color:#fff;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:12px;">X</button>
       </div>
     </div>
+    <pre id="debugOutput"
+      style="white-space:pre-wrap;word-break:break-word;background:#1e293b;padding:8px;border-radius:6px;line-height:1.25;">(vazio)</pre>
+    <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">
+      <button id="btnUpdateWidget"
+        style="background:#0d9488;color:#fff;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:12px;">Forçar
+        Widget</button>
+    </div>
+  </div>
   <!-- GitHub Pages SPA redirect handler (uses Vite %BASE_URL%) -->
-    <script>
-      (function() {
-    const base = ("%BASE_URL%" || "/");
-        const normalizedBase = base.endsWith('/') ? base : base + '/';
-        const redirect = new URLSearchParams(window.location.search).get('p');
-        if (redirect) {
-          const target = normalizedBase + redirect.replace(/^\//, '');
-          window.history.replaceState(null, '', target + window.location.hash);
+  <script>
+    (function () {
+      const base = ("%BASE_URL%" || "/");
+      const normalizedBase = base.endsWith('/') ? base : base + '/';
+      const redirect = new URLSearchParams(window.location.search).get('p');
+      if (redirect) {
+        const target = normalizedBase + redirect.replace(/^\//, '');
+        window.history.replaceState(null, '', target + window.location.hash);
+      }
+    })();
+  </script>
+  <script>
+    (function () {
+      const btn = document.getElementById('debugToggle');
+      // Check local storage flag
+      try {
+        if (localStorage.getItem('showDebugButton') === 'true') {
+          btn.style.display = 'block';
         }
-      })();
-    </script>
-    <script>
-      (function(){
-        const btn = document.getElementById('debugToggle');
-        const panel = document.getElementById('debugPanel');
-        const out = document.getElementById('debugOutput');
-        const btnClear = document.getElementById('btnClearPrefs');
-        const btnReload = document.getElementById('btnRefreshDebug');
-        const btnClose = document.getElementById('btnCloseDebug');
-        const btnUpdateWidget = document.getElementById('btnUpdateWidget');
+      } catch (e) { }
 
-        function pretty(obj){
-          try { if (typeof obj === 'string') return obj; return JSON.stringify(obj,null,2); } catch(e){ return String(obj); }
+      const panel = document.getElementById('debugPanel');
+      const out = document.getElementById('debugOutput');
+      const btnClear = document.getElementById('btnClearPrefs');
+      const btnReload = document.getElementById('btnRefreshDebug');
+      const btnClose = document.getElementById('btnCloseDebug');
+      const btnUpdateWidget = document.getElementById('btnUpdateWidget');
+
+      function pretty(obj) {
+        try { if (typeof obj === 'string') return obj; return JSON.stringify(obj, null, 2); } catch (e) { return String(obj); }
+      }
+
+      async function callPlugin(method) {
+        if (!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.WidgetUpdater) {
+          return { error: 'Plugin indisponível' };
         }
-
-        async function callPlugin(method){
-          if (!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.WidgetUpdater) {
-            return { error: 'Plugin indisponível' };
+        try {
+          const plugin = window.Capacitor.Plugins.WidgetUpdater;
+          if (method === 'getDebugState') {
+            const res = await plugin.getDebugState();
+            return res || {};
+          } else if (method === 'clearDebugData') {
+            await plugin.clearDebugData();
+            return { cleared: true };
+          } else if (method === 'update') {
+            await plugin.update();
+            return { updated: true };
           }
-          try {
-            const plugin = window.Capacitor.Plugins.WidgetUpdater;
-            if (method === 'getDebugState') {
-              const res = await plugin.getDebugState();
-              return res || {};
-            } else if (method === 'clearDebugData') {
-              await plugin.clearDebugData();
-              return { cleared:true };
-            } else if (method === 'update') {
-              await plugin.update();
-              return { updated:true };
-            }
-          } catch (e) { return { error: e.message || String(e) }; }
-        }
+        } catch (e) { return { error: e.message || String(e) }; }
+      }
 
-        async function loadDebug(){
-          out.textContent = 'Carregando...';
-            const data = await callPlugin('getDebugState');
-          function fmt(ts){
-            try { if(typeof ts !== 'number') return null; const d=new Date(ts); if(isNaN(d.getTime())) return null; const pad=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`; } catch { return null; }
-          }
-          function decorate(obj){
-            if(!obj || typeof obj!=='object') return obj;
-            const outObj = Array.isArray(obj)?[]:{};
-            for(const k in obj){
-              const v = obj[k];
-              if(v && typeof v === 'object') {
-                outObj[k] = decorate(v);
-              } else {
-                outObj[k] = v;
-                if(typeof v === 'number' && /(?:ts|At)$/i.test(k)) {
-                  const h = fmt(v);
-                  if(h) outObj[k+"_human"] = h; // adiciona campo human-readable logo após
-                }
+      async function loadDebug() {
+        out.textContent = 'Carregando...';
+        const data = await callPlugin('getDebugState');
+        function fmt(ts) {
+          try { if (typeof ts !== 'number') return null; const d = new Date(ts); if (isNaN(d.getTime())) return null; const pad = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`; } catch { return null; }
+        }
+        function decorate(obj) {
+          if (!obj || typeof obj !== 'object') return obj;
+          const outObj = Array.isArray(obj) ? [] : {};
+          for (const k in obj) {
+            const v = obj[k];
+            if (v && typeof v === 'object') {
+              outObj[k] = decorate(v);
+            } else {
+              outObj[k] = v;
+              if (typeof v === 'number' && /(?:ts|At)$/i.test(k)) {
+                const h = fmt(v);
+                if (h) outObj[k + "_human"] = h; // adiciona campo human-readable logo após
               }
             }
-            return outObj;
           }
-          let root = data && data.value ? data.value : data;
-          // Tentar parsear strings JSON nos campos conhecidos
-          try {
-            if(root.dailyProgress && typeof root.dailyProgress === 'string') {
-              root.dailyProgressParsed = JSON.parse(root.dailyProgress);
-            }
-          } catch {}
-          try {
-            if(root.lastRefreshMeta && typeof root.lastRefreshMeta === 'string') {
-              root.lastRefreshMetaParsed = JSON.parse(root.lastRefreshMeta);
-            }
-          } catch {}
-          try {
-            if(root.lastAlarmSchedule && typeof root.lastAlarmSchedule === 'string') {
-              root.lastAlarmScheduleParsed = JSON.parse(root.lastAlarmSchedule);
-            }
-          } catch {}
-          root = decorate(root);
-          out.textContent = pretty(root);
+          return outObj;
         }
+        let root = data && data.value ? data.value : data;
+        // Tentar parsear strings JSON nos campos conhecidos
+        try {
+          if (root.dailyProgress && typeof root.dailyProgress === 'string') {
+            root.dailyProgressParsed = JSON.parse(root.dailyProgress);
+          }
+        } catch { }
+        try {
+          if (root.lastRefreshMeta && typeof root.lastRefreshMeta === 'string') {
+            root.lastRefreshMetaParsed = JSON.parse(root.lastRefreshMeta);
+          }
+        } catch { }
+        try {
+          if (root.lastAlarmSchedule && typeof root.lastAlarmSchedule === 'string') {
+            root.lastAlarmScheduleParsed = JSON.parse(root.lastAlarmSchedule);
+          }
+        } catch { }
+        root = decorate(root);
+        out.textContent = pretty(root);
+      }
 
-        btn.addEventListener('click', ()=>{
-          panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-          if (panel.style.display === 'block') loadDebug();
-        });
-        btnReload.addEventListener('click', loadDebug);
-        btnClose.addEventListener('click', ()=> panel.style.display='none');
-        btnClear.addEventListener('click', async ()=>{ await callPlugin('clearDebugData'); loadDebug(); });
-        btnUpdateWidget.addEventListener('click', async ()=>{ await callPlugin('update'); loadDebug(); });
-      })();
-    </script>
+      btn.addEventListener('click', () => {
+        panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+        if (panel.style.display === 'block') loadDebug();
+      });
+      btnReload.addEventListener('click', loadDebug);
+      btnClose.addEventListener('click', () => panel.style.display = 'none');
+      btnClear.addEventListener('click', async () => { await callPlugin('clearDebugData'); loadDebug(); });
+      btnUpdateWidget.addEventListener('click', async () => { await callPlugin('update'); loadDebug(); });
+    })();
+  </script>
   <script type="module" src="/src/main.tsx"></script>
-  </body>
+</body>
+
 </html>

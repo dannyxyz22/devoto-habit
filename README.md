@@ -255,4 +255,30 @@ Para melhorar a performance do leitor de EPUBs, o sistema implementa um cache LR
 - Mantém em cache apenas os livros ativamente lidos
 - Evita sobrecarga do localStorage com livros antigos
 
+## Modo Debug
 
+O aplicativo inclui um Modo Debug oculto que fornece ferramentas úteis para desenvolvimento e solução de problemas, especialmente em dispositivos Android onde o acesso ao console do navegador é difícil.
+
+### Funcionalidades
+
+Quando ativado, um botão "Debug" aparece no canto inferior direito da tela. Clicar neste botão abre um painel com as seguintes funcionalidades:
+
+-   **Ver Estado Debug**: Exibe o estado interno atual do aplicativo (ex: progresso diário, status do widget).
+-   **Recarregar**: Atualiza os dados de debug.
+-   **Limpar Dados**: Limpa dados relacionados ao debug.
+-   **Forçar Atualização do Widget**: Aciona manualmente uma atualização para o widget Android.
+
+### Como Ativar/Desativar
+
+O Modo Debug está oculto por padrão. Para alterná-lo:
+
+1.  Vá para a página Inicial (onde está o banner "Clássicos católicos").
+2.  Toque no texto **"Clássicos católicos"** (acima do título principal) **7 vezes** rapidamente.
+3.  Uma mensagem toast aparecerá indicando se o Modo Debug foi **ATIVADO** ou **DESATIVADO**.
+4.  O aplicativo será recarregado automaticamente para aplicar as alterações.
+
+### Detalhes Técnicos
+
+-   O estado de visibilidade é armazenado no `localStorage` sob a chave `showDebugButton` ('true' ou 'false').
+-   O botão "Debug" é definido em `index.html` mas fica oculto via CSS (`display: none`) a menos que a flag esteja definida.
+-   A lógica do gatilho secreto é implementada em `src/components/app/Hero.tsx`.

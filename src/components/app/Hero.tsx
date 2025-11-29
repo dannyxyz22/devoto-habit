@@ -4,11 +4,14 @@ import hero from "@/assets/hero-devota.jpg";
 import { Button } from "@/components/ui/button";
 import { BOOKS } from "@/lib/books";
 import { UserMenu } from "./UserMenu";
+import { useToast } from "@/components/ui/use-toast";
 
 
 export const Hero = () => {
   const [ctaLabel, setCtaLabel] = useState("Começar agora");
   const [ctaHref, setCtaHref] = useState("/biblioteca");
+  const { toast } = useToast();
+  const [debugCount, setDebugCount] = useState(0);
 
   useEffect(() => {
     try {
@@ -54,6 +57,24 @@ export const Hero = () => {
     } catch { }
   }, []);
 
+  const handleSecretDebug = () => {
+    const next = debugCount + 1;
+    setDebugCount(next);
+    if (next === 7) {
+      const current = localStorage.getItem('showDebugButton') === 'true';
+      const newValue = !current;
+      localStorage.setItem('showDebugButton', String(newValue));
+      toast({
+        title: newValue ? "Modo Debug ATIVADO" : "Modo Debug DESATIVADO",
+        description: "Recarregando aplicação...",
+      });
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+      setDebugCount(0);
+    }
+  };
+
   return (
     <header className="relative overflow-hidden rounded-lg border bg-card">
       <div className="absolute inset-0 bg-gradient-to-r from-background/60 via-background/40 to-background/60" aria-hidden />
@@ -68,7 +89,12 @@ export const Hero = () => {
       </div>
       <div className="absolute inset-0 flex items-center">
         <div className="p-6 md:p-10">
-          <p className="text-sm text-muted-foreground">Clássicos católicos</p>
+          <p
+            className="text-sm text-muted-foreground select-none cursor-default active:text-primary transition-colors"
+            onClick={handleSecretDebug}
+          >
+            Clássicos católicos
+          </p>
           <h1 className="text-3xl md:text-5xl font-bold max-w-2xl leading-tight mt-2">
             Leitura devocional diária que cria hábito e transforma a alma
           </h1>
