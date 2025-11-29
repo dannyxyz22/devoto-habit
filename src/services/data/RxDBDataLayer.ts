@@ -23,6 +23,8 @@ class RxDBDataLayerImpl implements DataLayer {
             if (event === 'SIGNED_IN' && session) {
                 console.log('DataLayer: User signed in, migrating local data and starting replication...');
                 await this.migrateLocalUserData(session.user.id);
+                // Reconcile user_epubs to ensure missing rows are upserted before replication
+                await replicationManager.reconcileUserEpubs();
                 await replicationManager.startReplication();
             } else if (event === 'SIGNED_OUT') {
                 console.log('DataLayer: User signed out, stopping replication...');
@@ -39,7 +41,7 @@ class RxDBDataLayerImpl implements DataLayer {
         try {
             const db = await getDatabase();
 
-            // Find all books belonging to 'local-user'
+            // Migrate books
             const localBooks = await db.books.find({
                 selector: {
                     user_id: 'local-user',
@@ -47,28 +49,62 @@ class RxDBDataLayerImpl implements DataLayer {
                 }
             }).exec();
 
-            if (localBooks.length === 0) {
+            if (localBooks.length > 0) {
+                console.log(`DataLayer: Migrating ${localBooks.length} local-user books to user ${userId}`);
+
+                // Update each book's user_id to the authenticated user
+                // Preserve added_date during migration
+                for (const book of localBooks) {
+                    await book.update({
+                        $set: {
+                            user_id: userId,
+                            _modified: Date.now(),
+                            // Preserve added_date if it exists, otherwise use _modified as fallback
+                            added_date: book.added_date || book._modified
+                        }
+                    });
+                }
+
+                console.log('DataLayer: Books migration complete');
+            } else {
                 console.log('DataLayer: No local-user books to migrate');
-                return;
             }
 
-            console.log(`DataLayer: Migrating ${localBooks.length} local-user books to user ${userId}`);
+            // Migrate user EPUBs
+            const localEpubs = await db.user_epubs.find({
+                selector: {
+                    user_id: 'local-user',
+                    _deleted: { $eq: false }
+                }
+            }).exec();
 
-            // Update each book's user_id to the authenticated user
-            for (const book of localBooks) {
-                await book.update({
-                    $set: {
-                        user_id: userId,
-                        _modified: Date.now()
-                    }
-                });
+            if (localEpubs.length > 0) {
+                console.log(`DataLayer: Migrating ${localEpubs.length} local-user EPUBs to user ${userId}`);
+
+                // Update each EPUB's user_id to the authenticated user
+                for (const epub of localEpubs) {
+                    await epub.update({
+                        $set: {
+                            user_id: userId,
+                            _modified: Date.now(),
+                            // Preserve added_date if it exists, otherwise use _modified as fallback
+                            added_date: epub.added_date || epub._modified
+                        }
+                    });
+                }
+
+                console.log('DataLayer: EPUBs migration complete');
+            } else {
+                console.log('DataLayer: No local-user EPUBs to migrate');
             }
 
-            console.log('DataLayer: Migration complete');
+            console.log('DataLayer: All migrations complete');
         } catch (error) {
             console.error('DataLayer: Migration failed:', error);
         }
     }
+
+       // Removed checkpoint clearing due to internalStore API mismatch; using reconciliation instead.
 
     private async getUserId(): Promise<string> {
         const { user } = await authService.getUser();
@@ -112,11 +148,15 @@ class RxDBDataLayerImpl implements DataLayer {
         // Only save external URLs (http/https)
         const { cover_url, ...sanitizedBookData } = bookData as any;
 
+        const existingBook = await db.books.findOne(sanitizedBookData.id).exec();
+
         const dataToSave = {
             ...sanitizedBookData,
             user_id: userId,
             _modified: Date.now(),
             _deleted: false,
+            // Set added_date only for new books, preserve for existing
+            added_date: existingBook ? existingBook.added_date : (bookData.added_date || Date.now()),
             // Only save cover_url if it's an external URL, not base64
             cover_url: cover_url && !cover_url.startsWith('data:') ? cover_url : undefined,
             // Ensure progress fields are preserved or defaulted
@@ -125,13 +165,20 @@ class RxDBDataLayerImpl implements DataLayer {
             last_location_cfi: bookData.last_location_cfi ?? undefined
         } as RxBookDocumentType;
 
-        const existingBook = await db.books.findOne(dataToSave.id).exec();
-
         if (existingBook) {
             await existingBook.patch(dataToSave);
+            console.log('[DataLayer] Book updated:', { id: existingBook.id, title: existingBook.title, added_date: existingBook.added_date });
             return existingBook.toJSON();
         } else {
             const newBook = await db.books.insert(dataToSave);
+            console.log('[DataLayer] ✅ NEW BOOK CREATED:', {
+                id: newBook.id,
+                title: newBook.title,
+                type: newBook.type,
+                added_date: newBook.added_date,
+                added_date_readable: new Date(newBook.added_date).toLocaleString(),
+                _modified: newBook._modified
+            });
             return newBook.toJSON();
         }
     }
@@ -175,6 +222,67 @@ class RxDBDataLayerImpl implements DataLayer {
         } else {
             const newSettings = await db.settings.insert(dataToSave);
             return newSettings.toJSON();
+        }
+    }
+
+    async getUserEpubs(): Promise<import('@/lib/database/schema').RxUserEpubDocumentType[]> {
+        const db = await getDatabase();
+        const { user } = await authService.getUser();
+
+        // When logged in, show only user's EPUBs
+        // When logged out, show ALL locally cached EPUBs (for offline access)
+        const epubs = await db.user_epubs.find({
+            selector: user ? {
+                user_id: user.id,
+                _deleted: { $eq: false }
+            } : {
+                _deleted: { $eq: false }
+            }
+        }).exec();
+
+        return epubs.map(doc => doc.toJSON());
+    }
+
+    async getUserEpub(id: string): Promise<import('@/lib/database/schema').RxUserEpubDocumentType | null> {
+        const db = await getDatabase();
+        const epub = await db.user_epubs.findOne(id).exec();
+        return epub ? epub.toJSON() : null;
+    }
+
+    async saveUserEpub(epubData: Partial<import('@/lib/database/schema').RxUserEpubDocumentType>): Promise<import('@/lib/database/schema').RxUserEpubDocumentType> {
+        const db = await getDatabase();
+        const userId = await this.getUserId();
+
+        const existingEpub = await db.user_epubs.findOne(epubData.id!).exec();
+
+        const dataToSave = {
+            ...epubData,
+            user_id: userId,
+            _modified: Date.now(),
+            _deleted: false,
+            // Set added_date only for new EPUBs, preserve for existing
+            added_date: existingEpub ? existingEpub.added_date : (epubData.added_date || Date.now())
+        } as import('@/lib/database/schema').RxUserEpubDocumentType;
+
+        if (existingEpub) {
+            await existingEpub.patch(dataToSave);
+            return existingEpub.toJSON();
+        } else {
+            const newEpub = await db.user_epubs.insert(dataToSave);
+            return newEpub.toJSON();
+        }
+    }
+
+    async deleteUserEpub(id: string): Promise<void> {
+        const db = await getDatabase();
+        const epub = await db.user_epubs.findOne(id).exec();
+
+        if (epub) {
+            // Soft delete
+            await epub.patch({
+                _deleted: true,
+                _modified: Date.now()
+            });
         }
     }
 }

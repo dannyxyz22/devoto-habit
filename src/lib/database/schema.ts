@@ -5,7 +5,7 @@ import {
 } from 'rxdb';
 
 export const bookSchemaLiteral = {
-    version: 0,
+    version: 1,
     primaryKey: 'id',
     type: 'object',
     properties: {
@@ -56,6 +56,9 @@ export const bookSchemaLiteral = {
         file_hash: {
             type: 'string'
         },
+        added_date: {
+            type: 'number'
+        },
         _modified: {
             type: 'number'
         },
@@ -70,6 +73,51 @@ const schemaTyped = toTypedRxJsonSchema(bookSchemaLiteral);
 export type RxBookDocumentType = ExtractDocumentTypeFromTypedRxJsonSchema<typeof schemaTyped>;
 
 export const bookSchema: RxJsonSchema<RxBookDocumentType> = bookSchemaLiteral;
+
+export const userEpubSchemaLiteral = {
+    version: 0,
+    primaryKey: 'id',
+    type: 'object',
+    properties: {
+        id: {
+            type: 'string',
+            maxLength: 100
+        },
+        user_id: {
+            type: 'string'
+        },
+        title: {
+            type: 'string'
+        },
+        author: {
+            type: 'string'
+        },
+        file_hash: {
+            type: 'string'
+        },
+        file_size: {
+            type: 'number'
+        },
+        cover_url: {
+            type: 'string'
+        },
+        added_date: {
+            type: 'number'
+        },
+        _modified: {
+            type: 'number'
+        },
+        _deleted: {
+            type: 'boolean'
+        }
+    },
+    required: ['id', 'title', 'file_hash', 'added_date', '_modified']
+} as const;
+
+const userEpubSchemaTyped = toTypedRxJsonSchema(userEpubSchemaLiteral);
+export type RxUserEpubDocumentType = ExtractDocumentTypeFromTypedRxJsonSchema<typeof userEpubSchemaTyped>;
+
+export const userEpubSchema: RxJsonSchema<RxUserEpubDocumentType> = userEpubSchemaLiteral;
 
 export const settingsSchemaLiteral = {
     version: 0,

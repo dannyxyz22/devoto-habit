@@ -1,4 +1,4 @@
-import { RxBookDocumentType, RxSettingsDocumentType } from '@/lib/database/schema';
+import { RxBookDocumentType, RxSettingsDocumentType, RxUserEpubDocumentType } from '@/lib/database/schema';
 
 export interface DataLayer {
     /**
@@ -30,4 +30,24 @@ export interface DataLayer {
      * Save user settings
      */
     saveSettings(settings: Partial<RxSettingsDocumentType>): Promise<RxSettingsDocumentType>;
+
+    /**
+     * Get all EPUB metadata for the current user
+     */
+    getUserEpubs(): Promise<RxUserEpubDocumentType[]>;
+
+    /**
+     * Get a single EPUB metadata by ID
+     */
+    getUserEpub(id: string): Promise<RxUserEpubDocumentType | null>;
+
+    /**
+     * Save or update EPUB metadata
+     */
+    saveUserEpub(epub: Partial<RxUserEpubDocumentType>): Promise<RxUserEpubDocumentType>;
+
+    /**
+     * Delete EPUB metadata (Soft delete)
+     */
+    deleteUserEpub(id: string): Promise<void>;
 }

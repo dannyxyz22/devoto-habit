@@ -16,9 +16,10 @@ import { formatISO } from "date-fns";
 import { resolveEpubSource } from "@/lib/utils";
 import ePub from "epubjs";
 import { getCoverObjectUrl, saveCoverBlob } from "@/lib/coverCache";
-import { saveUserEpub, getUserEpubs, deleteUserEpub } from "@/lib/userEpubs";
+import { saveUserEpub, getUserEpubs, deleteUserEpub, reUploadEpub } from "@/lib/userEpubs";
+import { getDatabase } from "@/lib/database/db";
 import { BookSearchDialog } from "@/components/app/BookSearchDialog";
-import { Upload, Trash2, BookPlus } from "lucide-react";
+import { Upload, Trash2, BookPlus, AlertCircle, X } from "lucide-react";
 import { BookCover } from "@/components/book/BookCover";
 
 type Paragraph = { type: string; content: string };
@@ -42,6 +43,7 @@ const Library = () => {
   const [allBooks, setAllBooks] = useState<BookMeta[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [showBookSearch, setShowBookSearch] = useState(false);
+  const [dismissedOverlays, setDismissedOverlays] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const today = new Date().toISOString().slice(0, 10);
@@ -144,55 +146,87 @@ const Library = () => {
   // Load user EPUBs and physical books on mount and merge with existing books
   useEffect(() => {
     const loadBooks = async () => {
-      const userEpubs = await getUserEpubs();
-      const rxdbBooks = await dataLayer.getBooks();
+      try {
+        console.log('[Library] Starting to load books...');
+        const rxdb = await getDatabase();
+        console.log('[Library] Database loaded');
+        
+        const rxdbBooks = await dataLayer.getBooks();
+        console.log('[Library] RxDB books loaded:', rxdbBooks.length);
 
-      // Separar livros físicos do RxDB
-      const physicalBooks = rxdbBooks
-        .filter(b => b.type === 'physical')
-        .map(b => ({
-          id: b.id,
-          title: b.title,
-          author: b.author || '',
-          coverImage: b.cover_url,
-          totalPages: b.total_pages || 0,
-          currentPage: b.current_page || 0,
-          addedDate: new Date(b._modified).getTime(),
-          description: ''
+        // Get all EPUB metadata from RxDB
+        const epubMetadata = await rxdb.user_epubs.find({
+          selector: { _deleted: false }
+        }).exec();
+        console.log('[Library] EPUB metadata loaded:', epubMetadata.length);
+
+        // Get EPUBs that have local files
+        console.log('[Library] Checking for local EPUB files...');
+        const userEpubs = await getUserEpubs();
+        console.log('[Library] User EPUBs with local files:', userEpubs.length);
+        
+        const localEpubHashes = new Set(userEpubs.map(e => e.fileHash));
+
+        // Convert EPUB metadata to BookMeta format
+        const userEpubBooks: BookMeta[] = epubMetadata.map(epub => {
+          const epubData = epub.toJSON();
+          const hasLocalFile = localEpubHashes.has(epubData.file_hash);
+          const localEpub = userEpubs.find(e => e.fileHash === epubData.file_hash);
+
+          return {
+            id: epubData.id,
+            title: epubData.title,
+            author: epubData.author || '',
+            sourceUrl: hasLocalFile && localEpub ? URL.createObjectURL(localEpub.blob) : undefined,
+            description: 'Uploaded by user',
+            coverImage: hasLocalFile && localEpub ? localEpub.coverUrl : undefined,
+            type: 'epub' as const,
+            isUserUpload: true,
+            addedDate: epubData.added_date,
+            fileHash: epubData.file_hash,
+            hasLocalFile
+          };
+        });
+
+        // Separar livros físicos do RxDB
+        const physicalBooks = rxdbBooks
+          .filter(b => b.type === 'physical')
+          .map(b => ({
+            id: b.id,
+            title: b.title,
+            author: b.author || '',
+            coverImage: b.cover_url,
+            totalPages: b.total_pages || 0,
+            currentPage: b.current_page || 0,
+            addedDate: b.added_date || new Date(b._modified).getTime(),
+            description: ''
+          }));
+        
+        // Convert physical books to BookMeta format
+        const physicalBooksMeta: BookMeta[] = physicalBooks.map(book => ({
+          id: book.id,
+          title: book.title,
+          author: book.author,
+          description: book.description || '',
+          coverImage: book.coverImage,
+          type: 'physical' as const,
+          isPhysical: true,
+          totalPages: book.totalPages,
+          currentPage: book.currentPage,
+          addedDate: book.addedDate,
         }));
 
-      // Convert user EPUBs to BookMeta format
-      const userEpubBooks: BookMeta[] = userEpubs.map(epub => ({
-        id: epub.id,
-        title: epub.title,
-        author: epub.author,
-        sourceUrl: URL.createObjectURL(epub.blob),
-        description: 'Uploaded by user',
-        coverImage: epub.coverUrl,
-        type: 'epub' as const,
-        isUserUpload: true,
-        addedDate: epub.addedDate,
-      }));
+        // Sort all user books by date (newest first), then append static books
+        const allUserBooks = [...userEpubBooks, ...physicalBooksMeta]
+          .sort((a, b) => (b.addedDate || 0) - (a.addedDate || 0));
 
-      // Convert physical books to BookMeta format
-      const physicalBooksMeta: BookMeta[] = physicalBooks.map(book => ({
-        id: book.id,
-        title: book.title,
-        author: book.author,
-        description: book.description || '',
-        coverImage: book.coverImage,
-        type: 'physical' as const,
-        isPhysical: true,
-        totalPages: book.totalPages,
-        currentPage: book.currentPage,
-        addedDate: book.addedDate,
-      }));
-
-      // Sort all user books by date (newest first), then append static books
-      const allUserBooks = [...userEpubBooks, ...physicalBooksMeta]
-        .sort((a, b) => (b.addedDate || 0) - (a.addedDate || 0));
-
-      setAllBooks([...allUserBooks, ...BOOKS]);
+        setAllBooks([...allUserBooks, ...BOOKS]);
+        console.log('[Library] ✅ Books loaded successfully:', allUserBooks.length + BOOKS.length);
+      } catch (error) {
+        console.error('[Library] ❌ Error loading books:', error);
+        // Fallback: just show static books
+        setAllBooks(BOOKS);
+      }
     };
 
     loadBooks();
@@ -218,6 +252,8 @@ const Library = () => {
         type: 'epub',
         isUserUpload: true,
         addedDate: userEpub.addedDate,
+        fileHash: userEpub.fileHash,
+        hasLocalFile: true, // Explicitly mark as having local file
       };
 
       setAllBooks(prev => [newBook, ...prev]);
@@ -279,7 +315,7 @@ const Library = () => {
         coverImage: b.cover_url,
         totalPages: b.total_pages || 0,
         currentPage: b.current_page || 0,
-        addedDate: new Date(b._modified).getTime(),
+        addedDate: b.added_date || new Date(b._modified).getTime(),
         description: ''
       }));
 
@@ -560,7 +596,6 @@ const Library = () => {
               ) : book.type === 'epub' ? (
                 <EpubCoverLoader id={book.id} title={book.title} sourceUrl={book.sourceUrl!} />
               ) : null}
-
             </div>
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
@@ -586,6 +621,18 @@ const Library = () => {
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground mb-4">{book.description}</p>
+              
+              {/* EPUB not available locally message */}
+              {book.type === 'epub' && book.isUserUpload && !book.hasLocalFile && (
+                <div className="mb-4 p-3 bg-muted rounded-lg flex items-start gap-2">
+                  <AlertCircle className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-muted-foreground">EPUB não disponível localmente</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Faça upload para ler neste dispositivo</p>
+                  </div>
+                </div>
+              )}
+
               {book.isPhysical && book.totalPages && (
                 <div className="mb-4">
                   <div className="flex justify-between text-sm text-muted-foreground mb-1">
@@ -617,19 +664,121 @@ const Library = () => {
                   </div>
                 ) : null;
               })()}
-              <div className="flex items-center gap-2">
-                <Button onClick={() => {
-                  if (book.isPhysical) {
-                    navigate(`/physical/${book.id}`);
-                  } else {
-                    navigate(book.type === 'epub' ? `/epub/${book.id}` : `/leitor/${book.id}`);
-                  }
-                }}>
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Upload EPUB button for missing files */}
+                {book.type === 'epub' && book.isUserUpload && !book.hasLocalFile && (
+                  <Button
+                    variant="default"
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      const input = document.createElement('input');
+                      input.type = 'file';
+                      input.accept = '.epub';
+                      input.onchange = async (uploadEvent) => {
+                        const uploadedFile = (uploadEvent.target as HTMLInputElement).files?.[0];
+                        if (!uploadedFile) return;
+                        
+                        try {
+                          await reUploadEpub(book.fileHash!, uploadedFile);
+                          
+                          // Reload books to update UI
+                          const rxdb = await getDatabase();
+                          const epubMetadata = await rxdb.user_epubs.find({
+                            selector: { _deleted: false }
+                          }).exec();
+                          const userEpubs = await getUserEpubs();
+                          const localEpubHashes = new Set(userEpubs.map(e => e.fileHash));
+
+                          const userEpubBooks: BookMeta[] = epubMetadata.map(epub => {
+                            const epubData = epub.toJSON();
+                            const hasLocalFile = localEpubHashes.has(epubData.file_hash);
+                            const localEpub = userEpubs.find(e => e.fileHash === epubData.file_hash);
+
+                            return {
+                              id: epubData.id,
+                              title: epubData.title,
+                              author: epubData.author || '',
+                              sourceUrl: hasLocalFile && localEpub ? URL.createObjectURL(localEpub.blob) : undefined,
+                              description: 'Uploaded by user',
+                              coverImage: hasLocalFile && localEpub ? localEpub.coverUrl : undefined,
+                              type: 'epub' as const,
+                              isUserUpload: true,
+                              addedDate: epubData.added_date,
+                              fileHash: epubData.file_hash,
+                              hasLocalFile
+                            };
+                          });
+
+                          const rxdbBooks = await dataLayer.getBooks();
+                          const physicalBooks = rxdbBooks
+                            .filter(b => b.type === 'physical')
+                            .map(b => ({
+                              id: b.id,
+                              title: b.title,
+                              author: b.author || '',
+                              coverImage: b.cover_url,
+                              totalPages: b.total_pages || 0,
+                              currentPage: b.current_page || 0,
+                              addedDate: b.added_date || new Date(b._modified).getTime(),
+                              description: ''
+                            }));
+
+                          const physicalBooksMeta: BookMeta[] = physicalBooks.map(book => ({
+                            id: book.id,
+                            title: book.title,
+                            author: book.author,
+                            description: book.description || '',
+                            coverImage: book.coverImage,
+                            type: 'physical' as const,
+                            isPhysical: true,
+                            totalPages: book.totalPages,
+                            currentPage: book.currentPage,
+                            addedDate: book.addedDate,
+                          }));
+
+                          const allUserBooks = [...userEpubBooks, ...physicalBooksMeta]
+                            .sort((a, b) => (b.addedDate || 0) - (a.addedDate || 0));
+
+                          setAllBooks([...allUserBooks, ...BOOKS]);
+
+                          toast({
+                            title: 'EPUB carregado com sucesso',
+                            description: `${book.title} está disponível novamente neste dispositivo`,
+                          });
+                        } catch (error) {
+                          console.error('Re-upload error:', error);
+                          toast({
+                            title: 'Falha no upload',
+                            description: error instanceof Error ? error.message : 'Falha ao fazer upload do EPUB',
+                            variant: 'destructive',
+                          });
+                        }
+                      };
+                      input.click();
+                    }}
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    Fazer upload do EPUB
+                  </Button>
+                )}
+
+                {/* Reading and goal buttons - disabled when EPUB is not available */}
+                <Button 
+                  onClick={() => {
+                    if (book.isPhysical) {
+                      navigate(`/physical/${book.id}`);
+                    } else {
+                      navigate(book.type === 'epub' ? `/epub/${book.id}` : `/leitor/${book.id}`);
+                    }
+                  }}
+                  disabled={book.type === 'epub' && book.isUserUpload && !book.hasLocalFile}
+                >
                   Continuar leitura
                 </Button>
                 <Button
                   variant="secondary"
                   onClick={() => onChooseBook(book.id)}
+                  disabled={book.type === 'epub' && book.isUserUpload && !book.hasLocalFile}
                 >
                   Definir meta
                 </Button>

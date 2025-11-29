@@ -11,6 +11,8 @@ export type BookMeta = {
   totalPages?: number;         // For physical books
   currentPage?: number;        // For physical books
   addedDate?: number;          // Timestamp for sorting
+  fileHash?: string;           // For EPUB deduplication
+  hasLocalFile?: boolean;      // For cross-device EPUB sync
 };
 
 // Import asset via Vite so the URL is correctly handled in build
