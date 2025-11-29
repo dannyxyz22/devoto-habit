@@ -227,16 +227,39 @@ const EpubReader = () => {
                 setProgress(epubId, { partIndex: 0, chapterIndex: 0, percent });
 
                 // Sync with DataLayer (including CFI)
+                // Check if it's a user EPUB or a standard book
                 (async () => {
                   try {
-                    const book = await dataLayer.getBook(epubId);
-                    if (book) {
-                      await dataLayer.saveBook({
-                        ...book,
-                        percentage: percent,
-                        last_location_cfi: cfi,
-                        _modified: Date.now()
+                    const db = await import('@/lib/database/db').then(m => m.getDatabase());
+                    const dbInstance = await db;
+                    
+                    // Try to find in user_epubs first
+                    const userEpub = await dbInstance.user_epubs.findOne({
+                      selector: { id: epubId }
+                    }).exec();
+
+                    if (userEpub) {
+                      // Update user_epub progress
+                      await userEpub.update({
+                        $set: {
+                          percentage: percent,
+                          last_location_cfi: cfi,
+                          _modified: Date.now()
+                        }
                       });
+                      console.log('[EpubReader] Progress synced to user_epubs:', { id: epubId, percent, cfi });
+                    } else {
+                      // Fallback to books collection
+                      const book = await dataLayer.getBook(epubId);
+                      if (book) {
+                        await dataLayer.saveBook({
+                          ...book,
+                          percentage: percent,
+                          last_location_cfi: cfi,
+                          _modified: Date.now()
+                        });
+                        console.log('[EpubReader] Progress synced to books:', { id: epubId, percent, cfi });
+                      }
                     }
                   } catch (error) {
                     console.error("Error syncing EPUB progress:", error);
@@ -358,17 +381,37 @@ const EpubReader = () => {
               // Try local storage first for immediate feedback
               saved = localStorage.getItem(`epubLoc:${epubId}`);
 
-              // If not local, or if we want to ensure sync, check DataLayer
-              // Note: This is async, so we might need a better strategy if we want to wait
-              // For now, let's try to fetch it before rendering if possible, but here we are inside .then()
-              // We can fire a background check
-              dataLayer.getBook(epubId).then(book => {
-                if (book && book.last_location_cfi && book.last_location_cfi !== saved) {
-                  console.log('Found newer cloud location:', book.last_location_cfi);
-                  rendition.display(book.last_location_cfi);
-                  saved = book.last_location_cfi;
+              // Check RxDB for cloud-synced location (user_epubs or books)
+              (async () => {
+                try {
+                  const db = await import('@/lib/database/db').then(m => m.getDatabase());
+                  const dbInstance = await db;
+                  
+                  // Check user_epubs first
+                  const userEpub = await dbInstance.user_epubs.findOne({
+                    selector: { id: epubId }
+                  }).exec();
+
+                  if (userEpub) {
+                    const epub = userEpub.toJSON();
+                    if (epub.last_location_cfi && epub.last_location_cfi !== saved) {
+                      console.log('[EpubReader] Found cloud location from user_epubs:', epub.last_location_cfi);
+                      rendition.display(epub.last_location_cfi);
+                      saved = epub.last_location_cfi;
+                    }
+                  } else {
+                    // Fallback to books collection
+                    const book = await dataLayer.getBook(epubId);
+                    if (book && book.last_location_cfi && book.last_location_cfi !== saved) {
+                      console.log('[EpubReader] Found cloud location from books:', book.last_location_cfi);
+                      rendition.display(book.last_location_cfi);
+                      saved = book.last_location_cfi;
+                    }
+                  }
+                } catch (err) {
+                  console.warn('[EpubReader] Error loading cloud location:', err);
                 }
-              });
+              })();
             } catch { }
             rendition.display(saved || undefined);
 

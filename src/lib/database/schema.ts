@@ -75,7 +75,7 @@ export type RxBookDocumentType = ExtractDocumentTypeFromTypedRxJsonSchema<typeof
 export const bookSchema: RxJsonSchema<RxBookDocumentType> = bookSchemaLiteral;
 
 export const userEpubSchemaLiteral = {
-    version: 0,
+    version: 1,
     primaryKey: 'id',
     type: 'object',
     properties: {
@@ -99,6 +99,14 @@ export const userEpubSchemaLiteral = {
             type: 'number'
         },
         cover_url: {
+            type: 'string'
+        },
+        percentage: {
+            type: 'number',
+            minimum: 0,
+            maximum: 100
+        },
+        last_location_cfi: {
             type: 'string'
         },
         added_date: {

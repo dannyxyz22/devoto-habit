@@ -49,7 +49,18 @@ const _createDatabase = async (): Promise<DevotoDatabase> => {
             }
         },
         user_epubs: {
-            schema: userEpubSchema
+            schema: userEpubSchema,
+            migrationStrategies: {
+                // Migration from v0 to v1: add progress fields
+                1: function (oldDoc: any) {
+                    console.log('[Migration] user_epubs v0→v1: Adding progress fields for:', oldDoc.id);
+                    return {
+                        ...oldDoc,
+                        percentage: oldDoc.percentage || 0,
+                        last_location_cfi: oldDoc.last_location_cfi || ''
+                    };
+                }
+            }
         },
         settings: {
             schema: settingsSchema
