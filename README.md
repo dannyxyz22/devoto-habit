@@ -18,8 +18,7 @@ Este projeto foi construído com as seguintes tecnologias principais:
 - **UI/Estilo**: [Tailwind CSS](https://tailwindcss.com/), [shadcn-ui](https://ui.shadcn.com/), [Lucide React](https://lucide.dev/)
 - **Mobile**: [Capacitor](https://capacitorjs.com/)
 - **Leitura**: [epubjs](https://github.com/futurepress/epub.js)
-- **Gráficos**: [Recharts](https://recharts.org/)
-- **Gerenciamento de Estado/Dados**: [TanStack Query](https://tanstack.com/query/latest)
+-   **Gráficos**: [Recharts](https://recharts.org/)
 
 ## Configuração e Instalação
 

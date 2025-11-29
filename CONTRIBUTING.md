@@ -71,7 +71,6 @@ O widget nativo está localizado em `android/app/src/main/java/com/devotohabit/a
 -   **Componentes:** Prefira componentes funcionais com Hooks.
 -   **Gerenciamento de Estado:**
     -   Estado local: `useState`
-    -   Estado do servidor/assíncrono: `TanStack Query`
     -   Estado global simples: Context API (se necessário)
 
 ## 🐛 Debug Mode
