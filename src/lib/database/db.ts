@@ -3,6 +3,7 @@ import { getRxStorageDexie } from 'rxdb/plugins/storage-dexie';
 import { RxDBMigrationSchemaPlugin } from 'rxdb/plugins/migration-schema';
 import { RxDBUpdatePlugin } from 'rxdb/plugins/update';
 import { bookSchema, settingsSchema, userEpubSchema, RxBookDocumentType, RxSettingsDocumentType, RxUserEpubDocumentType } from './schema';
+import { ensureStaticBooks } from './staticBooksInit';
 
 // Add required plugins
 addRxPlugin(RxDBMigrationSchemaPlugin);
@@ -68,8 +69,14 @@ const _createDatabase = async (): Promise<DevotoDatabase> => {
     });
 
     console.log('DatabaseService: Database created');
+
+    // Initialize static books (EPUBs from books.ts)
+    // Use 'local-user' as default - will be updated when user logs in
+    await ensureStaticBooks(db, 'local-user');
+
     return db;
 };
+
 export const getDatabase = (): Promise<DevotoDatabase> => {
     if (!dbPromise) {
         dbPromise = _createDatabase();

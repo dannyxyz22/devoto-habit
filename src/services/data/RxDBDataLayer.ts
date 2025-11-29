@@ -3,6 +3,7 @@ import { getDatabase } from '@/lib/database/db';
 import { RxBookDocumentType, RxSettingsDocumentType } from '@/lib/database/schema';
 import { authService } from '@/services/auth/SupabaseAuthService';
 import { replicationManager } from '@/lib/database/replication';
+import { ensureStaticBooks } from '@/lib/database/staticBooksInit';
 
 class RxDBDataLayerImpl implements DataLayer {
     private static instance: RxDBDataLayerImpl;
@@ -20,9 +21,12 @@ class RxDBDataLayerImpl implements DataLayer {
 
     private initializeAuthListener() {
         authService.onAuthStateChange(async (event, session) => {
-            if (event === 'SIGNED_IN' && session) {
-                console.log('DataLayer: User signed in, migrating local data and starting replication...');
+            if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
+                console.log(`DataLayer: ${event} - migrating local data and starting replication...`);
                 await this.migrateLocalUserData(session.user.id);
+                // Ensure static books have correct user_id after login
+                const db = await getDatabase();
+                await ensureStaticBooks(db, session.user.id);
                 // Reconcile user_epubs to ensure missing rows are upserted before replication
                 await replicationManager.reconcileUserEpubs();
                 await replicationManager.startReplication();
@@ -104,7 +108,7 @@ class RxDBDataLayerImpl implements DataLayer {
         }
     }
 
-       // Removed checkpoint clearing due to internalStore API mismatch; using reconciliation instead.
+    // Removed checkpoint clearing due to internalStore API mismatch; using reconciliation instead.
 
     private async getUserId(): Promise<string> {
         const { user } = await authService.getUser();

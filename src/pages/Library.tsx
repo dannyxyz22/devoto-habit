@@ -143,93 +143,111 @@ const Library = () => {
     );
   };
 
-  // Load user EPUBs and physical books on mount and merge with existing books
+  // Reactive book loading
   useEffect(() => {
-    const loadBooks = async () => {
+    let subscription: any;
+
+    const setupSubscription = async () => {
       try {
-        console.log('[Library] Starting to load books...');
-        const rxdb = await getDatabase();
-        console.log('[Library] Database loaded');
-        
-        const rxdbBooks = await dataLayer.getBooks();
-        console.log('[Library] RxDB books loaded:', rxdbBooks.length);
+        const db = await getDatabase();
+        const { combineLatest } = await import('rxjs');
 
-        // Get all EPUB metadata from RxDB
-        const epubMetadata = await rxdb.user_epubs.find({
+        const books$ = db.books.find({
           selector: { _deleted: false }
-        }).exec();
-        console.log('[Library] EPUB metadata loaded:', epubMetadata.length);
+        }).$;
 
-        // Get EPUBs that have local files
-        console.log('[Library] Checking for local EPUB files...');
-        const userEpubs = await getUserEpubs();
-        console.log('[Library] User EPUBs with local files:', userEpubs.length);
-        
-        const localEpubHashes = new Set(userEpubs.map(e => e.fileHash));
+        const userEpubs$ = db.user_epubs.find({
+          selector: { _deleted: false }
+        }).$;
 
-        // Convert EPUB metadata to BookMeta format
-        const userEpubBooks: BookMeta[] = epubMetadata.map(epub => {
-          const epubData = epub.toJSON();
-          const hasLocalFile = localEpubHashes.has(epubData.file_hash);
-          const localEpub = userEpubs.find(e => e.fileHash === epubData.file_hash);
+        subscription = combineLatest([books$, userEpubs$]).subscribe(async ([rxBooks, rxEpubs]) => {
+          try {
+            // 1. Process User EPUBs
+            const userEpubsLocal = await getUserEpubs();
+            const localEpubHashes = new Set(userEpubsLocal.map(e => e.fileHash));
 
-          return {
-            id: epubData.id,
-            title: epubData.title,
-            author: epubData.author || '',
-            sourceUrl: hasLocalFile && localEpub ? URL.createObjectURL(localEpub.blob) : undefined,
-            description: 'Uploaded by user',
-            coverImage: hasLocalFile && localEpub ? localEpub.coverUrl : undefined,
-            type: 'epub' as const,
-            isUserUpload: true,
-            addedDate: epubData.added_date,
-            fileHash: epubData.file_hash,
-            hasLocalFile
-          };
+            const userEpubBooks: BookMeta[] = rxEpubs.map(epub => {
+              const epubData = epub.toJSON();
+              const hasLocalFile = localEpubHashes.has(epubData.file_hash);
+              const localEpub = userEpubsLocal.find(e => e.fileHash === epubData.file_hash);
+
+              return {
+                id: epubData.id,
+                title: epubData.title,
+                author: epubData.author || '',
+                sourceUrl: hasLocalFile && localEpub ? URL.createObjectURL(localEpub.blob) : undefined,
+                description: 'Uploaded by user',
+                coverImage: hasLocalFile && localEpub ? localEpub.coverUrl : undefined,
+                type: 'epub' as const,
+                isUserUpload: true,
+                addedDate: epubData.added_date,
+                fileHash: epubData.file_hash,
+                hasLocalFile,
+                percentage: epubData.percentage || 0
+              };
+            });
+
+            // 2. Process Physical Books from RxDB
+            const physicalBooksMeta: BookMeta[] = rxBooks
+              .filter(b => b.type === 'physical')
+              .map(b => {
+                const book = b.toJSON();
+                return {
+                  id: book.id,
+                  title: book.title,
+                  author: book.author || '',
+                  description: '', // Physical books in DB currently don't store description
+                  coverImage: book.cover_url,
+                  type: 'physical' as const,
+                  isPhysical: true,
+                  totalPages: book.total_pages || 0,
+                  currentPage: book.current_page || 0,
+                  addedDate: book.added_date || new Date(book._modified).getTime(),
+                  percentage: book.percentage || 0
+                };
+              });
+
+            // 3. Process Static Books (merge with RxDB data)
+            const staticBooksMeta: BookMeta[] = BOOKS.map(staticBook => {
+              // Check if we have synced data for this static book
+              const syncedBook = rxBooks.find(b => b.id === staticBook.id);
+              if (syncedBook) {
+                const syncedData = syncedBook.toJSON();
+                return {
+                  ...staticBook,
+                  // Override with synced progress data
+                  percentage: syncedData.percentage || 0,
+                  // Keep static metadata (cover, description, sourceUrl) from BOOKS
+                  // unless we want to allow overrides from DB in future
+                };
+              }
+              return staticBook;
+            });
+
+            // 4. Merge and Sort
+            const allUserBooks = [...userEpubBooks, ...physicalBooksMeta, ...staticBooksMeta]
+              .sort((a, b) => (b.addedDate || 0) - (a.addedDate || 0));
+
+            // Deduplicate by ID just in case
+            const uniqueBooks = Array.from(new Map(allUserBooks.map(item => [item.id, item])).values());
+
+            setAllBooks(uniqueBooks);
+            console.log('[Library] Updated books list:', uniqueBooks.length);
+
+          } catch (err) {
+            console.error('[Library] Error processing book update:', err);
+          }
         });
-
-        // Separar livros físicos do RxDB
-        const physicalBooks = rxdbBooks
-          .filter(b => b.type === 'physical')
-          .map(b => ({
-            id: b.id,
-            title: b.title,
-            author: b.author || '',
-            coverImage: b.cover_url,
-            totalPages: b.total_pages || 0,
-            currentPage: b.current_page || 0,
-            addedDate: b.added_date || new Date(b._modified).getTime(),
-            description: ''
-          }));
-        
-        // Convert physical books to BookMeta format
-        const physicalBooksMeta: BookMeta[] = physicalBooks.map(book => ({
-          id: book.id,
-          title: book.title,
-          author: book.author,
-          description: book.description || '',
-          coverImage: book.coverImage,
-          type: 'physical' as const,
-          isPhysical: true,
-          totalPages: book.totalPages,
-          currentPage: book.currentPage,
-          addedDate: book.addedDate,
-        }));
-
-        // Sort all user books by date (newest first), then append static books
-        const allUserBooks = [...userEpubBooks, ...physicalBooksMeta]
-          .sort((a, b) => (b.addedDate || 0) - (a.addedDate || 0));
-
-        setAllBooks([...allUserBooks, ...BOOKS]);
-        console.log('[Library] ✅ Books loaded successfully:', allUserBooks.length + BOOKS.length);
-      } catch (error) {
-        console.error('[Library] ❌ Error loading books:', error);
-        // Fallback: just show static books
-        setAllBooks(BOOKS);
+      } catch (err) {
+        console.error('[Library] Error setting up subscription:', err);
       }
     };
 
-    loadBooks();
+    setupSubscription();
+
+    return () => {
+      if (subscription) subscription.unsubscribe();
+    };
   }, []);
 
   // Handle EPUB file upload
@@ -621,7 +639,7 @@ const Library = () => {
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground mb-4">{book.description}</p>
-              
+
               {/* EPUB not available locally message */}
               {book.type === 'epub' && book.isUserUpload && !book.hasLocalFile && (
                 <div className="mb-4 p-3 bg-muted rounded-lg flex items-start gap-2">
@@ -648,17 +666,19 @@ const Library = () => {
                 </div>
               )}
               {book.type === 'epub' && (() => {
-                const progress = getProgress(book.id);
-                return progress.percent > 0 ? (
+                // Use percentage from RxDB (book.percentage) or fallback to local storage
+                const percent = book.percentage !== undefined ? book.percentage : getProgress(book.id).percent;
+
+                return percent > 0 ? (
                   <div className="mb-4">
                     <div className="flex justify-between text-sm text-muted-foreground mb-1">
                       <span>Progresso</span>
-                      <span>{Math.round(progress.percent)}%</span>
+                      <span>{Math.round(percent)}%</span>
                     </div>
                     <div className="w-full bg-secondary rounded-full h-2">
                       <div
                         className="bg-primary h-2 rounded-full transition-all"
-                        style={{ width: `${progress.percent}%` }}
+                        style={{ width: `${percent}%` }}
                       />
                     </div>
                   </div>
@@ -677,10 +697,10 @@ const Library = () => {
                       input.onchange = async (uploadEvent) => {
                         const uploadedFile = (uploadEvent.target as HTMLInputElement).files?.[0];
                         if (!uploadedFile) return;
-                        
+
                         try {
                           await reUploadEpub(book.fileHash!, uploadedFile);
-                          
+
                           // Reload books to update UI
                           const rxdb = await getDatabase();
                           const epubMetadata = await rxdb.user_epubs.find({
@@ -763,7 +783,7 @@ const Library = () => {
                 )}
 
                 {/* Reading and goal buttons - disabled when EPUB is not available */}
-                <Button 
+                <Button
                   onClick={() => {
                     if (book.isPhysical) {
                       navigate(`/physical/${book.id}`);

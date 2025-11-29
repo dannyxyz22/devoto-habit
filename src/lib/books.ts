@@ -13,6 +13,7 @@ export type BookMeta = {
   addedDate?: number;          // Timestamp for sorting
   fileHash?: string;           // For EPUB deduplication
   hasLocalFile?: boolean;      // For cross-device EPUB sync
+  percentage?: number;         // Reading progress percentage
 };
 
 // Import asset via Vite so the URL is correctly handled in build
