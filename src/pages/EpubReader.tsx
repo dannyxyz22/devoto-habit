@@ -25,6 +25,12 @@ type FontFamily = "serif" | "sans" | "dyslexic";
 type ThemeMode = "system" | "light" | "dark" | "sepia";
 type ContentWidth = "narrow" | "medium" | "wide";
 
+const THEME_PALETTES: Record<'light' | 'dark' | 'sepia', { background: string; text: string; link: string; }> = {
+  light: { background: '#fdfcf7', text: '#111111', link: '#1d4ed8' },
+  dark: { background: '#0a0a0a', text: '#f5f5f5', link: '#60a5fa' },
+  sepia: { background: '#f4ecd8', text: '#5c4a3a', link: '#8b6914' },
+};
+
 interface ReadingPreferences {
   fontSize: number; // 100-200 (percentage)
   fontFamily: FontFamily;
@@ -140,9 +146,11 @@ const EpubReader = () => {
 
     let rafId: number | null = null;
     let timeoutId: number | null = null;
+    let cancelled = false;
 
     // Wait for next frame to ensure rendition is ready
     rafId = requestAnimationFrame(() => {
+      if (cancelled || renditionRef.current !== rendition) return;
       try {
         const themes = (rendition as any).themes;
         if (!themes) {
@@ -188,29 +196,19 @@ const EpubReader = () => {
         themes.select(selectedTheme);
 
         // Update container background
-        const getVar = (name: string, fallback: string) => {
-          try {
-            const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-            return v ? `hsl(${v})` : fallback;
-          } catch { return fallback; }
-        };
-        const bgLight = getVar('--background', '#ffffff');
-        const bgDark = '#0a0a0a';
-        const bgSepia = '#f4ecd8';
-        const bgMap: Record<string, string> = { light: bgLight, dark: bgDark, sepia: bgSepia };
-
         const container = viewerRef.current;
         if (container) {
-          try { container.style.background = bgMap[selectedTheme]; } catch { }
+          try { container.style.background = THEME_PALETTES[selectedTheme].background; } catch { }
         }
 
         // Re-render to apply changes immediately, keeping exact CFI position
         try {
-          const currentLocation = rendition.currentLocation() as any;
+          const currentLocation = rendition.currentLocation?.() as any;
           const currentCfi = currentLocation?.start?.cfi;
           if (currentCfi) {
             // Small delay to ensure theme selection has propagated
             timeoutId = window.setTimeout(() => {
+              if (cancelled || renditionRef.current !== rendition) return;
               rendition.display(currentCfi);
             }, 100);
           }
@@ -225,6 +223,7 @@ const EpubReader = () => {
     });
 
     return () => {
+      cancelled = true;
       if (rafId) cancelAnimationFrame(rafId);
       if (timeoutId) clearTimeout(timeoutId);
     };
@@ -268,47 +267,36 @@ const EpubReader = () => {
   useEffect(() => {
     const container = viewerRef.current;
     if (!container || !epubId) return;
-    const getVar = (name: string, fallback: string) => {
-      try {
-        const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-        return v ? `hsl(${v})` : fallback;
-      } catch { return fallback; }
-    };
-    const isDarkMode = () => {
-      try {
-        return document.documentElement.classList.contains('dark') || window.matchMedia?.('(prefers-color-scheme: dark)')?.matches;
-      } catch { return false; }
-    };
     const applyEpubTheme = () => {
       try {
         const rend = renditionRef.current as any;
         if (!rend) return;
         const themes = rend.themes;
-        const bgLight = getVar('--background', '#ffffff');
-        const fgLight = getVar('--foreground', '#111111');
-        const linkLight = getVar('--primary', '#1d4ed8');
-        const bgDark = '#0a0a0a';
-        const fgDark = '#f5f5f5';
-        const linkDark = '#60a5fa';
-        const bgSepia = '#f4ecd8';
-        const fgSepia = '#5c4a3a';
-        const linkSepia = '#8b6914';
 
         themes.register('light', {
-          'html, body': { background: bgLight + ' !important', color: fgLight + ' !important' },
-          'a, a:visited': { color: linkLight + ' !important' },
-          'p, div, span, li': { color: fgLight + ' !important' },
+          'html, body': {
+            background: THEME_PALETTES.light.background + ' !important',
+            color: THEME_PALETTES.light.text + ' !important',
+          },
+          'a, a:visited': { color: THEME_PALETTES.light.link + ' !important' },
+          'p, div, span, li': { color: THEME_PALETTES.light.text + ' !important' },
         });
         themes.register('dark', {
-          'html, body': { background: bgDark + ' !important', color: fgDark + ' !important' },
-          'a, a:visited': { color: linkDark + ' !important' },
-          'p, div, span, li': { color: fgDark + ' !important' },
+          'html, body': {
+            background: THEME_PALETTES.dark.background + ' !important',
+            color: THEME_PALETTES.dark.text + ' !important',
+          },
+          'a, a:visited': { color: THEME_PALETTES.dark.link + ' !important' },
+          'p, div, span, li': { color: THEME_PALETTES.dark.text + ' !important' },
           'img': { filter: 'none' },
         });
         themes.register('sepia', {
-          'html, body': { background: bgSepia + ' !important', color: fgSepia + ' !important' },
-          'a, a:visited': { color: linkSepia + ' !important' },
-          'p, div, span, li': { color: fgSepia + ' !important' },
+          'html, body': {
+            background: THEME_PALETTES.sepia.background + ' !important',
+            color: THEME_PALETTES.sepia.text + ' !important',
+          },
+          'a, a:visited': { color: THEME_PALETTES.sepia.link + ' !important' },
+          'p, div, span, li': { color: THEME_PALETTES.sepia.text + ' !important' },
         });
       } catch { }
     };
