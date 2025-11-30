@@ -40,7 +40,7 @@ class RxDBDataLayerImpl implements DataLayer {
                     // Reconcile user_epubs to ensure missing rows are upserted before replication
                     await replicationManager.reconcileUserEpubs();
                     await replicationManager.startReplication();
-                    
+
                     this.lastMigratedUserId = session.user.id;
                 } finally {
                     this.migrationInProgress = false;
@@ -188,26 +188,41 @@ class RxDBDataLayerImpl implements DataLayer {
 
         const existingBook = await db.books.findOne(sanitizedBookData.id).exec();
 
-        const dataToSave = {
-            ...sanitizedBookData,
-            user_id: userId,
-            _modified: Date.now(),
-            _deleted: false,
-            // Set added_date only for new books, preserve for existing
-            added_date: existingBook ? existingBook.added_date : (bookData.added_date || Date.now()),
-            // Only save cover_url if it's an external URL, not base64
-            cover_url: cover_url && !cover_url.startsWith('data:') ? cover_url : undefined,
-            // Ensure progress fields are preserved or defaulted
-            part_index: bookData.part_index ?? 0,
-            chapter_index: bookData.chapter_index ?? 0,
-            last_location_cfi: bookData.last_location_cfi ?? undefined
-        } as RxBookDocumentType;
-
         if (existingBook) {
-            await existingBook.patch(dataToSave);
+            // Use atomicPatch to avoid CONFLICT errors
+            // Only update fields that are actually provided
+            const updates: any = {
+                _modified: Date.now()
+            };
+
+            // Add fields that are explicitly provided
+            if (sanitizedBookData.title !== undefined) updates.title = sanitizedBookData.title;
+            if (sanitizedBookData.author !== undefined) updates.author = sanitizedBookData.author;
+            if (sanitizedBookData.type !== undefined) updates.type = sanitizedBookData.type;
+            if (cover_url && !cover_url.startsWith('data:')) updates.cover_url = cover_url;
+            if (bookData.part_index !== undefined) updates.part_index = bookData.part_index;
+            if (bookData.chapter_index !== undefined) updates.chapter_index = bookData.chapter_index;
+            if (bookData.last_location_cfi !== undefined) updates.last_location_cfi = bookData.last_location_cfi;
+            if (bookData.total_pages !== undefined) updates.total_pages = bookData.total_pages;
+            if (bookData.current_page !== undefined) updates.current_page = bookData.current_page;
+            if (bookData.published_date !== undefined) updates.published_date = bookData.published_date;
+
+            await existingBook.incrementalPatch(updates);
             console.log('[DataLayer] Book updated:', { id: existingBook.id, title: existingBook.title, added_date: existingBook.added_date });
             return existingBook.toJSON();
         } else {
+            const dataToSave = {
+                ...sanitizedBookData,
+                user_id: userId,
+                _modified: Date.now(),
+                _deleted: false,
+                added_date: bookData.added_date || Date.now(),
+                cover_url: cover_url && !cover_url.startsWith('data:') ? cover_url : undefined,
+                part_index: bookData.part_index ?? 0,
+                chapter_index: bookData.chapter_index ?? 0,
+                last_location_cfi: bookData.last_location_cfi ?? undefined
+            } as RxBookDocumentType;
+
             const newBook = await db.books.insert(dataToSave);
             console.log('[DataLayer] ✅ NEW BOOK CREATED:', {
                 id: newBook.id,
@@ -226,8 +241,8 @@ class RxDBDataLayerImpl implements DataLayer {
         const book = await db.books.findOne(id).exec();
 
         if (book) {
-            // Soft delete
-            await book.patch({
+            // Soft delete using incrementalPatch to avoid conflicts
+            await book.incrementalPatch({
                 _deleted: true,
                 _modified: Date.now()
             });
@@ -246,18 +261,24 @@ class RxDBDataLayerImpl implements DataLayer {
         const db = await getDatabase();
         const userId = await this.getUserId();
 
-        const dataToSave = {
-            ...settingsData,
-            user_id: userId,
-            _modified: Date.now()
-        } as RxSettingsDocumentType;
-
         const existingSettings = await db.settings.findOne(userId).exec();
 
         if (existingSettings) {
-            await existingSettings.patch(dataToSave);
+            // Use atomicPatch with only the fields that changed
+            const updates: any = { _modified: Date.now() };
+            if (settingsData.daily_goal_minutes !== undefined) updates.daily_goal_minutes = settingsData.daily_goal_minutes;
+            if (settingsData.theme !== undefined) updates.theme = settingsData.theme;
+            if (settingsData.notification_enabled !== undefined) updates.notification_enabled = settingsData.notification_enabled;
+
+            await existingSettings.incrementalPatch(updates);
             return existingSettings.toJSON();
         } else {
+            const dataToSave = {
+                ...settingsData,
+                user_id: userId,
+                _modified: Date.now()
+            } as RxSettingsDocumentType;
+
             const newSettings = await db.settings.insert(dataToSave);
             return newSettings.toJSON();
         }
@@ -293,19 +314,45 @@ class RxDBDataLayerImpl implements DataLayer {
 
         const existingEpub = await db.user_epubs.findOne(epubData.id!).exec();
 
-        const dataToSave = {
-            ...epubData,
-            user_id: userId,
-            _modified: Date.now(),
-            _deleted: false,
-            // Set added_date only for new EPUBs, preserve for existing
-            added_date: existingEpub ? existingEpub.added_date : (epubData.added_date || Date.now())
-        } as import('@/lib/database/schema').RxUserEpubDocumentType;
-
         if (existingEpub) {
-            await existingEpub.patch(dataToSave);
+            // Use atomicPatch to avoid CONFLICT errors during replication
+            // Only update fields that are explicitly provided
+            const updates: any = {
+                _modified: Date.now()
+            };
+
+            if (epubData.title !== undefined) updates.title = epubData.title;
+            if (epubData.author !== undefined) updates.author = epubData.author;
+            if (epubData.file_hash !== undefined) updates.file_hash = epubData.file_hash;
+            if (epubData.file_size !== undefined) updates.file_size = epubData.file_size;
+            if (epubData.percentage !== undefined) updates.percentage = epubData.percentage;
+            if (epubData.last_location_cfi !== undefined) updates.last_location_cfi = epubData.last_location_cfi;
+
+            try {
+                await existingEpub.incrementalPatch(updates);
+            } catch (err: any) {
+                // Retry once if we get a CONFLICT (rare with atomicPatch, but possible)
+                if (err?.code === 'CONFLICT' || err?.rxdb?.code === 'CONFLICT') {
+                    console.log('[DataLayer] CONFLICT detected, retrying saveUserEpub...');
+                    const fresh = await db.user_epubs.findOne(epubData.id!).exec();
+                    if (fresh) {
+                        await fresh.incrementalPatch(updates);
+                    }
+                } else {
+                    throw err;
+                }
+            }
+
             return existingEpub.toJSON();
         } else {
+            const dataToSave = {
+                ...epubData,
+                user_id: userId,
+                _modified: Date.now(),
+                _deleted: false,
+                added_date: epubData.added_date || Date.now()
+            } as import('@/lib/database/schema').RxUserEpubDocumentType;
+
             const newEpub = await db.user_epubs.insert(dataToSave);
             return newEpub.toJSON();
         }
@@ -316,8 +363,8 @@ class RxDBDataLayerImpl implements DataLayer {
         const epub = await db.user_epubs.findOne(id).exec();
 
         if (epub) {
-            // Soft delete
-            await epub.patch({
+            // Soft delete using incrementalPatch to avoid conflicts
+            await epub.incrementalPatch({
                 _deleted: true,
                 _modified: Date.now()
             });
