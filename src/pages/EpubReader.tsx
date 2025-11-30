@@ -52,6 +52,8 @@ const EpubReader = () => {
   const { toast } = useToast();
   const viewerRef = useRef<HTMLDivElement | null>(null);
   const renditionRef = useRef<Rendition | null>(null);
+  const settingsPanelRef = useRef<HTMLDivElement | null>(null);
+  const settingsOpenRef = useRef<boolean>(false);
   const [err, setErr] = useState<string | null>(null);
   const [containerWidth, setContainerWidth] = useState<number>(0);
   const [reloadKey, setReloadKey] = useState(0);
@@ -127,6 +129,27 @@ const EpubReader = () => {
     try {
       localStorage.setItem("epubReaderSettingsOpen", JSON.stringify(settingsOpen));
     } catch { }
+  }, [settingsOpen]);
+
+  // Close settings when clicking outside panel
+  useEffect(() => {
+    if (!settingsOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const panel = settingsPanelRef.current;
+      if (!panel) return;
+      const target = event.target as Node | null;
+      if (target && !panel.contains(target)) {
+        setSettingsOpen(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown, true);
+    return () => document.removeEventListener('pointerdown', handlePointerDown, true);
+  }, [settingsOpen]);
+
+  useEffect(() => {
+    settingsOpenRef.current = settingsOpen;
   }, [settingsOpen]);
 
   // Persist reading preferences (both global last-used and per-book)
@@ -516,6 +539,9 @@ const EpubReader = () => {
 
                 // Click/Tap detection for menu toggle
                 const onClick = (e: Event) => {
+                  if (settingsOpenRef.current) {
+                    setSettingsOpen(false);
+                  }
                   // Only on mobile
                   if (window.innerWidth < 1024) {
                     // Toggle logic
@@ -803,7 +829,7 @@ const EpubReader = () => {
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent className="absolute right-4 top-16 z-50 max-h-[calc(100vh-8rem)] overflow-y-auto">
-                <div className="bg-popover border border-border rounded-lg p-4 shadow-xl min-w-[280px] lg:min-w-[320px] space-y-4">
+                <div ref={settingsPanelRef} className="bg-popover border border-border rounded-lg p-4 shadow-xl min-w-[280px] lg:min-w-[320px] space-y-4">
                   {/* Progress Indicator */}
                   <div className="pb-3 border-b border-border">
                     <p className="text-xs font-medium text-muted-foreground mb-2">Progresso de Leitura</p>
