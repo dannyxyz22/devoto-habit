@@ -98,6 +98,8 @@ export class ReplicationManager {
                         if (!doc.author) delete doc.author;
                         if (!doc.file_size) delete doc.file_size;
                         if (!doc.cover_url) delete doc.cover_url;
+                        if (!doc.percentage) delete doc.percentage;
+                        if (!doc.last_location_cfi) delete doc.last_location_cfi;
                         return doc;
                     }
                 },
@@ -116,19 +118,61 @@ export class ReplicationManager {
 
             this.replicationStates = [booksReplication, userEpubsReplication, settingsReplication];
 
-            // Log errors
+            // Validate all replication states were created successfully
+            const invalidStates = this.replicationStates.filter(s => !s);
+            if (invalidStates.length > 0) {
+                throw new Error(`Failed to create ${invalidStates.length} replication state(s)`);
+            }
+
+            // Log errors and activity
             this.replicationStates.forEach((state, index) => {
                 const names = ['Books', 'User EPUBs', 'Settings'];
                 const name = names[index] || 'Unknown';
-                state.error$.subscribe(err => {
-                    console.error(`[${name} Replication] Error:`, err);
-                });
+                
+                if (!state) {
+                    console.error(`[${name} Replication] State is null/undefined`);
+                    return;
+                }
+
+                // Subscribe to observables if they exist
+                try {
+                    if (state.error$) {
+                        state.error$.subscribe(err => {
+                            console.error(`[${name} Replication] Error:`, err);
+                        });
+                    }
+
+                    if (state.received$) {
+                        state.received$.subscribe(docs => {
+                            if (docs.length > 0) {
+                                console.log(`[${name} Replication] Pulled ${docs.length} document(s)`, docs.map((d: any) => d.id));
+                            }
+                        });
+                    }
+
+                    if (state.send$) {
+                        state.send$.subscribe(docs => {
+                            if (docs.length > 0) {
+                                console.log(`[${name} Replication] Pushed ${docs.length} document(s)`, docs.map((d: any) => d.id));
+                            }
+                        });
+                    }
+                } catch (err) {
+                    console.warn(`[${name} Replication] Failed to subscribe to observables:`, err);
+                }
             });
 
             // Wait for initial sync
             console.log('ReplicationManager: Waiting for initial replication...');
             await Promise.all(this.replicationStates.map(s => s.awaitInitialReplication()));
             console.log('ReplicationManager: Initial replication complete ✓');
+
+            // Log replication states
+            this.replicationStates.forEach((state, index) => {
+                const names = ['Books', 'User EPUBs', 'Settings'];
+                const name = names[index] || 'Unknown';
+                console.log(`[${name} Replication] Active:`, state.active, 'Live:', (state as any).live);
+            });
 
             // After initial replication, proactively reconcile user_epubs:
             // Ensure local docs exist in Supabase to avoid RC_PUSH 'doc not found'
@@ -143,9 +187,16 @@ export class ReplicationManager {
     async stopReplication() {
         if (this.replicationStates.length > 0) {
             console.log('ReplicationManager: Stopping replication...');
-            await Promise.all(this.replicationStates.map(state => state.cancel()));
-            this.replicationStates = [];
-            console.log('ReplicationManager: Replication stopped');
+            try {
+                // Filter out any null/undefined states before canceling
+                const validStates = this.replicationStates.filter(s => s && typeof s.cancel === 'function');
+                await Promise.all(validStates.map(state => state.cancel()));
+            } catch (error) {
+                console.warn('ReplicationManager: Error during stop:', error);
+            } finally {
+                this.replicationStates = [];
+                console.log('ReplicationManager: Replication stopped');
+            }
         }
     }
 

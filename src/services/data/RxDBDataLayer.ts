@@ -7,6 +7,8 @@ import { ensureStaticBooks } from '@/lib/database/staticBooksInit';
 
 class RxDBDataLayerImpl implements DataLayer {
     private static instance: RxDBDataLayerImpl;
+    private migrationInProgress = false;
+    private lastMigratedUserId: string | null = null;
 
     private constructor() {
         this.initializeAuthListener();
@@ -22,16 +24,30 @@ class RxDBDataLayerImpl implements DataLayer {
     private initializeAuthListener() {
         authService.onAuthStateChange(async (event, session) => {
             if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
-                console.log(`DataLayer: ${event} - migrating local data and starting replication...`);
-                await this.migrateLocalUserData(session.user.id);
-                // Ensure static books have correct user_id after login
-                const db = await getDatabase();
-                await ensureStaticBooks(db, session.user.id);
-                // Reconcile user_epubs to ensure missing rows are upserted before replication
-                await replicationManager.reconcileUserEpubs();
-                await replicationManager.startReplication();
+                // Prevent duplicate migrations for same user
+                if (this.migrationInProgress || this.lastMigratedUserId === session.user.id) {
+                    console.log(`DataLayer: ${event} - skipping duplicate migration for user ${session.user.id}`);
+                    return;
+                }
+
+                this.migrationInProgress = true;
+                try {
+                    console.log(`DataLayer: ${event} - migrating local data and starting replication...`);
+                    await this.migrateLocalUserData(session.user.id);
+                    // Ensure static books have correct user_id after login
+                    const db = await getDatabase();
+                    await ensureStaticBooks(db, session.user.id);
+                    // Reconcile user_epubs to ensure missing rows are upserted before replication
+                    await replicationManager.reconcileUserEpubs();
+                    await replicationManager.startReplication();
+                    
+                    this.lastMigratedUserId = session.user.id;
+                } finally {
+                    this.migrationInProgress = false;
+                }
             } else if (event === 'SIGNED_OUT') {
                 console.log('DataLayer: User signed out, stopping replication...');
+                this.lastMigratedUserId = null;
                 await replicationManager.stopReplication();
             }
         });
@@ -59,14 +75,23 @@ class RxDBDataLayerImpl implements DataLayer {
                 // Update each book's user_id to the authenticated user
                 // Preserve added_date during migration
                 for (const book of localBooks) {
-                    await book.update({
-                        $set: {
-                            user_id: userId,
-                            _modified: Date.now(),
-                            // Preserve added_date if it exists, otherwise use _modified as fallback
-                            added_date: book.added_date || book._modified
+                    try {
+                        await book.update({
+                            $set: {
+                                user_id: userId,
+                                _modified: Date.now(),
+                                // Preserve added_date if it exists, otherwise use _modified as fallback
+                                added_date: book.added_date || book._modified
+                            }
+                        });
+                    } catch (err: any) {
+                        // Ignore CONFLICT errors (already migrated by concurrent process)
+                        if (err?.code === 'CONFLICT') {
+                            console.log(`DataLayer: Book ${book.id} already migrated (conflict ignored)`);
+                        } else {
+                            throw err;
                         }
-                    });
+                    }
                 }
 
                 console.log('DataLayer: Books migration complete');
@@ -87,14 +112,23 @@ class RxDBDataLayerImpl implements DataLayer {
 
                 // Update each EPUB's user_id to the authenticated user
                 for (const epub of localEpubs) {
-                    await epub.update({
-                        $set: {
-                            user_id: userId,
-                            _modified: Date.now(),
-                            // Preserve added_date if it exists, otherwise use _modified as fallback
-                            added_date: epub.added_date || epub._modified
+                    try {
+                        await epub.update({
+                            $set: {
+                                user_id: userId,
+                                _modified: Date.now(),
+                                // Preserve added_date if it exists, otherwise use _modified as fallback
+                                added_date: epub.added_date || epub._modified
+                            }
+                        });
+                    } catch (err: any) {
+                        // Ignore CONFLICT errors (already migrated by concurrent process)
+                        if (err?.code === 'CONFLICT') {
+                            console.log(`DataLayer: EPUB ${epub.id} already migrated (conflict ignored)`);
+                        } else {
+                            throw err;
                         }
-                    });
+                    }
                 }
 
                 console.log('DataLayer: EPUBs migration complete');

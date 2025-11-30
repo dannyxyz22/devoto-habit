@@ -4,6 +4,16 @@ import './index.css'
 import { HelmetProvider } from 'react-helmet-async'
 import { Capacitor } from '@capacitor/core'
 import { Preferences } from '@capacitor/preferences'
+import { dataLayer } from './services/data/RxDBDataLayer'
+import { replicationManager } from './lib/database/replication'
+import { getDatabase } from './lib/database/db'
+
+// Expose debug utilities to window for troubleshooting
+if (typeof window !== 'undefined') {
+  (window as any).dataLayer = dataLayer;
+  (window as any).replicationManager = replicationManager;
+  (window as any).getDatabase = getDatabase;
+}
 
 createRoot(document.getElementById("root")!).render(
   <HelmetProvider>
