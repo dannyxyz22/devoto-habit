@@ -281,3 +281,18 @@ O Modo Debug está oculto por padrão. Para alterná-lo:
 -   O estado de visibilidade é armazenado no `localStorage` sob a chave `showDebugButton` ('true' ou 'false').
 -   O botão "Debug" é definido em `index.html` mas fica oculto via CSS (`display: none`) a menos que a flag esteja definida.
 -   A lógica do gatilho secreto é implementada em `src/components/app/Hero.tsx`.
+
+## Sincronização e Arquitetura Offline
+
+O projeto utiliza **RxDB** com replicação para **Supabase** para garantir que os dados estejam sempre disponíveis offline e sincronizados entre dispositivos.
+
+Para entender como funciona a resolução de conflitos, o sistema de revisões (`_rev`) e como evitar erros de sincronização em ambientes concorrentes, consulte a documentação detalhada:
+
+📄 **[Arquitetura de Sincronização Multi-Dispositivo](./SYNC_ARCHITECTURE.md)**
+
+Tópicos cobertos:
+- Conceitos de `_rev` e detecção de conflitos
+- Diferença entre `patch()` e `incrementalPatch()`
+- Fluxo de sincronização passo-a-passo
+- Estratégias de retry e boas práticas
+
