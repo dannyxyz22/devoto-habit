@@ -252,6 +252,23 @@ const EpubReader = () => {
                           _modified: Date.now()
                         });
                         console.log('[EpubReader] Progress synced to books:', { id: epubId, percent, cfi });
+                      } else {
+                        // If not in DB, check if it is a static book and create it
+                        const staticBook = BOOKS.find(b => b.id === epubId);
+                        if (staticBook) {
+                          console.log('[EpubReader] Static book not in DB, creating...', staticBook.title);
+                          await dataLayer.saveBook({
+                            id: staticBook.id,
+                            title: staticBook.title,
+                            author: staticBook.author,
+                            type: 'epub',
+                            percentage: percent,
+                            last_location_cfi: cfi,
+                            cover_url: staticBook.coverImage,
+                            added_date: Date.now(),
+                            _modified: Date.now()
+                          });
+                        }
                       }
                     }
                   } catch (error) {

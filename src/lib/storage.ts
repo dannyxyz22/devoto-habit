@@ -97,10 +97,7 @@ export const addReadingMinutes = (ms: number) => {
   return s;
 };
 
-// Reminder configuration (simple local reminder)
-export type Reminder = { time: string | null };
-export const getReminder = (): Reminder => storage.get<Reminder>("reminder", { time: null });
-export const setReminder = (time: string | null) => storage.set("reminder", { time });
+
 
 export const hasReadToday = () => {
   const s = getStreak();

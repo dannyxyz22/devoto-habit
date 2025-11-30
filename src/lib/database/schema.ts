@@ -59,6 +59,9 @@ export const bookSchemaLiteral = {
         added_date: {
             type: 'number'
         },
+        published_date: {
+            type: 'string'
+        },
         _modified: {
             type: 'number'
         },
@@ -150,6 +153,9 @@ export const settingsSchemaLiteral = {
         },
         last_active_book_id: {
             type: 'string'
+        },
+        daily_goal_minutes: {
+            type: 'number'
         },
         _modified: {
             type: 'number'

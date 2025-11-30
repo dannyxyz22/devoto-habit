@@ -206,6 +206,7 @@ class RxDBDataLayerImpl implements DataLayer {
             if (bookData.total_pages !== undefined) updates.total_pages = bookData.total_pages;
             if (bookData.current_page !== undefined) updates.current_page = bookData.current_page;
             if (bookData.published_date !== undefined) updates.published_date = bookData.published_date;
+            if (bookData.percentage !== undefined) updates.percentage = bookData.percentage;
 
             await existingBook.incrementalPatch(updates);
             console.log('[DataLayer] Book updated:', { id: existingBook.id, title: existingBook.title, added_date: existingBook.added_date });
@@ -268,7 +269,6 @@ class RxDBDataLayerImpl implements DataLayer {
             const updates: any = { _modified: Date.now() };
             if (settingsData.daily_goal_minutes !== undefined) updates.daily_goal_minutes = settingsData.daily_goal_minutes;
             if (settingsData.theme !== undefined) updates.theme = settingsData.theme;
-            if (settingsData.notification_enabled !== undefined) updates.notification_enabled = settingsData.notification_enabled;
 
             await existingSettings.incrementalPatch(updates);
             return existingSettings.toJSON();
