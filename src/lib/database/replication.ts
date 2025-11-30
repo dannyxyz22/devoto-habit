@@ -128,7 +128,7 @@ export class ReplicationManager {
             this.replicationStates.forEach((state, index) => {
                 const names = ['Books', 'User EPUBs', 'Settings'];
                 const name = names[index] || 'Unknown';
-                
+
                 if (!state) {
                     console.error(`[${name} Replication] State is null/undefined`);
                     return;
@@ -150,8 +150,8 @@ export class ReplicationManager {
                         });
                     }
 
-                    if (state.send$) {
-                        state.send$.subscribe(docs => {
+                    if (state.sent$) {
+                        state.sent$.subscribe(docs => {
                             if (docs.length > 0) {
                                 console.log(`[${name} Replication] Pushed ${docs.length} document(s)`, docs.map((d: any) => d.id));
                             }
