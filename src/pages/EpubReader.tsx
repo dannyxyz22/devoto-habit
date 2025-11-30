@@ -227,29 +227,22 @@ const EpubReader = () => {
                 setProgress(epubId, { partIndex: 0, chapterIndex: 0, percent });
 
                 // Sync with DataLayer (including CFI)
-                // Check if it's a user EPUB or a standard book
                 (async () => {
                   try {
-                    const db = await import('@/lib/database/db').then(m => m.getDatabase());
-                    const dbInstance = await db;
-                    
-                    // Try to find in user_epubs first
-                    const userEpub = await dbInstance.user_epubs.findOne({
-                      selector: { id: epubId }
-                    }).exec();
+                    // Try to find in user_epubs first using DataLayer
+                    const userEpub = await dataLayer.getUserEpub(epubId);
 
                     if (userEpub) {
-                      // Update user_epub progress
-                      await userEpub.update({
-                        $set: {
-                          percentage: percent,
-                          last_location_cfi: cfi,
-                          _modified: Date.now()
-                        }
+                      // Update user_epub progress via DataLayer
+                      await dataLayer.saveUserEpub({
+                        ...userEpub,
+                        percentage: percent,
+                        last_location_cfi: cfi,
+                        _modified: Date.now()
                       });
                       console.log('[EpubReader] Progress synced to user_epubs:', { id: epubId, percent, cfi });
                     } else {
-                      // Fallback to books collection
+                      // Fallback to books collection (for static EPUBs)
                       const book = await dataLayer.getBook(epubId);
                       if (book) {
                         await dataLayer.saveBook({
@@ -386,7 +379,7 @@ const EpubReader = () => {
                 try {
                   const db = await import('@/lib/database/db').then(m => m.getDatabase());
                   const dbInstance = await db;
-                  
+
                   // Check user_epubs first
                   const userEpub = await dbInstance.user_epubs.findOne({
                     selector: { id: epubId }
