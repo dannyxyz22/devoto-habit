@@ -734,8 +734,49 @@ const EpubReader = () => {
     return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
   }, []);
 
+  // Reflow EPUB after fullscreen toggles to avoid cropped text
+  useEffect(() => {
+    const rendition = renditionRef.current;
+    if (!rendition) return;
+
+    let cancelled = false;
+
+    const refreshLayout = () => {
+      if (cancelled) return;
+      try {
+        const viewer = viewerRef.current;
+        if (viewer) {
+          rendition.resize?.(viewer.clientWidth, viewer.clientHeight);
+        }
+        const currentLocation = rendition.currentLocation?.() as any;
+        const currentCfi = currentLocation?.start?.cfi;
+        if (currentCfi) {
+          rendition.display(currentCfi);
+        }
+      } catch (err) {
+        console.warn('[Fullscreen] Failed to refresh layout:', err);
+      }
+    };
+
+    refreshLayout();
+    const timeoutId = window.setTimeout(refreshLayout, 250);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
+  }, [isFullscreen]);
+
+  const fullscreenOuterShell = isFullscreen
+    ? "relative w-full"
+    : "relative w-full lg:bg-gradient-to-b lg:from-muted lg:to-background lg:rounded-2xl lg:p-6 lg:shadow-2xl";
+
+  const fullscreenInnerShell = isFullscreen
+    ? "relative bg-card h-[100dvh]"
+    : "relative bg-card lg:rounded-lg lg:shadow-[0_0_60px_rgba(0,0,0,0.1)] h-screen lg:h-[85vh]";
+
   return (
-    <main className={`h-screen bg-background flex flex-col items-center justify-center ${isFullscreen ? '' : 'lg:py-8 lg:px-4'}`}>
+    <main className={`min-h-[100dvh] w-full bg-background flex flex-col items-center justify-center ${isFullscreen ? '' : 'lg:py-8 lg:px-4'}`}>
       <SEO title={`EPUB — ${epubId}`} description="Leitor EPUB" canonical={`/epub/${epubId}`} />
 
       {/* Header - Hidden on mobile unless showMobileMenu is true */}
@@ -967,10 +1008,9 @@ const EpubReader = () => {
         </Button>
 
         {/* Book Pages - Full width on mobile, bordered on desktop */}
-        <div className={`relative w-full lg:bg-gradient-to-b lg:from-muted lg:to-background lg:rounded-2xl lg:p-6 lg:shadow-2xl ${isFullscreen ? 'h-screen' : ''}`}>
+        <div className={fullscreenOuterShell}>
           <div
-            className={`relative bg-card lg:rounded-lg lg:shadow-[0_0_60px_rgba(0,0,0,0.1)] overflow-hidden h-screen ${isFullscreen ? '' : 'lg:h-[85vh]'}`}
-            style={isFullscreen ? { height: 'calc(100vh - 3rem)' } : undefined}
+            className={`${fullscreenInnerShell} overflow-hidden`}
             onClick={() => {
               // Toggle mobile menu and fullscreen on tap (mobile only)
               if (window.innerWidth < 1024) {
