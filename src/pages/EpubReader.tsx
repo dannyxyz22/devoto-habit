@@ -805,14 +805,14 @@ const EpubReader = () => {
     : "relative bg-card lg:rounded-lg lg:shadow-[0_0_60px_rgba(0,0,0,0.1)] h-screen lg:h-[85vh]";
 
   return (
-    <main className={`min-h-[100dvh] w-full bg-background flex flex-col items-center justify-center ${isFullscreen ? '' : 'lg:py-8 lg:px-4'}`}>
+    <main className={`min-h-[100dvh] w-full bg-background flex flex-col items-center justify-center ${isFullscreen ? '' : 'lg:py-2 lg:px-2'}`}>
       <SEO title={`EPUB — ${epubId}`} description="Leitor EPUB" canonical={`/epub/${epubId}`} />
 
       {/* Header - Hidden on mobile unless showMobileMenu is true */}
       <div
         className={`
-          w-full max-w-7xl mb-6 flex items-center justify-between
-          transition-all duration-300 fixed top-0 left-0 right-0 p-4 z-50 bg-white/90 backdrop-blur lg:static lg:bg-transparent lg:p-0
+          w-full max-w-7xl lg:mb-2 flex items-center justify-between
+          transition-all duration-300 fixed top-0 left-0 right-0 px-2 py-1.5 z-50 bg-white/90 backdrop-blur lg:static lg:bg-transparent lg:p-0
           lg:opacity-100 lg:translate-y-0
           ${showMobileMenu ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-full pointer-events-none'}
           ${isFullscreen ? 'hidden' : ''}
@@ -827,8 +827,8 @@ const EpubReader = () => {
           <div className={`transition-opacity duration-300 ${isFullscreen ? 'lg:opacity-0 lg:pointer-events-none' : 'lg:opacity-100'}`}>
             <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen}>
               <CollapsibleTrigger asChild>
-                <Button variant="ghost" size="icon" className="text-foreground lg:text-muted-foreground hover:text-primary lg:hover:text-foreground lg:hover:bg-accent">
-                  <Settings className="h-5 w-5" />
+                <Button variant="ghost" size="icon" className="h-9 w-9 text-foreground lg:text-muted-foreground hover:text-primary lg:hover:text-foreground lg:hover:bg-accent">
+                  <Settings className="h-4 w-4" />
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent className="absolute right-4 top-16 z-50 max-h-[calc(100vh-8rem)] overflow-y-auto">
@@ -1005,7 +1005,7 @@ const EpubReader = () => {
                 }
               }
             }}
-            className="hidden lg:flex text-muted-foreground hover:text-foreground hover:bg-accent"
+            className="hidden lg:flex h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-accent"
             title={isFullscreen ? "Sair da tela cheia" : "Tela cheia"}
           >
             {isFullscreen ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
