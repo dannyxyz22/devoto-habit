@@ -67,14 +67,35 @@ const EpubReader = () => {
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
   // Reading preferences state
+  // Track if a rendition has been initialized so we can re-apply preferences
+  const [renditionReady, setRenditionReady] = useState<boolean>(false);
+
   const [preferences, setPreferences] = useState<ReadingPreferences>(() => {
+    // Initial load uses global key only; epubId-specific load happens in effect below
     try {
-      const saved = localStorage.getItem("epubReadingPreferences");
-      return saved ? { ...DEFAULT_PREFERENCES, ...JSON.parse(saved) } : DEFAULT_PREFERENCES;
+      const globalRaw = localStorage.getItem("epubReadingPreferences");
+      return globalRaw ? { ...DEFAULT_PREFERENCES, ...JSON.parse(globalRaw) } : DEFAULT_PREFERENCES;
     } catch {
       return DEFAULT_PREFERENCES;
     }
   });
+
+  // Reload preferences when book changes (supports per-book storage with fallback to global)
+  useEffect(() => {
+    if (!epubId) return;
+    try {
+      const globalRaw = localStorage.getItem("epubReadingPreferences");
+      const perBookRaw = localStorage.getItem(`epubReadingPreferences:${epubId}`);
+      const merged = {
+        ...DEFAULT_PREFERENCES,
+        ...(globalRaw ? JSON.parse(globalRaw) : {}),
+        ...(perBookRaw ? JSON.parse(perBookRaw) : {}),
+      } as ReadingPreferences;
+      setPreferences(merged);
+    } catch {
+      setPreferences(DEFAULT_PREFERENCES);
+    }
+  }, [epubId]);
 
   // Reading progress state
   const [readingProgress, setReadingProgress] = useState<{
@@ -101,17 +122,20 @@ const EpubReader = () => {
     } catch { }
   }, [settingsOpen]);
 
-  // Persist reading preferences
+  // Persist reading preferences (both global last-used and per-book)
   useEffect(() => {
     try {
       localStorage.setItem("epubReadingPreferences", JSON.stringify(preferences));
+      if (epubId) {
+        localStorage.setItem(`epubReadingPreferences:${epubId}`, JSON.stringify(preferences));
+      }
     } catch { }
-  }, [preferences]);
+  }, [preferences, epubId]);
 
-  // Apply reading preferences to rendition
+  // Apply reading preferences to rendition (runs whenever preferences or renditionReady change)
   useEffect(() => {
     const rendition = renditionRef.current;
-    if (!rendition) return;
+    if (!rendition || !renditionReady) return;
 
     // Wait for next frame to ensure rendition is ready
     requestAnimationFrame(() => {
@@ -165,33 +189,18 @@ const EpubReader = () => {
         themes.override("max-width", widthMap[preferences.contentWidth]);
         themes.override("margin", "0 auto");
 
-        // Force re-render to apply changes immediately, using percentage to maintain relative position
+        // Re-render to apply changes immediately, keeping exact CFI position
         try {
           const currentLocation = rendition.currentLocation() as any;
-          if (currentLocation && currentLocation.start) {
-            const currentCfi = currentLocation.start.cfi;
-
-            // Get current percentage position
-            const percentage = (rendition as any).book?.locations?.percentageFromCfi?.(currentCfi);
-
-            setTimeout(() => {
-              if (percentage !== undefined && percentage !== null) {
-                // Convert percentage back to CFI with new layout
-                const newCfi = (rendition as any).book?.locations?.cfiFromPercentage?.(percentage);
-                if (newCfi) {
-                  rendition.display(newCfi);
-                } else {
-                  // Fallback to original CFI if conversion fails
-                  rendition.display(currentCfi);
-                }
-              } else {
-                // Fallback to original CFI if percentage not available
-                rendition.display(currentCfi);
-              }
-            }, 50);
+          const currentCfi = currentLocation?.start?.cfi;
+          if (currentCfi) {
+            // Wait for styles to propagate, then redisplay at same CFI
+            requestAnimationFrame(() => {
+              rendition.display(currentCfi);
+            });
           }
         } catch (err) {
-          console.warn('[Preferences] Could not force re-render:', err);
+          console.warn('[Preferences] Reaplicar CFI falhou:', err);
         }
 
         console.log('[Preferences] Applied:', preferences);
@@ -199,7 +208,7 @@ const EpubReader = () => {
         console.error("[Preferences] Error applying:", error);
       }
     });
-  }, [preferences]);
+  }, [preferences, renditionReady, epubId]);
 
   // Monitor container width with ResizeObserver (debounced to avoid flickering)
   useEffect(() => {
@@ -335,6 +344,7 @@ const EpubReader = () => {
         const book = ePub(ab);
         const rendition = book.renderTo(container, { width: "100%", height: "100%", spread: effectiveSpread as any });
         renditionRef.current = rendition;
+        setRenditionReady(true); // signal that rendition has been created
         // Apply theme initially and on each render
         applyEpubTheme();
         rendition.on('rendered', () => applyEpubTheme());
