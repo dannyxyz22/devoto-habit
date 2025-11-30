@@ -83,6 +83,7 @@ const EpubReader = () => {
   });
 
   // Resolve the effective theme based on preferences.theme and system preference
+  // When resolvedTheme is undefined (initial render), defaults to 'light'
   const effectiveTheme = useMemo(() => {
     if (preferences.theme === 'system') {
       return resolvedTheme === 'dark' ? 'dark' : 'light';
