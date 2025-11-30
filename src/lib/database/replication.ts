@@ -171,7 +171,7 @@ export class ReplicationManager {
             this.replicationStates.forEach((state, index) => {
                 const names = ['Books', 'User EPUBs', 'Settings'];
                 const name = names[index] || 'Unknown';
-                console.log(`[${name} Replication] Active:`, state.active, 'Live:', (state as any).live);
+                console.log(`[${name} Replication] Active:`, state.active$, 'Live:', (state as any).live);
             });
 
             // After initial replication, proactively reconcile user_epubs:
