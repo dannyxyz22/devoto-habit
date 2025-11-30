@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { BackLink } from "@/components/app/BackLink";
 import { Button } from "@/components/ui/button";
@@ -74,6 +74,31 @@ const EpubReader = () => {
   });
   const [showMobileMenu, setShowMobileMenu] = useState<boolean>(true);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+      return;
+    }
+
+    const rendition = renditionRef.current;
+    if (!rendition) return;
+
+    switch (e.key) {
+      case 'ArrowLeft':
+      case 'PageUp':
+        e.preventDefault();
+        rendition.prev();
+        setTimeout(() => document.body.focus(), 100);
+        break;
+      case 'ArrowRight':
+      case 'PageDown':
+      case ' ':
+        e.preventDefault();
+        rendition.next();
+        setTimeout(() => document.body.focus(), 100);
+        break;
+    }
+  }, []);
 
   // Reading preferences state
   // Track if a rendition has been initialized so we can re-apply preferences
@@ -561,9 +586,13 @@ const EpubReader = () => {
                   }
                 };
 
+                const onKeyDown = handleKeyDown as any;
+
                 doc.addEventListener('touchstart', onTouchStart, { passive: true });
                 doc.addEventListener('touchend', onTouchEnd, { passive: true });
                 doc.addEventListener('click', onClick);
+                doc.addEventListener('keydown', onKeyDown);
+                contents?.window?.addEventListener('keydown', onKeyDown);
 
                 // Clean up when section is unloaded
                 contents?.window?.addEventListener('unload', () => {
@@ -571,6 +600,8 @@ const EpubReader = () => {
                     doc.removeEventListener('touchstart', onTouchStart as any);
                     doc.removeEventListener('touchend', onTouchEnd as any);
                     doc.removeEventListener('click', onClick);
+                    doc.removeEventListener('keydown', onKeyDown);
+                    contents?.window?.removeEventListener('keydown', onKeyDown);
                   } catch { }
                 });
               } catch { }
@@ -714,37 +745,9 @@ const EpubReader = () => {
 
   // Keyboard shortcuts for navigation
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if user is typing in an input/textarea
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-        return;
-      }
-
-      const rendition = renditionRef.current;
-      if (!rendition) return;
-
-      switch (e.key) {
-        case 'ArrowLeft':
-        case 'PageUp':
-          e.preventDefault();
-          rendition.prev();
-          // Refocus to ensure keyboard continues working
-          setTimeout(() => document.body.focus(), 100);
-          break;
-        case 'ArrowRight':
-        case 'PageDown':
-        case ' ': // Space bar
-          e.preventDefault();
-          rendition.next();
-          // Refocus to ensure keyboard continues working
-          setTimeout(() => document.body.focus(), 100);
-          break;
-      }
-    };
-
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [handleKeyDown]);
 
   // Sync menu state with fullscreen changes
   useEffect(() => {
