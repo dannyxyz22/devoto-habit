@@ -22,7 +22,7 @@ import { Slider } from "@/components/ui/slider";
 
 type LayoutMode = "auto" | "single" | "double";
 type FontFamily = "serif" | "sans" | "dyslexic";
-type ThemeMode = "light" | "dark" | "sepia";
+type ThemeMode = "system" | "light" | "dark" | "sepia";
 type ContentWidth = "narrow" | "medium" | "wide";
 
 interface ReadingPreferences {
@@ -37,7 +37,7 @@ const DEFAULT_PREFERENCES: ReadingPreferences = {
   fontSize: 100,
   fontFamily: "serif",
   lineHeight: 1.6,
-  theme: "light",
+  theme: "system",
   contentWidth: "medium",
 };
 
@@ -48,6 +48,7 @@ const EpubReader = () => {
   const renditionRef = useRef<Rendition | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [containerWidth, setContainerWidth] = useState<number>(0);
+  const [reloadKey, setReloadKey] = useState(0);
   const [layoutMode, setLayoutMode] = useState<LayoutMode>(() => {
     try {
       return (localStorage.getItem("epubLayoutMode") as LayoutMode) || "auto";
@@ -137,8 +138,11 @@ const EpubReader = () => {
     const rendition = renditionRef.current;
     if (!rendition || !renditionReady) return;
 
+    let rafId: number | null = null;
+    let timeoutId: number | null = null;
+
     // Wait for next frame to ensure rendition is ready
-    requestAnimationFrame(() => {
+    rafId = requestAnimationFrame(() => {
       try {
         const themes = (rendition as any).themes;
         if (!themes) {
@@ -146,27 +150,18 @@ const EpubReader = () => {
           return;
         }
 
-        // Select theme
-        const selectedTheme = preferences.theme === 'light' ? 'light' : preferences.theme === 'dark' ? 'dark' : 'sepia';
-        themes.select(selectedTheme);
-
-        // Update container background
-        const getVar = (name: string, fallback: string) => {
-          try {
-            const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-            return v ? `hsl(${v})` : fallback;
-          } catch { return fallback; }
+        // Select theme (resolve 'system' to actual theme)
+        const resolveTheme = (theme: ThemeMode): 'light' | 'dark' | 'sepia' => {
+          if (theme === 'system') {
+            const isDark = document.documentElement.classList.contains('dark') || 
+                          window.matchMedia?.('(prefers-color-scheme: dark)')?.matches;
+            return isDark ? 'dark' : 'light';
+          }
+          return theme as 'light' | 'dark' | 'sepia';
         };
-        const bgLight = getVar('--background', '#ffffff');
-        const bgDark = getVar('--background', '#0b0b0b');
-        const bgSepia = '#f4ecd8';
-        const bgMap: Record<string, string> = { light: bgLight, dark: bgDark, sepia: bgSepia };
-
-        const container = viewerRef.current;
-        if (container) {
-          try { container.style.background = bgMap[selectedTheme]; } catch { }
-        }
-
+        const selectedTheme = resolveTheme(preferences.theme);
+        console.log('[Preferences] Selecting theme:', selectedTheme, 'from preference:', preferences.theme);
+        
         // Apply font size
         themes.fontSize(`${preferences.fontSize}%`);
 
@@ -189,15 +184,35 @@ const EpubReader = () => {
         themes.override("max-width", widthMap[preferences.contentWidth]);
         themes.override("margin", "0 auto");
 
+        // Select theme AFTER applying overrides to ensure it takes effect
+        themes.select(selectedTheme);
+
+        // Update container background
+        const getVar = (name: string, fallback: string) => {
+          try {
+            const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+            return v ? `hsl(${v})` : fallback;
+          } catch { return fallback; }
+        };
+        const bgLight = getVar('--background', '#ffffff');
+        const bgDark = '#0a0a0a';
+        const bgSepia = '#f4ecd8';
+        const bgMap: Record<string, string> = { light: bgLight, dark: bgDark, sepia: bgSepia };
+
+        const container = viewerRef.current;
+        if (container) {
+          try { container.style.background = bgMap[selectedTheme]; } catch { }
+        }
+
         // Re-render to apply changes immediately, keeping exact CFI position
         try {
           const currentLocation = rendition.currentLocation() as any;
           const currentCfi = currentLocation?.start?.cfi;
           if (currentCfi) {
-            // Wait for styles to propagate, then redisplay at same CFI
-            requestAnimationFrame(() => {
+            // Small delay to ensure theme selection has propagated
+            timeoutId = window.setTimeout(() => {
               rendition.display(currentCfi);
-            });
+            }, 100);
           }
         } catch (err) {
           console.warn('[Preferences] Reaplicar CFI falhou:', err);
@@ -208,6 +223,11 @@ const EpubReader = () => {
         console.error("[Preferences] Error applying:", error);
       }
     });
+
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      if (timeoutId) clearTimeout(timeoutId);
+    };
   }, [preferences, renditionReady, epubId]);
 
   // Monitor container width with ResizeObserver (debounced to avoid flickering)
@@ -267,9 +287,9 @@ const EpubReader = () => {
         const bgLight = getVar('--background', '#ffffff');
         const fgLight = getVar('--foreground', '#111111');
         const linkLight = getVar('--primary', '#1d4ed8');
-        const bgDark = getVar('--background', '#0b0b0b');
-        const fgDark = getVar('--foreground', '#f5f5f5');
-        const linkDark = getVar('--primary', '#60a5fa');
+        const bgDark = '#0a0a0a';
+        const fgDark = '#f5f5f5';
+        const linkDark = '#60a5fa';
         const bgSepia = '#f4ecd8';
         const fgSepia = '#5c4a3a';
         const linkSepia = '#8b6914';
@@ -344,10 +364,9 @@ const EpubReader = () => {
         const book = ePub(ab);
         const rendition = book.renderTo(container, { width: "100%", height: "100%", spread: effectiveSpread as any });
         renditionRef.current = rendition;
-        setRenditionReady(true); // signal that rendition has been created
-        // Apply theme initially and on each render
+        // Register themes once
         applyEpubTheme();
-        rendition.on('rendered', () => applyEpubTheme());
+        setRenditionReady(true); // signal that rendition has been created (triggers preference application)
         book.ready
           .then(async () => {
             // Listener de mudança de posição
@@ -638,28 +657,46 @@ const EpubReader = () => {
     load();
 
     return () => { cancelled = true; try { renditionRef.current?.destroy(); } catch { } };
-  }, [epubId, effectiveSpread, toast]);
+  }, [epubId, effectiveSpread, toast, reloadKey]);
 
-  // Watch for dark mode changes and re-apply theme
+  // When theme preference changes, reinitialize the rendition to mimic a fresh load
+  const prevThemeRef = useRef<ThemeMode>(preferences.theme);
   useEffect(() => {
+    if (prevThemeRef.current === preferences.theme) return;
+    prevThemeRef.current = preferences.theme;
+
+    // Destroy current rendition and trigger reload
+    try { renditionRef.current?.destroy(); } catch { }
+    renditionRef.current = null;
+    setRenditionReady(false);
+    setReloadKey((key) => key + 1);
+  }, [preferences.theme]);
+
+  // Watch for system theme changes and re-apply preferences when theme is 'system'
+  useEffect(() => {
+    if (preferences.theme !== 'system') return;
+
     const target = document.documentElement;
     let mo: MutationObserver | null = null;
+    
+    const reapplyPreferences = () => {
+      // Trigger re-render of preferences by forcing a tiny state change
+      setPreferences(prev => ({ ...prev }));
+    };
+
     try {
-      mo = new MutationObserver(() => {
-        try { (renditionRef.current as any)?.themes && (renditionRef.current as any).themes.select(target.classList.contains('dark') ? 'dark' : 'light'); } catch { }
-      });
+      mo = new MutationObserver(reapplyPreferences);
       mo.observe(target, { attributes: true, attributeFilter: ['class'] });
     } catch { }
+    
     const mq = window.matchMedia?.('(prefers-color-scheme: dark)');
-    const onMq = () => {
-      try { (renditionRef.current as any)?.themes && (renditionRef.current as any).themes.select(target.classList.contains('dark') || mq.matches ? 'dark' : 'light'); } catch { }
-    };
-    try { mq?.addEventListener?.('change', onMq); } catch { }
+    try { mq?.addEventListener?.('change', reapplyPreferences); } catch { }
+    
     return () => {
       try { mo?.disconnect(); } catch { }
-      try { mq?.removeEventListener?.('change', onMq); } catch { }
+      try { mq?.removeEventListener?.('change', reapplyPreferences); } catch { }
     };
-  }, []);
+  }, [preferences.theme]);
 
   // Keyboard shortcuts for navigation
   useEffect(() => {
@@ -817,6 +854,9 @@ const EpubReader = () => {
                       onValueChange={(v) => v && setPreferences(prev => ({ ...prev, theme: v as ThemeMode }))}
                       className="justify-start flex-wrap"
                     >
+                      <ToggleGroupItem value="system" aria-label="Sistema" className="data-[state=on]:bg-accent text-xs">
+                        Sistema
+                      </ToggleGroupItem>
                       <ToggleGroupItem value="light" aria-label="Claro" className="data-[state=on]:bg-accent">
                         Claro
                       </ToggleGroupItem>
