@@ -25,10 +25,10 @@ const App = () => {
   const baseName = isNative ? "/" : import.meta.env.BASE_URL;
 
   return (
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
         <BrowserRouter basename={baseName}>
           <AuthCallbackHandler />
           <Routes>
@@ -44,8 +44,8 @@ const App = () => {
           </Routes>
           <InstallPWA />
         </BrowserRouter>
-      </ThemeProvider>
-    </TooltipProvider>
+      </TooltipProvider>
+    </ThemeProvider>
   );
 };
 
