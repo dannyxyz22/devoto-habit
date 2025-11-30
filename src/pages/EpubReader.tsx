@@ -18,8 +18,28 @@ import { useToast } from "@/components/ui/use-toast";
 import { getUserEpubBlob } from "@/lib/userEpubs";
 import { loadLocationsFromCache, saveLocationsToCache } from "@/lib/locationsCache";
 import { dataLayer } from "@/services/data/RxDBDataLayer";
+import { Slider } from "@/components/ui/slider";
 
 type LayoutMode = "auto" | "single" | "double";
+type FontFamily = "serif" | "sans" | "dyslexic";
+type ThemeMode = "light" | "dark" | "sepia";
+type ContentWidth = "narrow" | "medium" | "wide";
+
+interface ReadingPreferences {
+  fontSize: number; // 100-200 (percentage)
+  fontFamily: FontFamily;
+  lineHeight: number; // 1.4-2.0
+  theme: ThemeMode;
+  contentWidth: ContentWidth;
+}
+
+const DEFAULT_PREFERENCES: ReadingPreferences = {
+  fontSize: 100,
+  fontFamily: "serif",
+  lineHeight: 1.6,
+  theme: "light",
+  contentWidth: "medium",
+};
 
 const EpubReader = () => {
   const { epubId = "" } = useParams();
@@ -46,6 +66,27 @@ const EpubReader = () => {
   const [showMobileMenu, setShowMobileMenu] = useState<boolean>(true);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
+  // Reading preferences state
+  const [preferences, setPreferences] = useState<ReadingPreferences>(() => {
+    try {
+      const saved = localStorage.getItem("epubReadingPreferences");
+      return saved ? { ...DEFAULT_PREFERENCES, ...JSON.parse(saved) } : DEFAULT_PREFERENCES;
+    } catch {
+      return DEFAULT_PREFERENCES;
+    }
+  });
+
+  // Reading progress state
+  const [readingProgress, setReadingProgress] = useState<{
+    percentage: number;
+    currentPage: number;
+    totalPages: number;
+  }>({
+    percentage: 0,
+    currentPage: 0,
+    totalPages: 0,
+  });
+
   // Persist layout mode preference
   useEffect(() => {
     try {
@@ -59,6 +100,106 @@ const EpubReader = () => {
       localStorage.setItem("epubReaderSettingsOpen", JSON.stringify(settingsOpen));
     } catch { }
   }, [settingsOpen]);
+
+  // Persist reading preferences
+  useEffect(() => {
+    try {
+      localStorage.setItem("epubReadingPreferences", JSON.stringify(preferences));
+    } catch { }
+  }, [preferences]);
+
+  // Apply reading preferences to rendition
+  useEffect(() => {
+    const rendition = renditionRef.current;
+    if (!rendition) return;
+
+    // Wait for next frame to ensure rendition is ready
+    requestAnimationFrame(() => {
+      try {
+        const themes = (rendition as any).themes;
+        if (!themes) {
+          console.warn('[Preferences] Themes not ready yet');
+          return;
+        }
+
+        // Select theme
+        const selectedTheme = preferences.theme === 'light' ? 'light' : preferences.theme === 'dark' ? 'dark' : 'sepia';
+        themes.select(selectedTheme);
+
+        // Update container background
+        const getVar = (name: string, fallback: string) => {
+          try {
+            const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+            return v ? `hsl(${v})` : fallback;
+          } catch { return fallback; }
+        };
+        const bgLight = getVar('--background', '#ffffff');
+        const bgDark = getVar('--background', '#0b0b0b');
+        const bgSepia = '#f4ecd8';
+        const bgMap: Record<string, string> = { light: bgLight, dark: bgDark, sepia: bgSepia };
+
+        const container = viewerRef.current;
+        if (container) {
+          try { container.style.background = bgMap[selectedTheme]; } catch { }
+        }
+
+        // Apply font size
+        themes.fontSize(`${preferences.fontSize}%`);
+
+        // Apply font family
+        const fontFamilyMap: Record<FontFamily, string> = {
+          serif: "Georgia, 'Times New Roman', serif",
+          sans: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+          dyslexic: "'OpenDyslexic', sans-serif",
+        };
+        themes.font(fontFamilyMap[preferences.fontFamily]);
+
+        // Apply line height and content width via override
+        const widthMap: Record<ContentWidth, string> = {
+          narrow: "60%",
+          medium: "80%",
+          wide: "95%",
+        };
+
+        themes.override("line-height", preferences.lineHeight.toString());
+        themes.override("max-width", widthMap[preferences.contentWidth]);
+        themes.override("margin", "0 auto");
+
+        // Force re-render to apply changes immediately, using percentage to maintain relative position
+        try {
+          const currentLocation = rendition.currentLocation() as any;
+          if (currentLocation && currentLocation.start) {
+            const currentCfi = currentLocation.start.cfi;
+
+            // Get current percentage position
+            const percentage = (rendition as any).book?.locations?.percentageFromCfi?.(currentCfi);
+
+            setTimeout(() => {
+              if (percentage !== undefined && percentage !== null) {
+                // Convert percentage back to CFI with new layout
+                const newCfi = (rendition as any).book?.locations?.cfiFromPercentage?.(percentage);
+                if (newCfi) {
+                  rendition.display(newCfi);
+                } else {
+                  // Fallback to original CFI if conversion fails
+                  rendition.display(currentCfi);
+                }
+              } else {
+                // Fallback to original CFI if percentage not available
+                rendition.display(currentCfi);
+              }
+            }, 50);
+          }
+        } catch (err) {
+          console.warn('[Preferences] Could not force re-render:', err);
+        }
+
+        console.log('[Preferences] Applied:', preferences);
+      } catch (error) {
+        console.error("[Preferences] Error applying:", error);
+      }
+    });
+  }, [preferences]);
 
   // Monitor container width with ResizeObserver (debounced to avoid flickering)
   useEffect(() => {
@@ -120,6 +261,10 @@ const EpubReader = () => {
         const bgDark = getVar('--background', '#0b0b0b');
         const fgDark = getVar('--foreground', '#f5f5f5');
         const linkDark = getVar('--primary', '#60a5fa');
+        const bgSepia = '#f4ecd8';
+        const fgSepia = '#5c4a3a';
+        const linkSepia = '#8b6914';
+
         themes.register('light', {
           'html, body': { background: bgLight + ' !important', color: fgLight + ' !important' },
           'a, a:visited': { color: linkLight + ' !important' },
@@ -131,10 +276,11 @@ const EpubReader = () => {
           'p, div, span, li': { color: fgDark + ' !important' },
           'img': { filter: 'none' },
         });
-        const dark = isDarkMode();
-        themes.select(dark ? 'dark' : 'light');
-        // Match container bg too
-        try { container.style.background = (dark ? bgDark : bgLight); } catch { }
+        themes.register('sepia', {
+          'html, body': { background: bgSepia + ' !important', color: fgSepia + ' !important' },
+          'a, a:visited': { color: linkSepia + ' !important' },
+          'p, div, span, li': { color: fgSepia + ' !important' },
+        });
       } catch { }
     };
     try { localStorage.setItem('lastBookId', epubId); } catch { }
@@ -205,14 +351,16 @@ const EpubReader = () => {
                 }
 
                 let percent = 0;
+                let totalPages = 1;
 
                 // Tenta pelas locations (se já existirem)
                 try {
-                  if (book.locations.length) {
+                  if (book.locations.length()) {
                     const p = book.locations.percentageFromCfi(cfi);
                     if (typeof p === "number" && !isNaN(p)) {
                       percent = Math.round(p * 100);
                     }
+                    totalPages = book.locations.length();
                   }
                 } catch { }
 
@@ -223,6 +371,14 @@ const EpubReader = () => {
                     percent = Math.round(p2 * 100);
                   }
                 }
+
+                // Update reading progress state
+                const currentPage = Math.max(1, Math.round((percent / 100) * totalPages));
+                setReadingProgress({
+                  percentage: percent,
+                  currentPage,
+                  totalPages: Math.max(totalPages, 1),
+                });
 
                 setProgress(epubId, { partIndex: 0, chapterIndex: 0, percent });
 
@@ -511,12 +667,16 @@ const EpubReader = () => {
         case 'PageUp':
           e.preventDefault();
           rendition.prev();
+          // Refocus to ensure keyboard continues working
+          setTimeout(() => document.body.focus(), 100);
           break;
         case 'ArrowRight':
         case 'PageDown':
         case ' ': // Space bar
           e.preventDefault();
           rendition.next();
+          // Refocus to ensure keyboard continues working
+          setTimeout(() => document.body.focus(), 100);
           break;
       }
     };
@@ -558,7 +718,7 @@ const EpubReader = () => {
         </nav>
 
         <div className="flex items-center gap-2">
-          {/* Settings Panel - Compact version */}
+          {/* Settings Panel */}
           <div className={`transition-opacity duration-300 ${isFullscreen ? 'lg:opacity-0 lg:pointer-events-none' : 'lg:opacity-100'}`}>
             <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen}>
               <CollapsibleTrigger asChild>
@@ -566,29 +726,144 @@ const EpubReader = () => {
                   <Settings className="h-5 w-5" />
                 </Button>
               </CollapsibleTrigger>
-              <CollapsibleContent className="absolute right-4 top-16 z-50">
-                <div className="bg-popover border border-border rounded-lg p-4 shadow-xl min-w-[280px]">
-                  <p className="text-sm font-medium text-foreground mb-3">Modo de layout</p>
-                  <ToggleGroup type="single" value={layoutMode} onValueChange={(v) => v && setLayoutMode(v as LayoutMode)}>
-                    <ToggleGroupItem value="auto" aria-label="Layout automático" title="Automático" className="data-[state=on]:bg-accent">
-                      <Settings className="h-4 w-4 mr-2" />
-                      Auto
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="single" aria-label="Página única" title="Página Única" className="data-[state=on]:bg-accent">
-                      <BookOpen className="h-4 w-4 mr-2" />
-                      1 Página
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="double" aria-label="Duas páginas" title="Duas Páginas" className="data-[state=on]:bg-accent">
-                      <BookOpenCheck className="h-4 w-4 mr-2" />
-                      2 Páginas
-                    </ToggleGroupItem>
-                  </ToggleGroup>
-                  <p className="text-xs text-muted-foreground mt-3">
-                    {layoutMode === "auto" && containerWidth >= 900 && "Modo atual: duas páginas (tela larga)"}
-                    {layoutMode === "auto" && containerWidth < 900 && "Modo atual: página única (tela estreita)"}
-                    {layoutMode === "single" && "Modo atual: sempre página única"}
-                    {layoutMode === "double" && "Modo atual: sempre duas páginas"}
-                  </p>
+              <CollapsibleContent className="absolute right-4 top-16 z-50 max-h-[calc(100vh-8rem)] overflow-y-auto">
+                <div className="bg-popover border border-border rounded-lg p-4 shadow-xl min-w-[280px] lg:min-w-[320px] space-y-4">
+                  {/* Progress Indicator */}
+                  <div className="pb-3 border-b border-border">
+                    <p className="text-xs font-medium text-muted-foreground mb-2">Progresso de Leitura</p>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-foreground font-medium">{readingProgress.percentage}%</span>
+                      <span className="text-muted-foreground text-xs">
+                        Página {readingProgress.currentPage} de {readingProgress.totalPages}
+                      </span>
+                    </div>
+                    <div className="mt-2 w-full bg-secondary rounded-full h-2 overflow-hidden">
+                      <div
+                        className="bg-primary h-full transition-all duration-300 rounded-full"
+                        style={{ width: `${readingProgress.percentage}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Font Size */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-sm font-medium text-foreground">Tamanho da Fonte</label>
+                      <span className="text-xs text-muted-foreground">{preferences.fontSize}%</span>
+                    </div>
+                    <Slider
+                      value={[preferences.fontSize]}
+                      onValueChange={([value]) => setPreferences(prev => ({ ...prev, fontSize: value }))}
+                      min={100}
+                      max={200}
+                      step={10}
+                      className="w-full"
+                    />
+                  </div>
+
+                  {/* Font Family */}
+                  <div>
+                    <label className="text-sm font-medium text-foreground mb-2 block">Fonte</label>
+                    <ToggleGroup
+                      type="single"
+                      value={preferences.fontFamily}
+                      onValueChange={(v) => v && setPreferences(prev => ({ ...prev, fontFamily: v as FontFamily }))}
+                      className="justify-start flex-wrap"
+                    >
+                      <ToggleGroupItem value="serif" aria-label="Serif" className="data-[state=on]:bg-accent">
+                        Serif
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value="sans" aria-label="Sans-serif" className="data-[state=on]:bg-accent">
+                        Sans
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value="dyslexic" aria-label="Dyslexic" className="data-[state=on]:bg-accent text-xs">
+                        Dyslexic
+                      </ToggleGroupItem>
+                    </ToggleGroup>
+                  </div>
+
+                  {/* Line Height */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-sm font-medium text-foreground">Espaçamento</label>
+                      <span className="text-xs text-muted-foreground">{preferences.lineHeight.toFixed(1)}</span>
+                    </div>
+                    <Slider
+                      value={[preferences.lineHeight]}
+                      onValueChange={([value]) => setPreferences(prev => ({ ...prev, lineHeight: value }))}
+                      min={1.4}
+                      max={2.0}
+                      step={0.1}
+                      className="w-full"
+                    />
+                  </div>
+
+                  {/* Theme */}
+                  <div>
+                    <label className="text-sm font-medium text-foreground mb-2 block">Tema</label>
+                    <ToggleGroup
+                      type="single"
+                      value={preferences.theme}
+                      onValueChange={(v) => v && setPreferences(prev => ({ ...prev, theme: v as ThemeMode }))}
+                      className="justify-start flex-wrap"
+                    >
+                      <ToggleGroupItem value="light" aria-label="Claro" className="data-[state=on]:bg-accent">
+                        Claro
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value="dark" aria-label="Escuro" className="data-[state=on]:bg-accent">
+                        Escuro
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value="sepia" aria-label="Sépia" className="data-[state=on]:bg-accent">
+                        Sépia
+                      </ToggleGroupItem>
+                    </ToggleGroup>
+                  </div>
+
+                  {/* Content Width */}
+                  <div>
+                    <label className="text-sm font-medium text-foreground mb-2 block">Largura do Conteúdo</label>
+                    <ToggleGroup
+                      type="single"
+                      value={preferences.contentWidth}
+                      onValueChange={(v) => v && setPreferences(prev => ({ ...prev, contentWidth: v as ContentWidth }))}
+                      className="justify-start flex-wrap"
+                    >
+                      <ToggleGroupItem value="narrow" aria-label="Estreito" className="data-[state=on]:bg-accent text-xs">
+                        Estreito
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value="medium" aria-label="Médio" className="data-[state=on]:bg-accent text-xs">
+                        Médio
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value="wide" aria-label="Largo" className="data-[state=on]:bg-accent text-xs">
+                        Largo
+                      </ToggleGroupItem>
+                    </ToggleGroup>
+                  </div>
+
+                  {/* Layout Mode */}
+                  <div className="pt-3 border-t border-border">
+                    <label className="text-sm font-medium text-foreground mb-2 block">Modo de Layout</label>
+                    <ToggleGroup type="single" value={layoutMode} onValueChange={(v) => v && setLayoutMode(v as LayoutMode)}>
+                      <ToggleGroupItem value="auto" aria-label="Layout automático" title="Automático" className="data-[state=on]:bg-accent">
+                        <Settings className="h-4 w-4 mr-2" />
+                        Auto
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value="single" aria-label="Página única" title="Página Única" className="data-[state=on]:bg-accent">
+                        <BookOpen className="h-4 w-4 mr-2" />
+                        1 Pág
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value="double" aria-label="Duas páginas" title="Duas Páginas" className="data-[state=on]:bg-accent">
+                        <BookOpenCheck className="h-4 w-4 mr-2" />
+                        2 Pág
+                      </ToggleGroupItem>
+                    </ToggleGroup>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      {layoutMode === "auto" && containerWidth >= 900 && "Modo atual: duas páginas"}
+                      {layoutMode === "auto" && containerWidth < 900 && "Modo atual: página única"}
+                      {layoutMode === "single" && "Modo atual: sempre página única"}
+                      {layoutMode === "double" && "Modo atual: sempre duas páginas"}
+                    </p>
+                  </div>
                 </div>
               </CollapsibleContent>
             </Collapsible>
@@ -640,7 +915,10 @@ const EpubReader = () => {
       <div className="relative w-full max-w-[1500px] flex-1 flex items-center justify-center">
         {/* Navigation Button - Left (Desktop only) */}
         <Button
-          onClick={() => renditionRef.current?.prev()}
+          onClick={() => {
+            renditionRef.current?.prev();
+            setTimeout(() => document.body.focus(), 100);
+          }}
           variant="ghost"
           size="icon"
           className="absolute left-0 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full bg-background/80 hover:bg-accent text-muted-foreground hover:text-foreground shadow-lg backdrop-blur-sm z-50 hidden lg:flex"
@@ -693,7 +971,10 @@ const EpubReader = () => {
 
         {/* Navigation Button - Right (Desktop only) */}
         <Button
-          onClick={() => renditionRef.current?.next()}
+          onClick={() => {
+            renditionRef.current?.next();
+            setTimeout(() => document.body.focus(), 100);
+          }}
           variant="ghost"
           size="icon"
           className="absolute right-0 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full bg-background/80 hover:bg-accent text-muted-foreground hover:text-foreground shadow-lg backdrop-blur-sm z-50 hidden lg:flex"
