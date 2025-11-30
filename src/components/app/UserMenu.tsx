@@ -39,8 +39,8 @@ export function UserMenu() {
         navigate('/');
     };
 
-    // Theme toggle component (used for both logged in and not logged in states)
-    const ThemeSubmenu = () => (
+    // Theme submenu JSX (shared between logged in and not logged in states)
+    const themeSubmenu = (
         <DropdownMenuSub>
             <DropdownMenuSubTrigger>
                 {theme === 'dark' ? (
@@ -81,13 +81,13 @@ export function UserMenu() {
                         Entrar
                     </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-56" align="end" forceMount>
+                <DropdownMenuContent className="w-56" align="end">
                     <DropdownMenuItem onClick={() => navigate('/login')}>
                         <UserIcon className="mr-2 h-4 w-4" />
                         <span>Fazer login</span>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <ThemeSubmenu />
+                    {themeSubmenu}
                 </DropdownMenuContent>
             </DropdownMenu>
         );
@@ -122,7 +122,7 @@ export function UserMenu() {
                     <span>Sincronização Ativa</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <ThemeSubmenu />
+                {themeSubmenu}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleSignOut} className="text-destructive focus:text-destructive">
                     <LogOut className="mr-2 h-4 w-4" />
