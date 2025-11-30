@@ -48,6 +48,8 @@ const Library = () => {
   const navigate = useNavigate();
   const today = new Date().toISOString().slice(0, 10);
 
+  const [sortBy, setSortBy] = useState<'date' | 'title'>('date');
+
   // Lazy EPUB cover loader: extracts the cover image from the EPUB and caches as Blob in Cache Storage
   const EpubCoverLoader = ({ id, title, sourceUrl }: { id: string; title: string; sourceUrl: string }) => {
     const [src, setSrc] = useState<string | null>(null);
@@ -224,9 +226,8 @@ const Library = () => {
               return staticBook;
             });
 
-            // 4. Merge and Sort
-            const allUserBooks = [...userEpubBooks, ...physicalBooksMeta, ...staticBooksMeta]
-              .sort((a, b) => (b.addedDate || 0) - (a.addedDate || 0));
+            // 4. Merge
+            const allUserBooks = [...userEpubBooks, ...physicalBooksMeta, ...staticBooksMeta];
 
             // Deduplicate by ID just in case
             const uniqueBooks = Array.from(new Map(allUserBooks.map(item => [item.id, item])).values());
@@ -362,8 +363,7 @@ const Library = () => {
       addedDate: book.addedDate,
     }));
 
-    const allUserBooks = [...userEpubBooks, ...physicalBooksMeta]
-      .sort((a, b) => (b.addedDate || 0) - (a.addedDate || 0));
+    const allUserBooks = [...userEpubBooks, ...physicalBooksMeta];
 
     setAllBooks([...allUserBooks, ...BOOKS]);
   };
@@ -535,6 +535,14 @@ const Library = () => {
     navigate(selectedIsEpub ? `/epub/${selectedBook}` : `/leitor/${selectedBook}`);
   };
 
+  const sortedBooks = [...allBooks].sort((a, b) => {
+    if (sortBy === 'date') {
+      return (b.addedDate || 0) - (a.addedDate || 0);
+    } else {
+      return a.title.localeCompare(b.title);
+    }
+  });
+
   return (
     <main className="min-h-screen bg-background py-10">
       <SEO
@@ -546,7 +554,20 @@ const Library = () => {
         <nav className="mb-4 text-sm">
           <BackLink to="/" label="Início" className="text-muted-foreground hover:text-foreground" />
         </nav>
-        <h1 className="text-3xl font-bold mb-6 text-foreground">Biblioteca</h1>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+          <h1 className="text-3xl font-bold text-foreground">Biblioteca</h1>
+          <div className="flex items-center gap-2">
+            <Select value={sortBy} onValueChange={(v) => setSortBy(v as 'date' | 'title')}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Ordenar por" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="date">Data de adição</SelectItem>
+                <SelectItem value="title">Alfabética</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
       </div>
       <div className="container mx-auto mb-6">
         <input
@@ -582,7 +603,7 @@ const Library = () => {
         onBookAdded={handleBookAdded}
       />
       <section className="container mx-auto grid md:grid-cols-2 gap-6">
-        {allBooks.map((book) => (
+        {sortedBooks.map((book) => (
           <Card key={book.id} className="hover:shadow-lg transition-shadow">
             <div
               role="button"
@@ -636,6 +657,11 @@ const Library = () => {
                   )}
                 </div>
               </CardTitle>
+              {book.addedDate && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Adicionado em: {new Date(book.addedDate).toLocaleDateString()}
+                </p>
+              )}
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground mb-4">{book.description}</p>
