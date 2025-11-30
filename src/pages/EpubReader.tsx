@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import { BackLink } from "@/components/app/BackLink";
 import { Button } from "@/components/ui/button";
@@ -13,16 +13,17 @@ import { format } from "date-fns";
 import { computeDaysRemaining, computeDailyProgressPercent } from "@/lib/reading";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
-import { Settings, BookOpen, BookOpenCheck, Maximize, Minimize } from "lucide-react";
+import { Settings, BookOpen, BookOpenCheck, Maximize, Minimize, Sun, Moon, Monitor } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { getUserEpubBlob } from "@/lib/userEpubs";
 import { loadLocationsFromCache, saveLocationsToCache } from "@/lib/locationsCache";
 import { dataLayer } from "@/services/data/RxDBDataLayer";
 import { Slider } from "@/components/ui/slider";
+import { useTheme } from "next-themes";
 
 type LayoutMode = "auto" | "single" | "double";
 type FontFamily = "serif" | "sans" | "dyslexic";
-type ThemeMode = "light" | "dark" | "sepia";
+type ThemeMode = "system" | "light" | "dark" | "sepia";
 type ContentWidth = "narrow" | "medium" | "wide";
 
 interface ReadingPreferences {
@@ -37,13 +38,14 @@ const DEFAULT_PREFERENCES: ReadingPreferences = {
   fontSize: 100,
   fontFamily: "serif",
   lineHeight: 1.6,
-  theme: "light",
+  theme: "system",
   contentWidth: "medium",
 };
 
 const EpubReader = () => {
   const { epubId = "" } = useParams();
   const { toast } = useToast();
+  const { resolvedTheme } = useTheme();
   const viewerRef = useRef<HTMLDivElement | null>(null);
   const renditionRef = useRef<Rendition | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -79,6 +81,14 @@ const EpubReader = () => {
       return DEFAULT_PREFERENCES;
     }
   });
+
+  // Resolve the effective theme based on preferences.theme and system preference
+  const effectiveTheme = useMemo(() => {
+    if (preferences.theme === 'system') {
+      return resolvedTheme === 'dark' ? 'dark' : 'light';
+    }
+    return preferences.theme;
+  }, [preferences.theme, resolvedTheme]);
 
   // Reload preferences when book changes (supports per-book storage with fallback to global)
   useEffect(() => {
@@ -132,7 +142,7 @@ const EpubReader = () => {
     } catch { }
   }, [preferences, epubId]);
 
-  // Apply reading preferences to rendition (runs whenever preferences or renditionReady change)
+  // Apply reading preferences to rendition (runs whenever preferences, effectiveTheme or renditionReady change)
   useEffect(() => {
     const rendition = renditionRef.current;
     if (!rendition || !renditionReady) return;
@@ -146,9 +156,8 @@ const EpubReader = () => {
           return;
         }
 
-        // Select theme
-        const selectedTheme = preferences.theme === 'light' ? 'light' : preferences.theme === 'dark' ? 'dark' : 'sepia';
-        themes.select(selectedTheme);
+        // Select theme using the resolved effective theme
+        themes.select(effectiveTheme);
 
         // Update container background
         const getVar = (name: string, fallback: string) => {
@@ -164,7 +173,7 @@ const EpubReader = () => {
 
         const container = viewerRef.current;
         if (container) {
-          try { container.style.background = bgMap[selectedTheme]; } catch { }
+          try { container.style.background = bgMap[effectiveTheme]; } catch { }
         }
 
         // Apply font size
@@ -203,12 +212,12 @@ const EpubReader = () => {
           console.warn('[Preferences] Reaplicar CFI falhou:', err);
         }
 
-        console.log('[Preferences] Applied:', preferences);
+        console.log('[Preferences] Applied:', { ...preferences, effectiveTheme });
       } catch (error) {
         console.error("[Preferences] Error applying:", error);
       }
     });
-  }, [preferences, renditionReady, epubId]);
+  }, [preferences, effectiveTheme, renditionReady, epubId]);
 
   // Monitor container width with ResizeObserver (debounced to avoid flickering)
   useEffect(() => {
@@ -640,26 +649,8 @@ const EpubReader = () => {
     return () => { cancelled = true; try { renditionRef.current?.destroy(); } catch { } };
   }, [epubId, effectiveSpread, toast]);
 
-  // Watch for dark mode changes and re-apply theme
-  useEffect(() => {
-    const target = document.documentElement;
-    let mo: MutationObserver | null = null;
-    try {
-      mo = new MutationObserver(() => {
-        try { (renditionRef.current as any)?.themes && (renditionRef.current as any).themes.select(target.classList.contains('dark') ? 'dark' : 'light'); } catch { }
-      });
-      mo.observe(target, { attributes: true, attributeFilter: ['class'] });
-    } catch { }
-    const mq = window.matchMedia?.('(prefers-color-scheme: dark)');
-    const onMq = () => {
-      try { (renditionRef.current as any)?.themes && (renditionRef.current as any).themes.select(target.classList.contains('dark') || mq.matches ? 'dark' : 'light'); } catch { }
-    };
-    try { mq?.addEventListener?.('change', onMq); } catch { }
-    return () => {
-      try { mo?.disconnect(); } catch { }
-      try { mq?.removeEventListener?.('change', onMq); } catch { }
-    };
-  }, []);
+  // Note: System theme changes are handled automatically via effectiveTheme
+  // which responds to resolvedTheme from next-themes
 
   // Keyboard shortcuts for navigation
   useEffect(() => {
@@ -817,10 +808,16 @@ const EpubReader = () => {
                       onValueChange={(v) => v && setPreferences(prev => ({ ...prev, theme: v as ThemeMode }))}
                       className="justify-start flex-wrap"
                     >
+                      <ToggleGroupItem value="system" aria-label="Sistema" className="data-[state=on]:bg-accent">
+                        <Monitor className="h-4 w-4 mr-1" />
+                        Sistema
+                      </ToggleGroupItem>
                       <ToggleGroupItem value="light" aria-label="Claro" className="data-[state=on]:bg-accent">
+                        <Sun className="h-4 w-4 mr-1" />
                         Claro
                       </ToggleGroupItem>
                       <ToggleGroupItem value="dark" aria-label="Escuro" className="data-[state=on]:bg-accent">
+                        <Moon className="h-4 w-4 mr-1" />
                         Escuro
                       </ToggleGroupItem>
                       <ToggleGroupItem value="sepia" aria-label="Sépia" className="data-[state=on]:bg-accent">
