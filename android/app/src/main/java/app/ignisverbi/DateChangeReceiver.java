@@ -1,4 +1,4 @@
-package com.devotohabit.app;
+package app.ignisverbi;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;

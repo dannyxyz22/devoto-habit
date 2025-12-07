@@ -1,4 +1,4 @@
-package com.devotohabit.app;
+package app.ignisverbi;
 
 import android.app.AlarmManager;
 import android.app.PendingIntent;
@@ -14,9 +14,9 @@ import java.util.concurrent.TimeUnit;
 
 /** Centraliza lógica para reagendar e disparar atualização do widget ao virar o dia. */
 public class RefreshScheduler {
-  public static final String ACTION_MIDNIGHT_ALARM = "com.devotohabit.app.ACTION_MIDNIGHT_ALARM";
-  public static final String ACTION_DEBUG_ALARM = "com.devotohabit.app.ACTION_DEBUG_ALARM"; // manual test
-  public static final String ACTION_FORCE_REFRESH = "com.devotohabit.app.ACTION_FORCE_REFRESH"; // manual broadcast
+  public static final String ACTION_MIDNIGHT_ALARM = "app.ignisverbi.ACTION_MIDNIGHT_ALARM";
+  public static final String ACTION_DEBUG_ALARM = "app.ignisverbi.ACTION_DEBUG_ALARM"; // manual test
+  public static final String ACTION_FORCE_REFRESH = "app.ignisverbi.ACTION_FORCE_REFRESH"; // manual broadcast
   private static final String UNIQUE_WORK = "DailyWidgetRefresh";
   private static final String META_KEY = "widget:lastRefreshMeta"; // diagnostic JSON
   private static final String SCHEDULE_META_KEY = "widget:lastAlarmSchedule"; // stores last scheduled times

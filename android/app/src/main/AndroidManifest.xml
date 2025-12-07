@@ -42,9 +42,9 @@
         <!-- Daily events (time/date/user/boot) + custom midnight alarm receiver -->
         <receiver android:name=".DailyEventsReceiver" android:exported="true">
             <intent-filter>
-                <action android:name="com.devotohabit.app.ACTION_MIDNIGHT_ALARM" />
-                <action android:name="com.devotohabit.app.ACTION_DEBUG_ALARM" />
-                <action android:name="com.devotohabit.app.ACTION_FORCE_REFRESH" />
+                <action android:name="app.ignisverbi.ACTION_MIDNIGHT_ALARM" />
+                <action android:name="app.ignisverbi.ACTION_DEBUG_ALARM" />
+                <action android:name="app.ignisverbi.ACTION_FORCE_REFRESH" />
                 <action android:name="android.intent.action.DATE_CHANGED" />
                 <action android:name="android.intent.action.TIME_CHANGED" />
                 <action android:name="android.intent.action.TIMEZONE_CHANGED" />

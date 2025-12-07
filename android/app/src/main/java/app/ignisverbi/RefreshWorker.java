@@ -1,4 +1,4 @@
-package com.devotohabit.app;
+package app.ignisverbi;
 
 import android.content.Context;
 import android.util.Log;

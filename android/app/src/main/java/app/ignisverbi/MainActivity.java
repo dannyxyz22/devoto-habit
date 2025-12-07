@@ -1,4 +1,4 @@
-package com.devotohabit.app;
+package app.ignisverbi;
 
 import android.os.Bundle;
 import android.content.Intent;
@@ -8,8 +8,8 @@ import android.content.Context;
 import android.util.Log;
 import androidx.core.view.WindowCompat;
 import com.getcapacitor.BridgeActivity;
-import com.devotohabit.app.WidgetUpdater;
-import com.devotohabit.app.RefreshScheduler;
+import app.ignisverbi.WidgetUpdater;
+import app.ignisverbi.RefreshScheduler;
 public class MainActivity extends BridgeActivity {
 	private BroadcastReceiver userPresentReceiver;
 
