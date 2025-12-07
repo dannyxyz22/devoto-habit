@@ -49,37 +49,16 @@ public class ProgressWidgetProvider extends AppWidgetProvider {
 
   private static void updateAppWidget(Context context, AppWidgetManager appWidgetManager, int appWidgetId) {
     RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_progress);
-    // Preferred: use drawable resource widget_background (place widget_background.png in res/drawable)
+    // Simplified background rendering for debugging
     int bgRes = context.getResources().getIdentifier("widget_background", "drawable", context.getPackageName());
     if (bgRes != 0) {
-      try {
-        // Create a rounded bitmap mask so the image corners match the widget shape
-        android.graphics.Bitmap src = android.graphics.BitmapFactory.decodeResource(context.getResources(), bgRes);
-        if (src != null) {
-          int w = src.getWidth();
-          int h = src.getHeight();
-          android.graphics.Bitmap out = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888);
-          android.graphics.Canvas canvas = new android.graphics.Canvas(out);
-          android.graphics.Paint paint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
-          android.graphics.RectF rf = new android.graphics.RectF(0, 0, w, h);
-          float radius = Math.min(w, h) * 0.08f; // ~8% rounding
-          paint.setColor(0xFFFFFFFF);
-          canvas.drawRoundRect(rf, radius, radius, paint);
-          paint.setXfermode(new android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN));
-          canvas.drawBitmap(src, 0, 0, paint);
-          views.setImageViewBitmap(R.id.widget_bg, out);
-        } else {
-          views.setImageViewResource(R.id.widget_bg, bgRes);
-        }
-      } catch (Throwable t) {
         views.setImageViewResource(R.id.widget_bg, bgRes);
-      }
     } else {
-      // Fallback to drawable resource background if present
-      int resId = context.getResources().getIdentifier("progress_widget", "drawable", context.getPackageName());
-      if (resId != 0) {
-        views.setInt(R.id.widget_root, "setBackgroundResource", resId);
-      }
+        // Fallback to drawable resource background if present
+        int resId = context.getResources().getIdentifier("progress_widget", "drawable", context.getPackageName());
+        if (resId != 0) {
+            views.setInt(R.id.widget_root, "setBackgroundResource", resId);
+        }
     }
 
   // We'll adjust layout after knowing if there's a goal or not
