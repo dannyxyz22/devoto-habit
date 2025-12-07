@@ -11,6 +11,11 @@ export const AuthCallbackHandler = () => {
             if (window.location.hash && window.location.hash.includes('access_token')) {
                 console.log('AuthCallbackHandler: Detected OAuth hash, processing...');
 
+                if (!supabase) {
+                    console.error('AuthCallbackHandler: Supabase client not initialized');
+                    return;
+                }
+
                 try {
                     // This call automatically parses the URL hash and sets the session
                     const { data, error } = await supabase.auth.getSession();

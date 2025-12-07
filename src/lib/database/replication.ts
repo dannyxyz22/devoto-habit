@@ -19,6 +19,12 @@ export class ReplicationManager {
 
     async startReplication() {
         console.log('ReplicationManager: Starting Supabase replication...');
+        
+        if (!supabase) {
+            console.warn('ReplicationManager: Supabase client not initialized, skipping replication');
+            return;
+        }
+        
         const db = await getDatabase();
 
         // Stop existing replications if any

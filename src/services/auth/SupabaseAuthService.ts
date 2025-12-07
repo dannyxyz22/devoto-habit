@@ -14,6 +14,9 @@ class SupabaseAuthServiceImpl implements AuthService {
     }
 
     async signIn(email: string): Promise<{ error: any }> {
+        if (!supabase) {
+            return { error: new Error('Supabase client not initialized') };
+        }
         const { error } = await supabase.auth.signInWithOtp({
             email,
             options: {
@@ -25,6 +28,9 @@ class SupabaseAuthServiceImpl implements AuthService {
     }
 
     async signInWithGoogle(): Promise<{ error: any }> {
+        if (!supabase) {
+            return { error: new Error('Supabase client not initialized') };
+        }
         const { error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
@@ -35,11 +41,17 @@ class SupabaseAuthServiceImpl implements AuthService {
     }
 
     async signOut(): Promise<{ error: any }> {
+        if (!supabase) {
+            return { error: new Error('Supabase client not initialized') };
+        }
         const { error } = await supabase.auth.signOut();
         return { error };
     }
 
     async getSession(): Promise<{ session: AuthSession | null; error: any }> {
+        if (!supabase) {
+            return { session: null, error: new Error('Supabase client not initialized') };
+        }
         const { data, error } = await supabase.auth.getSession();
         if (error) return { session: null, error };
 
@@ -53,6 +65,9 @@ class SupabaseAuthServiceImpl implements AuthService {
     }
 
     async getUser(): Promise<{ user: User | null; error: any }> {
+        if (!supabase) {
+            return { user: null, error: new Error('Supabase client not initialized') };
+        }
         const { data, error } = await supabase.auth.getUser();
         if (error) return { user: null, error };
 
@@ -63,6 +78,10 @@ class SupabaseAuthServiceImpl implements AuthService {
     }
 
     onAuthStateChange(callback: (event: string, session: AuthSession | null) => void) {
+        if (!supabase) {
+            console.warn('Supabase client not initialized, auth state changes will not be monitored');
+            return { data: { subscription: { unsubscribe: () => {} } } };
+        }
         const { data } = supabase.auth.onAuthStateChange((event, session) => {
             const authSession = session ? {
                 user: session.user as User,

@@ -15,6 +15,9 @@ class SupabaseStorageServiceImpl implements StorageService {
     }
 
     async uploadFile(path: string, file: File | Blob): Promise<{ path: string | null; error: any }> {
+        if (!supabase) {
+            return { path: null, error: new Error('Supabase client not initialized') };
+        }
         const { data, error } = await supabase.storage
             .from(this.bucketName)
             .upload(path, file, {
@@ -29,6 +32,12 @@ class SupabaseStorageServiceImpl implements StorageService {
         // If the path is already a full URL (e.g. Google Books), return it as is
         if (path.startsWith('http')) {
             return path;
+        }
+
+        // If supabase is not initialized, return empty string
+        if (!supabase) {
+            console.warn('Supabase client not initialized, cannot generate public URL');
+            return '';
         }
 
         // Otherwise, generate the Supabase Storage public URL
