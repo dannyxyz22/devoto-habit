@@ -1,5 +1,16 @@
 import { AuthService, AuthSession, User } from './AuthService';
 import { supabase } from '@/lib/supabase';
+import { Capacitor } from '@capacitor/core';
+
+// Resolve the correct redirect target for OAuth depending on platform.
+// On Android/iOS we want to deep-link back into the app instead of opening the browser.
+const getRedirectTo = () => {
+    const platform = Capacitor.getPlatform?.();
+    const isNative = (Capacitor.isNativePlatform?.() === true) || platform === 'android' || platform === 'ios';
+    const target = isNative ? 'ignisverbi://auth/callback' : window.location.origin;
+    console.log('[SupabaseAuthService] redirectTo', { platform, isNative, target });
+    return target;
+};
 
 class SupabaseAuthServiceImpl implements AuthService {
     private static instance: SupabaseAuthServiceImpl;
@@ -21,7 +32,7 @@ class SupabaseAuthServiceImpl implements AuthService {
             email,
             options: {
                 // Set this to your app's redirect URL
-                emailRedirectTo: window.location.origin,
+                emailRedirectTo: getRedirectTo(),
             },
         });
         return { error };
@@ -31,10 +42,11 @@ class SupabaseAuthServiceImpl implements AuthService {
         if (!supabase) {
             return { error: new Error('Supabase client not initialized') };
         }
+        console.log('[SupabaseAuthService] signInWithGoogle');
         const { error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
-                redirectTo: window.location.origin,
+                redirectTo: getRedirectTo(),
             },
         });
         return { error };

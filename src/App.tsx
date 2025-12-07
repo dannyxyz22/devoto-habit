@@ -2,6 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { useEffect } from "react";
 import { usePWA } from "@/hooks/usePWA";
 import { InstallPWA } from "@/components/app/InstallPWA";
 import { AuthCallbackHandler } from "@/components/auth/AuthCallbackHandler";
@@ -16,6 +17,7 @@ import Stats from "./pages/Stats";
 import NotFound from "./pages/NotFound";
 import { ThemeProvider } from "next-themes";
 import { Capacitor } from "@capacitor/core";
+import { App as CapacitorApp } from "@capacitor/app";
 
 const App = () => {
   // Initialize PWA functionality
@@ -23,6 +25,34 @@ const App = () => {
 
   const isNative = (Capacitor.isNativePlatform?.() ?? (Capacitor.getPlatform?.() !== 'web')) as boolean;
   const baseName = isNative ? "/" : import.meta.env.BASE_URL;
+
+  useEffect(() => {
+    if (!isNative) return;
+
+    const listener = CapacitorApp.addListener('appUrlOpen', (event) => {
+      try {
+        console.log('[appUrlOpen]', event.url);
+        const url = new URL(event.url);
+        const isAuthCallback = url.protocol === 'ignisverbi:' && url.host === 'auth';
+        if (!isAuthCallback) return;
+
+        // Re-inject the hash (tokens) into the SPA without leaving the app.
+        const hash = url.hash || '';
+        // Ensure we are at the root route (BrowserRouter) then set the hash
+        window.history.replaceState(null, '', '/');
+        if (hash) {
+          console.log('[appUrlOpen] applying hash to SPA', hash);
+          window.location.hash = hash; // triggers AuthCallbackHandler to process session
+        }
+      } catch (err) {
+        console.error('Failed to handle deep link', err);
+      }
+    });
+
+    return () => {
+      listener?.remove();
+    };
+  }, [isNative]);
 
   return (
     <TooltipProvider>
