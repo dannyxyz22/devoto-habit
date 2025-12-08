@@ -157,6 +157,10 @@ class RxDBDataLayerImpl implements DataLayer {
         const db = await getDatabase();
         const { user } = await authService.getUser();
 
+        // Log total books in database before filtering
+        const allBooksCount = await db.books.count().exec();
+        console.log('[DataLayer.getBooks] Total books in RxDB:', allBooksCount, 'User:', user?.id || 'local-user');
+
         // When logged in, show only user's books
         // When logged out, show ALL locally cached books (for offline access)
         const books = await db.books.find({
@@ -168,6 +172,7 @@ class RxDBDataLayerImpl implements DataLayer {
             }
         }).exec();
 
+        console.log('[DataLayer.getBooks] Filtered books:', books.length, 'User filter:', user?.id || 'none');
         return books.map(doc => doc.toJSON());
     }
 
@@ -288,6 +293,10 @@ class RxDBDataLayerImpl implements DataLayer {
         const db = await getDatabase();
         const { user } = await authService.getUser();
 
+        // Log total EPUBs in database before filtering
+        const allEpubsCount = await db.user_epubs.count().exec();
+        console.log('[DataLayer.getUserEpubs] Total EPUBs in RxDB:', allEpubsCount, 'User:', user?.id || 'local-user');
+
         // When logged in, show only user's EPUBs
         // When logged out, show ALL locally cached EPUBs (for offline access)
         const epubs = await db.user_epubs.find({
@@ -299,6 +308,7 @@ class RxDBDataLayerImpl implements DataLayer {
             }
         }).exec();
 
+        console.log('[DataLayer.getUserEpubs] Filtered EPUBs:', epubs.length, 'User filter:', user?.id || 'none');
         return epubs.map(doc => doc.toJSON());
     }
 

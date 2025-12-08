@@ -577,7 +577,7 @@ const Library = () => {
           onChange={handleFileUpload}
           className="hidden"
         />
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading}
@@ -593,6 +593,187 @@ const Library = () => {
           >
             <BookPlus className="h-4 w-4 mr-2" />
             Adicionar livro físico
+          </Button>
+          <Button 
+            onClick={async () => {
+              try {
+                const { supabase } = await import('@/lib/supabase');
+                if (!supabase) {
+                  toast({ title: 'Supabase não inicializado', variant: 'destructive' });
+                  return;
+                }
+                
+                const { data: { session } } = await supabase.auth.getSession();
+                console.log('🔍 Session:', session?.user.email, session?.user.id);
+                
+                const { data: books, error, count } = await supabase
+                  .from('books')
+                  .select('id, title, user_id, type', { count: 'exact' })
+                  .limit(100);
+                
+                console.log('🔍 RLS Test - Books:', books?.length || 0, 'Total:', count, error);
+                if (books) {
+                  console.table(books);
+                  const byType = books.reduce((acc, b) => {
+                    const type = (b as any).type || 'unknown';
+                    acc[type] = (acc[type] || 0) + 1;
+                    return acc;
+                  }, {} as Record<string, number>);
+                  console.log('📊 By type:', byType);
+                }
+                
+                toast({
+                  title: `Livros acessíveis: ${books?.length || 0} (Total: ${count})`,
+                  description: error ? `Erro: ${error.message}` : 'Verifique o console para detalhes',
+                  variant: error ? 'destructive' : 'default',
+                });
+              } catch (error) {
+                console.error('RLS Test error:', error);
+                toast({
+                  title: 'Erro no teste',
+                  description: error instanceof Error ? error.message : 'Erro desconhecido',
+                  variant: 'destructive',
+                });
+              }
+            }} 
+            variant="outline"
+            size="sm"
+          >
+            🔍 Test RLS
+          </Button>
+          <Button 
+            onClick={async () => {
+              try {
+                const { getDatabase } = await import('@/lib/database/db');
+                const { supabase } = await import('@/lib/supabase');
+                
+                if (!supabase) {
+                  toast({ title: 'Supabase não inicializado', variant: 'destructive' });
+                  return;
+                }
+                
+                const db = await getDatabase();
+                const localBooks = await db.books.find({ selector: { _deleted: false } }).exec();
+                
+                console.log('📤 Pushing', localBooks.length, 'local books to Supabase...');
+                
+                const booksToUpsert = localBooks.map(book => {
+                  const json = book.toJSON();
+                  const { created_at, updated_at, ...rest } = json as any;
+                  // Remove base64 covers
+                  if (rest.cover_url?.startsWith('data:')) {
+                    delete rest.cover_url;
+                  }
+                  return rest;
+                });
+                
+                const { data, error } = await supabase
+                  .from('books')
+                  .upsert(booksToUpsert, { onConflict: 'id' });
+                
+                if (error) {
+                  console.error('❌ Push error:', error);
+                  toast({
+                    title: 'Erro ao enviar livros',
+                    description: error.message,
+                    variant: 'destructive',
+                  });
+                } else {
+                  console.log('✅ Push successful!');
+                  toast({
+                    title: 'Livros enviados!',
+                    description: `${booksToUpsert.length} livros enviados para o Supabase`,
+                  });
+                }
+              } catch (error) {
+                console.error('Push error:', error);
+                toast({
+                  title: 'Erro',
+                  description: error instanceof Error ? error.message : 'Erro desconhecido',
+                  variant: 'destructive',
+                });
+              }
+            }} 
+            variant="outline"
+            size="sm"
+          >
+            📤 Push Local to Supabase
+          </Button>
+          <Button 
+            onClick={async () => {
+              try {
+                const { replicationManager } = await import('@/lib/database/replication');
+                toast({
+                  title: 'Forçando re-sync completo...',
+                  description: 'Aguarde, isso pode levar alguns segundos',
+                });
+                await replicationManager.forceFullResync();
+                toast({
+                  title: 'Re-sync completo!',
+                  description: 'Todos os livros foram baixados novamente',
+                });
+              } catch (error) {
+                toast({
+                  title: 'Erro no re-sync',
+                  description: error instanceof Error ? error.message : 'Erro desconhecido',
+                  variant: 'destructive',
+                });
+              }
+            }} 
+            variant="outline"
+            size="sm"
+          >
+            🔄 Force Re-sync
+          </Button>
+          <Button 
+            onClick={async () => {
+              if (!confirm('⚠️ Isso vai DELETAR o banco local e baixar tudo do Supabase. Continuar?')) {
+                return;
+              }
+              
+              try {
+                toast({
+                  title: 'Deletando banco local...',
+                  description: 'Aguarde, isso vai recarregar a página',
+                });
+                
+                // Delete IndexedDB databases
+                const dbs = await indexedDB.databases();
+                console.log('🗑️ Found databases:', dbs);
+                
+                for (const db of dbs) {
+                  if (db.name?.includes('devoto')) {
+                    console.log('🗑️ Deleting:', db.name);
+                    await new Promise((resolve, reject) => {
+                      const req = indexedDB.deleteDatabase(db.name!);
+                      req.onsuccess = () => resolve(undefined);
+                      req.onerror = () => reject(req.error);
+                      req.onblocked = () => {
+                        console.warn('Database deletion blocked:', db.name);
+                        resolve(undefined);
+                      };
+                    });
+                  }
+                }
+                
+                console.log('✅ Database deleted, reloading...');
+                
+                // Reload the page to recreate database
+                window.location.reload();
+                
+              } catch (error) {
+                console.error('Delete error:', error);
+                toast({
+                  title: 'Erro ao deletar banco',
+                  description: error instanceof Error ? error.message : 'Erro desconhecido',
+                  variant: 'destructive',
+                });
+              }
+            }} 
+            variant="destructive"
+            size="sm"
+          >
+            🗑️ Nuclear: Delete DB
           </Button>
         </div>
       </div>
