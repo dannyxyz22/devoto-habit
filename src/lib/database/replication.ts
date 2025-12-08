@@ -57,27 +57,8 @@ export class ReplicationManager {
         // Stop existing replications if any
         await this.stopReplication();
 
-        // Setup direct Realtime listener to debug sync between clients
-        try {
-            const booksChannel = supabase.channel('books-changes')
-                .on('postgres_changes', 
-                    { event: '*', schema: 'public', table: 'books' },
-                    (payload) => {
-                        console.log('🔔 [Realtime] Books change detected:', payload.eventType, payload.new);
-                    }
-                )
-                .subscribe((status) => {
-                    console.log('🔔 [Realtime] Books channel status:', status);
-                    if (status === 'CHANNEL_ERROR') {
-                        console.error('🔔 [Realtime] Channel error - check RLS policies for SELECT');
-                    }
-                });
-            
-            // Store for cleanup later
-            (this as any).realtimeChannel = booksChannel;
-        } catch (err) {
-            console.error('ReplicationManager: Realtime books channel failed:', err);
-        }
+        // We'll setup Realtime listener after replications are created
+        // to trigger reSync when changes come from other clients
 
         try {
             // Replicate Books
@@ -208,6 +189,39 @@ export class ReplicationManager {
             const totalBooks = await db.books.count().exec();
             console.log(`ReplicationManager: Synced ${totalBooks} books`);
 
+            // Setup Realtime listener to trigger reSync when changes come from other clients
+            // The replicateSupabase plugin should handle this, but as a fallback we do it manually
+            const booksState = this.replicationStates[0];
+            const userEpubsState = this.replicationStates[1];
+            
+            const realtimeChannel = supabase.channel('db-changes')
+                .on('postgres_changes', 
+                    { event: '*', schema: 'public', table: 'books' },
+                    (payload) => {
+                        console.log('🔔 [Realtime] Books change from server:', payload.eventType);
+                        // Trigger reSync to pull the changes
+                        if (booksState && typeof (booksState as any).reSync === 'function') {
+                            console.log('🔔 [Realtime] Triggering books reSync...');
+                            (booksState as any).reSync();
+                        }
+                    }
+                )
+                .on('postgres_changes',
+                    { event: '*', schema: 'public', table: 'user_epubs' },
+                    (payload) => {
+                        console.log('🔔 [Realtime] User EPUBs change from server:', payload.eventType);
+                        if (userEpubsState && typeof (userEpubsState as any).reSync === 'function') {
+                            (userEpubsState as any).reSync();
+                        }
+                    }
+                )
+                .subscribe((status) => {
+                    console.log('🔔 [Realtime] Channel status:', status);
+                });
+            
+            // Store for cleanup
+            (this as any).realtimeChannel = realtimeChannel;
+
             // Reconcile user_epubs to avoid push conflicts
             await this.reconcileUserEpubs();
 
@@ -218,6 +232,16 @@ export class ReplicationManager {
     }
 
     async stopReplication() {
+        // Cleanup Realtime channel
+        if ((this as any).realtimeChannel) {
+            try {
+                supabase.removeChannel((this as any).realtimeChannel);
+                (this as any).realtimeChannel = null;
+            } catch (err) {
+                console.warn('ReplicationManager: Error removing realtime channel:', err);
+            }
+        }
+        
         if (this.replicationStates.length > 0) {
             console.log('ReplicationManager: Stopping replication...');
             try {
