@@ -5,7 +5,7 @@ import {
 } from 'rxdb';
 
 export const bookSchemaLiteral = {
-    version: 1,
+    version: 0,
     primaryKey: 'id',
     type: 'object',
     properties: {
@@ -78,7 +78,7 @@ export type RxBookDocumentType = ExtractDocumentTypeFromTypedRxJsonSchema<typeof
 export const bookSchema: RxJsonSchema<RxBookDocumentType> = bookSchemaLiteral;
 
 export const userEpubSchemaLiteral = {
-    version: 1,
+    version: 0,
     primaryKey: 'id',
     type: 'object',
     properties: {
