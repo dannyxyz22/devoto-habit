@@ -153,28 +153,35 @@ const Library = () => {
       let cancelled = false;
       const run = async () => {
         try {
-          // Try Cache Storage first
+          // Try Cache Storage first - this should have the cover if already cached
           const cachedUrl = await getCoverObjectUrl(id);
-          if (cachedUrl && !cancelled) {
-            setSrc(cachedUrl);
-            return;
+          if (cachedUrl) {
+            if (!cancelled) setSrc(cachedUrl);
+            return; // Found in cache, no need to fetch
           }
           
-          // Fallback to coverUrl if available
+          // No cache found - only fetch if we have a coverUrl
+          // Use a CORS proxy for external URLs to avoid CORS errors
           if (coverUrl && !cancelled) {
-            // If it's a URL, try to cache it
+            if (coverUrl.startsWith('data:')) {
+              // Base64 data URL - use directly
+              setSrc(coverUrl);
+              return;
+            }
+            
             if (coverUrl.startsWith('http')) {
+              // Use weserv.nl proxy to bypass CORS
+              const proxyUrl = `https://images.weserv.nl/?url=${encodeURIComponent(coverUrl)}&w=300&q=80`;
               try {
-                const resp = await fetch(coverUrl);
+                const resp = await fetch(proxyUrl);
                 if (resp.ok) {
                   const blob = await resp.blob();
                   await saveCoverBlob(id, blob);
                   if (!cancelled) setSrc(URL.createObjectURL(blob));
                   return;
                 }
-              } catch { /* fallback to direct use */ }
+              } catch { /* ignore proxy errors */ }
             }
-            if (!cancelled) setSrc(coverUrl);
           }
         } catch { /* ignore */ }
       };
