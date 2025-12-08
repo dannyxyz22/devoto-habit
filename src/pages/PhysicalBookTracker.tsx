@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { BookCover } from "@/components/book/BookCover";
 
 import { useParams, useNavigate } from "react-router-dom";
@@ -12,6 +12,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { format } from "date-fns";
 import { BookOpen, Plus } from "lucide-react";
 import type { PhysicalBook } from "@/lib/physicalBooks";
+import { getDatabase } from "@/lib/database/db";
 import { dataLayer } from "@/services/data/RxDBDataLayer";
 
 export default function PhysicalBookTracker() {
@@ -22,80 +23,104 @@ export default function PhysicalBookTracker() {
     const [book, setBook] = useState<PhysicalBook | null>(null);
     const [currentPage, setCurrentPage] = useState("");
     const [loading, setLoading] = useState(true);
+    
+    // Track if user is currently editing to avoid overwriting their input
+    const isUserEditing = useRef(false);
 
+    // Reactive subscription to book changes
     useEffect(() => {
-        const loadBook = async () => {
-            if (!bookId) {
-                navigate("/biblioteca");
-                return;
-            }
+        if (!bookId) {
+            navigate("/biblioteca");
+            return;
+        }
 
+        let subscription: any;
+
+        const setupSubscription = async () => {
             try {
-                const rxBook = await dataLayer.getBook(bookId);
+                const db = await getDatabase();
+                const book$ = db.books.findOne(bookId).$;
 
-                if (!rxBook) {
-                    toast({
-                        title: "Livro não encontrado",
-                        description: "Este livro não existe na sua biblioteca",
-                        variant: "destructive",
-                    });
-                    navigate("/biblioteca");
-                    return;
-                }
+                subscription = book$.subscribe((rxBook) => {
+                    if (!rxBook) {
+                        // Book was deleted or doesn't exist
+                        if (!loading) {
+                            toast({
+                                title: "Livro não encontrado",
+                                description: "Este livro não existe na sua biblioteca",
+                                variant: "destructive",
+                            });
+                            navigate("/biblioteca");
+                        }
+                        return;
+                    }
 
-                const physicalBook: PhysicalBook = {
-                    id: rxBook.id,
-                    title: rxBook.title,
-                    author: rxBook.author || "",
-                    coverUrl: rxBook.cover_url,
-                    totalPages: rxBook.total_pages || 0,
-                    currentPage: rxBook.current_page || 0,
-                    isPhysical: true,
-                    addedDate: rxBook._modified,
-                    description: "", // Add if needed
-                    publisher: "", // Add if needed
-                };
+                    const bookData = rxBook.toJSON();
+                    const physicalBook: PhysicalBook = {
+                        id: bookData.id,
+                        title: bookData.title,
+                        author: bookData.author || "",
+                        coverUrl: bookData.cover_url,
+                        totalPages: bookData.total_pages || 0,
+                        currentPage: bookData.current_page || 0,
+                        isPhysical: true,
+                        addedDate: bookData._modified,
+                        description: "",
+                        publisher: "",
+                    };
 
-                setBook(physicalBook);
-                setCurrentPage(physicalBook.currentPage.toString());
+                    setBook(physicalBook);
+                    
+                    // Only update input if user is not currently editing
+                    if (!isUserEditing.current) {
+                        setCurrentPage(physicalBook.currentPage.toString());
+                    }
 
-                // Initialize progress in storage
-                const todayISO = format(new Date(), "yyyy-MM-dd");
-                const existingProgress = getProgress(bookId);
+                    // Initialize progress in storage
+                    const todayISO = format(new Date(), "yyyy-MM-dd");
+                    const existingProgress = getProgress(bookId);
 
-                if (!existingProgress) {
-                    const percent = Math.round((physicalBook.currentPage / physicalBook.totalPages) * 100);
-                    setProgress(bookId, {
-                        partIndex: 0,
-                        chapterIndex: 0,
-                        percent,
-                        currentPage: physicalBook.currentPage,
-                        totalPages: physicalBook.totalPages,
-                    });
-                }
+                    if (!existingProgress) {
+                        const percent = Math.round((physicalBook.currentPage / physicalBook.totalPages) * 100);
+                        setProgress(bookId, {
+                            partIndex: 0,
+                            chapterIndex: 0,
+                            percent,
+                            currentPage: physicalBook.currentPage,
+                            totalPages: physicalBook.totalPages,
+                        });
+                    }
 
-                // Initialize baseline if needed
-                const baseline = getDailyBaseline(bookId, todayISO);
-                if (!baseline) {
-                    const percent = Math.round((physicalBook.currentPage / physicalBook.totalPages) * 100);
-                    setDailyBaseline(bookId, todayISO, {
-                        words: 0,
-                        percent,
-                    });
-                }
+                    // Initialize baseline if needed
+                    const baseline = getDailyBaseline(bookId, todayISO);
+                    if (!baseline) {
+                        const percent = Math.round((physicalBook.currentPage / physicalBook.totalPages) * 100);
+                        setDailyBaseline(bookId, todayISO, {
+                            words: 0,
+                            percent,
+                        });
+                    }
+
+                    setLoading(false);
+                });
             } catch (error) {
-                console.error("Error loading book:", error);
+                console.error("Error setting up book subscription:", error);
                 toast({
                     title: "Erro ao carregar livro",
                     description: "Tente novamente",
                     variant: "destructive",
                 });
-            } finally {
                 setLoading(false);
             }
         };
 
-        loadBook();
+        setupSubscription();
+
+        return () => {
+            if (subscription) {
+                subscription.unsubscribe();
+            }
+        };
     }, [bookId, navigate, toast]);
 
     const handleUpdateProgress = async () => {
@@ -275,6 +300,8 @@ export default function PhysicalBookTracker() {
                                         max={book.totalPages}
                                         value={currentPage}
                                         onChange={(e) => setCurrentPage(e.target.value)}
+                                        onFocus={() => { isUserEditing.current = true; }}
+                                        onBlur={() => { isUserEditing.current = false; }}
                                         className="flex-1"
                                     />
                                     <Button onClick={handleUpdateProgress}>Atualizar</Button>
