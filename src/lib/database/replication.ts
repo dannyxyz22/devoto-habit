@@ -57,6 +57,44 @@ export class ReplicationManager {
         // Stop existing replications if any
         await this.stopReplication();
 
+        // Test Realtime connection
+        try {
+            const channel = supabase.channel('test-realtime');
+            channel.on('system', { event: '*' }, (payload) => {
+                console.log('ReplicationManager: Realtime system event:', payload);
+            });
+            
+            const status = await channel.subscribe((status) => {
+                console.log('ReplicationManager: Realtime subscription status:', status);
+            });
+            
+            // Cleanup test channel after 2 seconds
+            setTimeout(() => {
+                supabase.removeChannel(channel);
+            }, 2000);
+        } catch (err) {
+            console.error('ReplicationManager: Realtime test failed:', err);
+        }
+
+        // Setup direct Realtime listener to debug
+        try {
+            const booksChannel = supabase.channel('books-changes')
+                .on('postgres_changes', 
+                    { event: '*', schema: 'public', table: 'books' },
+                    (payload) => {
+                        console.log('🔔 [Realtime] Books change detected:', payload.eventType, payload.new);
+                    }
+                )
+                .subscribe((status) => {
+                    console.log('🔔 [Realtime] Books channel status:', status);
+                });
+            
+            // Store for cleanup later
+            (this as any).realtimeChannel = booksChannel;
+        } catch (err) {
+            console.error('ReplicationManager: Realtime books channel failed:', err);
+        }
+
         try {
             // Replicate Books
             const booksReplication = await replicateSupabase<RxBookDocumentType>({
