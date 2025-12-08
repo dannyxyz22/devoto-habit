@@ -71,9 +71,10 @@ export class ReplicationManager {
                 pull: {
                     batchSize: 50,
                     modifier: (doc) => {
-                        // Map nullable fields
+                        // Map nullable fields - cover_url is handled by Cache Storage in UI
                         if (!doc.author) delete doc.author;
                         if (!doc.file_hash) delete doc.file_hash;
+                        if (!doc.cover_url) delete doc.cover_url;
                         return doc;
                     }
                 },
@@ -124,7 +125,7 @@ export class ReplicationManager {
                 pull: {
                     batchSize: 50,
                     modifier: (doc) => {
-                        // Map nullable fields
+                        // Map nullable fields - cover_url is handled by Cache Storage in UI
                         if (!doc.author) delete doc.author;
                         if (!doc.file_size) delete doc.file_size;
                         if (!doc.cover_url) delete doc.cover_url;

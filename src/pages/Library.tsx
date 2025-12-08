@@ -145,6 +145,51 @@ const Library = () => {
     );
   };
 
+  // Cached cover loader: loads from Cache Storage first, falls back to coverUrl
+  const CachedCoverLoader = ({ id, title, coverUrl }: { id: string; title: string; coverUrl?: string | null }) => {
+    const [src, setSrc] = useState<string | null>(null);
+
+    useEffect(() => {
+      let cancelled = false;
+      const run = async () => {
+        try {
+          // Try Cache Storage first
+          const cachedUrl = await getCoverObjectUrl(id);
+          if (cachedUrl && !cancelled) {
+            setSrc(cachedUrl);
+            return;
+          }
+          
+          // Fallback to coverUrl if available
+          if (coverUrl && !cancelled) {
+            // If it's a URL, try to cache it
+            if (coverUrl.startsWith('http')) {
+              try {
+                const resp = await fetch(coverUrl);
+                if (resp.ok) {
+                  const blob = await resp.blob();
+                  await saveCoverBlob(id, blob);
+                  if (!cancelled) setSrc(URL.createObjectURL(blob));
+                  return;
+                }
+              } catch { /* fallback to direct use */ }
+            }
+            if (!cancelled) setSrc(coverUrl);
+          }
+        } catch { /* ignore */ }
+      };
+      run();
+      return () => { cancelled = true; };
+    }, [id, coverUrl]);
+
+    return (
+      <Cover
+        src={src || "/placeholder.svg"}
+        alt={`Capa do livro ${title}`}
+      />
+    );
+  };
+
   // Reactive book loading
   useEffect(() => {
     let subscription: any;
@@ -249,6 +294,23 @@ const Library = () => {
     return () => {
       if (subscription) subscription.unsubscribe();
     };
+  }, []);
+
+  // Auto-sync on page load as fallback when Realtime is not available
+  useEffect(() => {
+    const autoSync = async () => {
+      try {
+        const { replicationManager } = await import('@/lib/database/replication');
+        // Small delay to let the page render first
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await replicationManager.quickSync();
+        console.log('[Library] Auto-sync completed on page load');
+      } catch (err) {
+        console.warn('[Library] Auto-sync failed (non-critical):', err);
+      }
+    };
+    
+    autoSync();
   }, []);
 
   // Handle EPUB file upload
@@ -843,7 +905,9 @@ const Library = () => {
               }}
               className="cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2"
             >
-              {book.coverImage ? (
+              {book.isPhysical || book.isUserUpload ? (
+                <CachedCoverLoader id={book.id} title={book.title} coverUrl={book.coverImage} />
+              ) : book.coverImage ? (
                 <Cover
                   src={book.coverImage}
                   alt={`Capa do livro ${book.title}`}
