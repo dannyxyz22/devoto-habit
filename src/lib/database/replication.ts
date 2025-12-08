@@ -37,31 +37,16 @@ export class ReplicationManager {
         }
         console.log('ReplicationManager: Authenticated as:', session.user.email, 'User ID:', session.user.id);
         
-        // Test RLS policies by fetching a sample document
+        // Verify RLS policies
         try {
-            const { data: testBooks, error: testError, count } = await supabase
+            const { count, error: testError } = await supabase
                 .from('books')
-                .select('id, title, user_id, type, _modified', { count: 'exact' })
-                .limit(100);
+                .select('id', { count: 'exact', head: true });
             
-            console.log('ReplicationManager: RLS Test - Books accessible:', testBooks?.length || 0, 'Total count:', count);
-            
-            // Show _modified values to debug replication
-            if (testBooks && testBooks.length > 0) {
-                console.log('ReplicationManager: Sample book _modified:', testBooks[0]._modified, 'Type:', typeof testBooks[0]._modified);
-                console.log('ReplicationManager: All _modified values:', testBooks.map((b: any) => ({ id: b.id, _modified: b._modified })));
-            }
             if (testError) {
                 console.error('ReplicationManager: RLS Test failed:', testError);
-            } else if (testBooks) {
-                console.log('ReplicationManager: Sample books:', testBooks);
-                // Count by type
-                const byType = testBooks.reduce((acc, book) => {
-                    const type = book.type || 'unknown';
-                    acc[type] = (acc[type] || 0) + 1;
-                    return acc;
-                }, {} as Record<string, number>);
-                console.log('ReplicationManager: Books by type:', byType);
+            } else {
+                console.log('ReplicationManager: Books accessible via RLS:', count);
             }
         } catch (err) {
             console.error('ReplicationManager: RLS Test exception:', err);
@@ -71,15 +56,6 @@ export class ReplicationManager {
 
         // Stop existing replications if any
         await this.stopReplication();
-
-        // Clear old checkpoints to force full re-sync
-        try {
-            // Try to clear checkpoint data from storage
-            const allDocs = await db.books.find().exec();
-            console.log('ReplicationManager: Found', allDocs.length, 'books in local DB before clear');
-        } catch (err) {
-            console.warn('ReplicationManager: Could not query books:', err);
-        }
 
         try {
             // Replicate Books
@@ -91,48 +67,24 @@ export class ReplicationManager {
                 live: true,
                 pull: {
                     batchSize: 50,
-                    queryBuilder: ({ query }) => {
-                        // CRITICAL: This tells RxDB how to query Supabase
-                        console.log('[Books Pull] queryBuilder called!');
-                        return query;
-                    },
                     modifier: (doc) => {
-                        console.log('[Books Pull] Received from Supabase:', { id: doc.id, user_id: doc.user_id, title: doc.title });
                         // Map nullable fields
                         if (!doc.author) delete doc.author;
                         if (!doc.file_hash) delete doc.file_hash;
-
-                        // _modified is already BIGINT in Supabase, no conversion needed
                         return doc;
                     }
                 },
                 push: {
                     batchSize: 50,
                     modifier: (doc) => {
-                        console.log('[Push Modifier] Original:', doc);
                         const { created_at, updated_at, ...rest } = doc as any;
-
                         // Filter out base64 cover_url, but keep external URLs
                         if (rest.cover_url && rest.cover_url.startsWith('data:')) {
                             delete rest.cover_url;
                         }
-
-                        console.log('[Push Modifier] Sanitized:', rest);
                         return rest;
                     }
                 }
-            });
-            
-            console.log('ReplicationManager: Books replication result:', {
-                type: typeof booksReplication,
-                hasAwaitInitialReplication: typeof (booksReplication as any).awaitInitialReplication === 'function',
-                hasReceived: typeof (booksReplication as any).received$ !== 'undefined',
-                keys: Object.keys(booksReplication as any).slice(0, 10),
-                // Explore internal structure
-                internalState: (booksReplication as any).internalReplicationState ? 'exists' : 'missing',
-                isPaused: (booksReplication as any).isPaused,
-                isStopped: (booksReplication as any).isStopped,
-                canceled: (booksReplication as any).canceled
             });
 
             // Replicate Settings
@@ -144,10 +96,6 @@ export class ReplicationManager {
                 live: true,
                 pull: {
                     batchSize: 10,
-                    queryBuilder: ({ query }) => {
-                        console.log('[Settings Pull] Executing query...');
-                        return query; // Return the base query - RLS will filter by user
-                    },
                     modifier: (doc) => {
                         // Map nullable fields
                         if (!doc.theme) delete doc.theme;
@@ -172,12 +120,7 @@ export class ReplicationManager {
                 live: true,
                 pull: {
                     batchSize: 50,
-                    queryBuilder: ({ query }) => {
-                        console.log('[User EPUBs Pull] Executing query...');
-                        return query; // Return the base query - RLS will filter by user
-                    },
                     modifier: (doc) => {
-                        console.log('[User EPUBs Pull] Received from Supabase:', { id: doc.id, user_id: doc.user_id, title: doc.title });
                         // Map nullable fields
                         if (!doc.author) delete doc.author;
                         if (!doc.file_size) delete doc.file_size;
@@ -208,107 +151,23 @@ export class ReplicationManager {
                 throw new Error(`Failed to create ${invalidStates.length} replication state(s)`);
             }
 
-            // CRITICAL: Subscribe to observables to trigger pull
-            // RxDB won't start pulling until someone subscribes to the replication state's observables
-            console.log('ReplicationManager: Setting up subscriptions to trigger replication...');
-            const subscriptions: any[] = [];
-            
+            // Subscribe to error$ for each replication to catch issues
             this.replicationStates.forEach((state, index) => {
                 const names = ['Books', 'User EPUBs', 'Settings'];
                 const name = names[index];
-                let totalReceived = 0;
-                try {
-                    // Subscribe to ALL observables to ensure pull is triggered
-                    subscriptions.push(
-                        (state as any).error$.subscribe((err: any) => {
-                            console.error(`[${name} Replication] Error:`, err);
-                        })
-                    );
-                    
-                    subscriptions.push(
-                        (state as any).received$.subscribe((docs: any[]) => {
-                            if (!docs || !Array.isArray(docs)) {
-                                console.log(`[${name} Replication] received$ emitted with non-array:`, typeof docs, docs);
-                            } else {
-                                totalReceived += docs.length;
-                                console.log(`[${name} Replication] received$ emitted with ${docs.length} docs (Total so far: ${totalReceived})`);
-                                if (docs.length > 0) {
-                                    console.log(`[${name} Replication] Pulled ${docs.length} document(s)`, docs.map((d: any) => d.id));
-                                }
-                            }
-                        })
-                    );
-                    
-                    subscriptions.push(
-                        (state as any).sent$.subscribe((docs: any[]) => {
-                            console.log(`[${name} Replication] sent$ emitted with ${docs.length} docs`);
-                            if (docs.length > 0) {
-                                console.log(`[${name} Replication] Pushed ${docs.length} document(s)`);
-                            }
-                        })
-                    );
-                    
-                    // Also subscribe to active$ to see state changes
-                    subscriptions.push(
-                        (state as any).active$.subscribe((isActive: boolean) => {
-                            console.log(`[${name} Replication] active$ changed to:`, isActive);
-                        })
-                    );
-                    
-                } catch (err) {
-                    console.warn(`[${name}] Failed to setup subscriptions:`, err);
-                }
+                (state as any).error$.subscribe((err: any) => {
+                    console.error(`[${name} Replication] Error:`, err);
+                });
             });
             
-            // Try to resume/activate the replication if it's paused
-            console.log('ReplicationManager: Attempting to resume replication if paused...');
-            for (let i = 0; i < this.replicationStates.length; i++) {
-                const state = this.replicationStates[i];
-                const names = ['Books', 'User EPUBs', 'Settings'];
-                const name = names[i];
-                
-                try {
-                    if (typeof (state as any).resume === 'function') {
-                        console.log(`[${name}] Calling resume()...`);
-                        await (state as any).resume();
-                        console.log(`[${name}] Resumed`);
-                    }
-                    
-                    if (typeof (state as any).start === 'function') {
-                        console.log(`[${name}] Calling start()...`);
-                        await (state as any).start();
-                        console.log(`[${name}] Started`);
-                    }
-                } catch (err) {
-                    console.warn(`[${name}] Error resuming/starting:`, err);
-                }
-            }
-            
-            console.log('ReplicationManager: Subscriptions active, replication should be pulling now...');
-
-            // Try to manually trigger pull if method exists
-            console.log('ReplicationManager: Attempting to manually trigger pull...');
-            for (let i = 0; i < this.replicationStates.length; i++) {
-                const state = this.replicationStates[i];
-                const names = ['Books', 'User EPUBs', 'Settings'];
-                const name = names[i];
-                
-                try {
-                    // Try to call pull() directly if it exists
-                    if (typeof (state as any).pull === 'function') {
-                        console.log(`[${name}] Calling pull() directly...`);
-                        await (state as any).pull();
-                        console.log(`[${name}] Pull completed`);
-                    } else {
-                        console.log(`[${name}] pull() method not found on state`);
-                    }
-                } catch (err) {
-                    console.warn(`[${name}] Error calling pull():`, err);
+            // Start replications
+            for (const state of this.replicationStates) {
+                if (typeof (state as any).start === 'function') {
+                    await (state as any).start();
                 }
             }
 
             // Wait for initial sync
-            console.log('ReplicationManager: Waiting for initial replication...');
             try {
                 await Promise.race([
                     Promise.all(this.replicationStates.map(s => s.awaitInitialReplication())),
@@ -317,48 +176,17 @@ export class ReplicationManager {
                 console.log('ReplicationManager: Initial replication complete ✓');
             } catch (err) {
                 if ((err as Error).message === 'Replication timeout') {
-                    console.warn('ReplicationManager: Replication timeout (but continuing anyway)...');
+                    console.warn('ReplicationManager: Replication timeout (continuing anyway)');
                 } else {
                     throw err;
                 }
             }
 
-            // Check how many books were synced
+            // Log final sync count
             const totalBooks = await db.books.count().exec();
-            console.log(`ReplicationManager: Books sync complete - Total in RxDB: ${totalBooks} (Expected: 20 from Supabase)`);
+            console.log(`ReplicationManager: Synced ${totalBooks} books`);
 
-            // Log replication states and internal checkpoints
-            this.replicationStates.forEach((state, index) => {
-                const names = ['Books', 'User EPUBs', 'Settings'];
-                const name = names[index] || 'Unknown';
-                
-                // Get internal state
-                const internalState = (state as any).internalReplicationState;
-                const checkpoint = internalState?.checkpointDoc;
-                
-                console.log(`[${name} Replication] Active:`, !!(state as any).isStopped, 'Live:', (state as any).live);
-                console.log(`[${name} Replication] Checkpoint:`, checkpoint);
-                
-                // Try to get stats
-                try {
-                    const stats = {
-                        canceled: (state as any).canceled,
-                        isStopped: (state as any).isStopped,
-                        subjects: {
-                            active: !!(state as any).subjects?.active,
-                            error: !!(state as any).subjects?.error,
-                            received: !!(state as any).subjects?.received,
-                            sent: !!(state as any).subjects?.sent,
-                        }
-                    };
-                    console.log(`[${name} Replication] Stats:`, stats);
-                } catch (err) {
-                    console.warn(`[${name} Replication] Could not get stats:`, err);
-                }
-            });
-
-            // After initial replication, proactively reconcile user_epubs:
-            // Ensure local docs exist in Supabase to avoid RC_PUSH 'doc not found'
+            // Reconcile user_epubs to avoid push conflicts
             await this.reconcileUserEpubs();
 
         } catch (error) {
@@ -518,8 +346,6 @@ export class ReplicationManager {
                 .upsert(upsertPayload, { onConflict: 'user_id,file_hash' });
             if (upsertErr) {
                 console.warn('[User EPUBs Reconciliation] Upsert error:', upsertErr);
-            } else {
-                console.log('[User EPUBs Reconciliation] Upserted/Aligned', upsertPayload.length, 'rows');
             }
         } catch (err) {
             console.warn('[User EPUBs Reconciliation] Failed:', err);
