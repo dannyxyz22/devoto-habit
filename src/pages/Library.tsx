@@ -769,14 +769,9 @@ const Library = () => {
                   title: 'Sincronizando...',
                 });
                 await replicationManager.quickSync();
-                
-                // Refresh the books list after sync
-                const books = await dataLayer.getBooks();
-                setAllBooks(books as any);
-                
+                // RxDB subscription will automatically update the UI when data changes
                 toast({
                   title: 'Sincronizado!',
-                  description: `${books.length} livros atualizados`,
                 });
               } catch (error) {
                 toast({
@@ -800,14 +795,9 @@ const Library = () => {
                   description: 'Aguarde, isso pode levar alguns segundos',
                 });
                 await replicationManager.forceFullResync();
-                
-                // Refresh the books list after sync
-                const books = await dataLayer.getBooks();
-                setAllBooks(books as any);
-                
+                // RxDB subscription will automatically update the UI when data changes
                 toast({
                   title: 'Re-sync completo!',
-                  description: `${books.length} livros sincronizados`,
                 });
               } catch (error) {
                 toast({
