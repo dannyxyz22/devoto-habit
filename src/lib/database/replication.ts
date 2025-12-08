@@ -258,6 +258,38 @@ export class ReplicationManager {
     }
 
     /**
+     * Quick sync: trigger reSync on all active replications without clearing checkpoints.
+     * This is a lightweight fallback when Realtime is not available.
+     * Returns a promise that resolves when all reSyncs have been triggered.
+     */
+    async quickSync(): Promise<void> {
+        console.log('ReplicationManager: Quick sync triggered...');
+        
+        if (this.replicationStates.length === 0) {
+            console.warn('ReplicationManager: No active replications for quick sync');
+            // Try to start replication if not active
+            await this.startReplication();
+            return;
+        }
+
+        const names = ['Books', 'User EPUBs', 'Settings'];
+        
+        for (let i = 0; i < this.replicationStates.length; i++) {
+            const state = this.replicationStates[i];
+            const name = names[i];
+            
+            if (state && typeof (state as any).reSync === 'function') {
+                console.log(`[${name}] Triggering reSync...`);
+                (state as any).reSync();
+            }
+        }
+
+        // Wait a bit for the sync to process
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        console.log('ReplicationManager: Quick sync complete');
+    }
+
+    /**
      * Force a full re-sync by clearing checkpoints and restarting replication.
      * Useful when documents are missing from local database.
      */

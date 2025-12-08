@@ -704,13 +704,48 @@ const Library = () => {
               try {
                 const { replicationManager } = await import('@/lib/database/replication');
                 toast({
+                  title: 'Sincronizando...',
+                });
+                await replicationManager.quickSync();
+                
+                // Refresh the books list after sync
+                const books = await dataLayer.getBooks();
+                setAllBooks(books as any);
+                
+                toast({
+                  title: 'Sincronizado!',
+                  description: `${books.length} livros atualizados`,
+                });
+              } catch (error) {
+                toast({
+                  title: 'Erro no sync',
+                  description: error instanceof Error ? error.message : 'Erro desconhecido',
+                  variant: 'destructive',
+                });
+              }
+            }} 
+            variant="outline"
+            size="sm"
+          >
+            🔄 Quick Sync
+          </Button>
+          <Button 
+            onClick={async () => {
+              try {
+                const { replicationManager } = await import('@/lib/database/replication');
+                toast({
                   title: 'Forçando re-sync completo...',
                   description: 'Aguarde, isso pode levar alguns segundos',
                 });
                 await replicationManager.forceFullResync();
+                
+                // Refresh the books list after sync
+                const books = await dataLayer.getBooks();
+                setAllBooks(books as any);
+                
                 toast({
                   title: 'Re-sync completo!',
-                  description: 'Todos os livros foram baixados novamente',
+                  description: `${books.length} livros sincronizados`,
                 });
               } catch (error) {
                 toast({
