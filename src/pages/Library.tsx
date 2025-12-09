@@ -139,7 +139,7 @@ const Library = () => {
 
     return (
       <Cover
-        src={src || "/placeholder.svg"}
+        src={src || "/placeholder.png"}
         alt={`Capa do livro ${title}`}
       />
     );
@@ -191,7 +191,7 @@ const Library = () => {
 
     return (
       <Cover
-        src={src || "/placeholder.svg"}
+        src={src || "/placeholder.png"}
         alt={`Capa do livro ${title}`}
       />
     );
