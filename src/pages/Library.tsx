@@ -666,6 +666,19 @@ const Library = () => {
           <Button 
             onClick={async () => {
               try {
+                // Check if user is logged in first
+                const { authService } = await import('@/services/auth/SupabaseAuthService');
+                const { user } = await authService.getUser();
+                
+                if (!user) {
+                  toast({
+                    title: 'Login necessário',
+                    description: 'Faça login para sincronizar seus dados',
+                  });
+                  navigate('/login');
+                  return;
+                }
+                
                 const { replicationManager } = await import('@/lib/database/replication');
                 toast({
                   title: 'Sincronizando...',
