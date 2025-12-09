@@ -54,6 +54,10 @@ const EpubReader = () => {
   const renditionRef = useRef<Rendition | null>(null);
   const settingsPanelRef = useRef<HTMLDivElement | null>(null);
   const settingsOpenRef = useRef<boolean>(false);
+  // Flag para evitar que efeitos chamem display() durante o carregamento inicial
+  const initialLoadCompleteRef = useRef<boolean>(false);
+  // Timestamp de quando podemos começar a salvar posições (ignora os primeiros eventos relocated)
+  const canSavePositionAfterRef = useRef<number>(0);
   const [err, setErr] = useState<string | null>(null);
   const [containerWidth, setContainerWidth] = useState<number>(0);
   const [reloadKey, setReloadKey] = useState(0);
@@ -250,18 +254,26 @@ const EpubReader = () => {
         }
 
         // Re-render to apply changes immediately, keeping exact CFI position
-        try {
-          const currentLocation = rendition.currentLocation?.() as any;
-          const currentCfi = currentLocation?.start?.cfi;
-          if (currentCfi) {
-            // Small delay to ensure theme selection has propagated
-            timeoutId = window.setTimeout(() => {
-              if (cancelled || renditionRef.current !== rendition) return;
-              rendition.display(currentCfi);
-            }, 100);
+        // IMPORTANTE: Só chama display() se o carregamento inicial já completou
+        // para evitar race condition com a navegação inicial
+        if (initialLoadCompleteRef.current) {
+          try {
+            const savedCfi = localStorage.getItem(`epubLoc:${epubId}`);
+            const currentLocation = rendition.currentLocation?.() as any;
+            const currentCfi = savedCfi || currentLocation?.start?.cfi;
+            if (currentCfi) {
+              // Small delay to ensure theme selection has propagated
+              timeoutId = window.setTimeout(() => {
+                if (cancelled || renditionRef.current !== rendition) return;
+                console.log('[Preferences] Re-displaying at CFI:', currentCfi);
+                rendition.display(currentCfi);
+              }, 100);
+            }
+          } catch (err) {
+            console.warn('[Preferences] Reaplicar CFI falhou:', err);
           }
-        } catch (err) {
-          console.warn('[Preferences] Reaplicar CFI falhou:', err);
+        } else {
+          console.log('[Preferences] Skipping display() - initial load not complete yet');
         }
 
         console.log('[Preferences] Applied:', preferences);
@@ -397,9 +409,72 @@ const EpubReader = () => {
         }
 
         if (cancelled) return;
+        
+        // Ler o CFI salvo ANTES de criar o rendition
+        let savedCfi: string | null = null;
+        try {
+          savedCfi = localStorage.getItem(`epubLoc:${epubId}`);
+          console.log('[CFI Debug] Loading saved CFI before renderTo:', { key: `epubLoc:${epubId}`, savedCfi });
+        } catch { }
+        
         const book = ePub(ab);
         const rendition = book.renderTo(container, { width: "100%", height: "100%", spread: effectiveSpread as any });
         renditionRef.current = rendition;
+        
+        // IMPORTANTE: Chamar display() IMEDIATAMENTE após renderTo() para evitar que
+        // o epub.js navegue para uma posição padrão e emita um "relocated" errado
+        initialLoadCompleteRef.current = false;
+        
+        // Ignorar eventos relocated por 2 segundos após o display() inicial
+        // Isso garante que não salvamos posições erradas durante a inicialização
+        canSavePositionAfterRef.current = Date.now() + 2000;
+        
+        // Navegar para a posição salva imediatamente (ou início se não tiver)
+        console.log('[CFI Debug] Calling display() immediately after renderTo with:', savedCfi || '(undefined - start of book)');
+        rendition.display(savedCfi || undefined).then(() => {
+          console.log('[CFI Debug] Initial navigation done');
+          
+          // Aguarda um pouco para o layout estabilizar antes de carregar locations
+          setTimeout(() => {
+            initialLoadCompleteRef.current = true;
+            console.log('[CFI Debug] Initial load complete, other effects can now call display()');
+            
+            // Carregar locations DEPOIS que a navegação inicial completou
+            try {
+              const cachedLocations = loadLocationsFromCache(epubId);
+
+              if (cachedLocations) {
+                try {
+                  const locations = JSON.parse(cachedLocations);
+                  book.locations.load(locations);
+                  console.log('[Locations] Restauradas do cache após navegação inicial:', book.locations.length());
+                } catch (err) {
+                  console.error('[Locations] Erro ao restaurar cache:', err);
+                  generateLocations();
+                }
+              } else {
+                generateLocations();
+              }
+              
+              function generateLocations() {
+                console.log('[Locations] Gerando locations em segundo plano...');
+                book.locations.generate(500).then(() => {
+                  try {
+                    const locationsData = book.locations.save();
+                    saveLocationsToCache(epubId, locationsData);
+                    console.log('[Locations] Geradas e salvas no cache:', book.locations.length());
+                  } catch (err) {
+                    console.error('[Locations] Erro ao salvar cache:', err);
+                  }
+                });
+              }
+            } catch { }
+          }, 500);
+        }).catch((err) => {
+          console.warn('[CFI Debug] Initial display failed:', err);
+          initialLoadCompleteRef.current = true;
+        });
+        
         // Register themes once
         applyEpubTheme();
         setRenditionReady(true); // signal that rendition has been created (triggers preference application)
@@ -408,10 +483,33 @@ const EpubReader = () => {
             // Listener de mudança de posição
             rendition.on("relocated", (location: any) => {
               try {
+                const cfi = location?.start?.cfi;
+                
+                // IMPORTANTE: Ignorar eventos relocated durante os primeiros 2 segundos
+                // O epub.js emite eventos "falsos" durante a inicialização
+                const now = Date.now();
+                if (now < canSavePositionAfterRef.current) {
+                  console.log('[CFI Debug] IGNORANDO relocated - ainda na janela de inicialização', { 
+                    cfi, 
+                    msRemaining: canSavePositionAfterRef.current - now 
+                  });
+                  return;
+                }
+                
                 // Compute today's local date on each relocation to catch system date changes
                 const todayISO = format(new Date(), 'yyyy-MM-dd');
-                const cfi = location?.start?.cfi;
+                
+                // DEBUG: Log every relocation event with stack trace
+                console.log('[CFI Debug] relocated event:', {
+                  cfi,
+                  startIndex: location?.start?.index,
+                  startDisplayedPage: location?.start?.displayed?.page,
+                  startDisplayedTotal: location?.start?.displayed?.total,
+                  endCfi: location?.end?.cfi,
+                });
+                
                 if (cfi) {
+                  console.log('[CFI Debug] Saving to localStorage:', { key: `epubLoc:${epubId}`, cfi });
                   try { localStorage.setItem(`epubLoc:${epubId}`, cfi); } catch { }
                 }
 
@@ -446,6 +544,7 @@ const EpubReader = () => {
                 });
 
                 setProgress(epubId, { partIndex: 0, chapterIndex: 0, percent });
+                console.log('[CFI Debug] Saving progress:', { epubId, percent, cfi });
 
                 // Sync with DataLayer (including CFI)
                 (async () => {
@@ -455,6 +554,7 @@ const EpubReader = () => {
 
                     if (userEpub) {
                       // Update user_epub progress via DataLayer
+                      console.log('[CFI Debug] Saving to user_epubs:', { id: epubId, percent, cfi });
                       await dataLayer.saveUserEpub({
                         ...userEpub,
                         percentage: percent,
@@ -466,6 +566,7 @@ const EpubReader = () => {
                       // Fallback to books collection (for static EPUBs)
                       const book = await dataLayer.getBook(epubId);
                       if (book) {
+                        console.log('[CFI Debug] Saving to books:', { id: epubId, percent, cfi });
                         await dataLayer.saveBook({
                           ...book,
                           percentage: percent,
@@ -615,83 +716,6 @@ const EpubReader = () => {
               list.forEach((c: any) => attachEvents(c));
             } catch { }
 
-            // Exibe a posição salva (ou início)
-            let saved: string | null = null;
-            try {
-              // Try local storage first for immediate feedback
-              saved = localStorage.getItem(`epubLoc:${epubId}`);
-
-              // Check RxDB for cloud-synced location (user_epubs or books)
-              (async () => {
-                try {
-                  const db = await import('@/lib/database/db').then(m => m.getDatabase());
-                  const dbInstance = await db;
-
-                  // Check user_epubs first
-                  const userEpub = await dbInstance.user_epubs.findOne({
-                    selector: { id: epubId }
-                  }).exec();
-
-                  if (userEpub) {
-                    const epub = userEpub.toJSON();
-                    if (epub.last_location_cfi && epub.last_location_cfi !== saved) {
-                      console.log('[EpubReader] Found cloud location from user_epubs:', epub.last_location_cfi);
-                      rendition.display(epub.last_location_cfi);
-                      saved = epub.last_location_cfi;
-                    }
-                  } else {
-                    // Fallback to books collection
-                    const book = await dataLayer.getBook(epubId);
-                    if (book && book.last_location_cfi && book.last_location_cfi !== saved) {
-                      console.log('[EpubReader] Found cloud location from books:', book.last_location_cfi);
-                      rendition.display(book.last_location_cfi);
-                      saved = book.last_location_cfi;
-                    }
-                  }
-                } catch (err) {
-                  console.warn('[EpubReader] Error loading cloud location:', err);
-                }
-              })();
-            } catch { }
-            rendition.display(saved || undefined);
-
-            // ⚡ Gera locations em segundo plano (ou restaura do cache LRU)
-            try {
-              // Tenta carregar locations do cache LRU
-              const cachedLocations = loadLocationsFromCache(epubId);
-
-              if (cachedLocations) {
-                // Restaura locations do cache
-                try {
-                  const locations = JSON.parse(cachedLocations);
-                  book.locations.load(locations);
-                  console.log('[Locations] Restauradas do cache LRU:', book.locations.length);
-                  // Força recalcular percentuais com locations restauradas
-                  try { rendition.currentLocation() && rendition.emit("relocated", rendition.currentLocation()); } catch { }
-                } catch (err) {
-                  console.error('[Locations] Erro ao restaurar cache:', err);
-                  // Se falhar, gera novamente
-                  generateAndCacheLocations();
-                }
-              } else {
-                // Não tem cache, gera pela primeira vez
-                generateAndCacheLocations();
-              }
-
-              function generateAndCacheLocations() {
-                book.locations.generate(500).then(() => {
-                  // Salva locations no cache LRU
-                  try {
-                    const locationsData = book.locations.save();
-                    saveLocationsToCache(epubId, locationsData);
-                  } catch (err) {
-                    console.error('[Locations] Erro ao salvar cache:', err);
-                  }
-                  // Força recalcular percentuais com base nas novas locations
-                  try { rendition.currentLocation() && rendition.emit("relocated", rendition.currentLocation()); } catch { }
-                });
-              }
-            } catch { }
           })
           .catch(() => setErr("Falha ao carregar o EPUB."));
 
@@ -701,7 +725,12 @@ const EpubReader = () => {
     };
     load();
 
-    return () => { cancelled = true; try { renditionRef.current?.destroy(); } catch { } };
+    return () => { 
+      cancelled = true; 
+      initialLoadCompleteRef.current = false; // Reset para o próximo carregamento
+      canSavePositionAfterRef.current = 0; // Reset para o próximo carregamento
+      try { renditionRef.current?.destroy(); } catch { } 
+    };
   }, [epubId, effectiveSpread, toast, reloadKey]);
 
   // When theme preference changes, reinitialize the rendition to mimic a fresh load
@@ -711,6 +740,8 @@ const EpubReader = () => {
     prevThemeRef.current = preferences.theme;
 
     // Destroy current rendition and trigger reload
+    canSavePositionAfterRef.current = 0; // Reset para o reload
+    initialLoadCompleteRef.current = false; // Reset para o reload
     try { renditionRef.current?.destroy(); } catch { }
     renditionRef.current = null;
     setRenditionReady(false);
@@ -768,7 +799,22 @@ const EpubReader = () => {
     const rendition = renditionRef.current;
     if (!rendition) return;
 
+    // Só faz reflow se o carregamento inicial já completou
+    if (!initialLoadCompleteRef.current) {
+      console.log('[Fullscreen] Skipping reflow - initial load not complete yet');
+      return;
+    }
+
     let cancelled = false;
+
+    // Use saved CFI from localStorage instead of currentLocation() to avoid race conditions
+    const getSavedCfi = (): string | null => {
+      try {
+        return localStorage.getItem(`epubLoc:${epubId}`);
+      } catch {
+        return null;
+      }
+    };
 
     const refreshLayout = () => {
       if (cancelled) return;
@@ -777,9 +823,12 @@ const EpubReader = () => {
         if (viewer) {
           rendition.resize?.(viewer.clientWidth, viewer.clientHeight);
         }
+        // Prefer saved CFI, fallback to currentLocation() only if no saved position
+        const savedCfi = getSavedCfi();
         const currentLocation = rendition.currentLocation?.() as any;
-        const currentCfi = currentLocation?.start?.cfi;
+        const currentCfi = savedCfi || currentLocation?.start?.cfi;
         if (currentCfi) {
+          console.log('[Fullscreen] Re-displaying at CFI:', currentCfi);
           rendition.display(currentCfi);
         }
       } catch (err) {

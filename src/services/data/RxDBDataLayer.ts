@@ -214,7 +214,13 @@ class RxDBDataLayerImpl implements DataLayer {
             if (bookData.percentage !== undefined) updates.percentage = bookData.percentage;
 
             await existingBook.incrementalPatch(updates);
-            console.log('[DataLayer] Book updated:', { id: existingBook.id, title: existingBook.title, added_date: existingBook.added_date });
+            console.log('[DataLayer] Book updated:', { 
+                id: existingBook.id, 
+                title: existingBook.title, 
+                percentage: updates.percentage,
+                last_location_cfi: updates.last_location_cfi,
+                _modified: updates._modified
+            });
             return existingBook.toJSON();
         } else {
             const dataToSave = {
