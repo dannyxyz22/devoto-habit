@@ -716,6 +716,15 @@ const Library = () => {
               role="button"
               tabIndex={0}
               onClick={() => {
+                // Check if EPUB is not available locally
+                if (book.type === 'epub' && book.isUserUpload && !book.hasLocalFile) {
+                  toast({
+                    title: 'EPUB não disponível',
+                    description: 'Faça o upload para ler neste dispositivo',
+                  });
+                  return;
+                }
+                
                 if (book.isPhysical) {
                   navigate(`/physical/${book.id}`);
                 } else {
@@ -725,6 +734,16 @@ const Library = () => {
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
+                  
+                  // Check if EPUB is not available locally
+                  if (book.type === 'epub' && book.isUserUpload && !book.hasLocalFile) {
+                    toast({
+                      title: 'EPUB não disponível',
+                      description: 'Faça o upload para ler neste dispositivo',
+                    });
+                    return;
+                  }
+                  
                   if (book.isPhysical) {
                     navigate(`/physical/${book.id}`);
                   } else {
