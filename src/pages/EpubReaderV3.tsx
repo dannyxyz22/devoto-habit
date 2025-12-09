@@ -20,67 +20,57 @@ import { dataLayer } from "@/services/data/RxDBDataLayer";
  * https://github.com/gerhardsletten/react-reader/blob/main/src/examples/Persist.tsx
  */
 
-// Chave para localStorage
-const getLocationKey = (epubId: string) => `epubLoc:${epubId}`;
-
 const EpubReaderV3 = () => {
   const { epubId = "" } = useParams();
   const navigate = useNavigate();
-  
+
   // URL do EPUB (pode ser string URL ou ArrayBuffer)
   const [epubUrl, setEpubUrl] = useState<string | ArrayBuffer | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Controlado pelo react-reader - estado da localização (CFI)
-  // Inicializa do localStorage se existir
-  const [location, setLocation] = useState<string | number>(() => {
-    try {
-      const saved = localStorage.getItem(getLocationKey(epubId));
-      return saved || 0;
-    } catch {
-      return 0;
-    }
-  });
+  const [location, setLocation] = useState<string | number>(0);
 
   // Referência para o rendition (para calcular progresso)
   const renditionRef = useRef<Rendition | null>(null);
 
-  // Função para sincronizar progresso com DataLayer
-  const syncProgress = useCallback(async (cfi: string, percent: number) => {
+  // Refs para controle de debounce e flush
+  const latestCfiRef = useRef<string | null>(null);
+  const latestPercentRef = useRef<number>(0);
+  const lastSavedCfiRef = useRef<string | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Função core de salvamento (estável, não recriada)
+  const saveToRxDB = useCallback(async (cfi: string, percent: number) => {
     if (!epubId) return;
-    
+
+    // Atualiza tracking do último salvo
+    lastSavedCfiRef.current = cfi;
+
+    console.log("[EpubReaderV3] Persisting to DB:", { cfi, percent });
     const todayISO = format(new Date(), 'yyyy-MM-dd');
-    
-    console.log("[EpubReaderV3] syncProgress called:", { cfi, percent });
-    
-    // Salvar no storage local
-    setProgress(epubId, { partIndex: 0, chapterIndex: 0, percent });
-    
+
     // Sincronizar com DataLayer (RxDB/Supabase)
     try {
       const userEpub = await dataLayer.getUserEpub(epubId);
-      
+
       if (userEpub) {
-        console.log("[EpubReaderV3] Saving to user_epubs:", { id: epubId, percent, cfi });
         await dataLayer.saveUserEpub({
           ...userEpub,
           percentage: percent,
           last_location_cfi: cfi,
           _modified: Date.now()
         });
-        console.log("[EpubReaderV3] Progress synced to user_epubs:", { percent, cfi });
       } else {
         const book = await dataLayer.getBook(epubId);
         if (book) {
-          console.log("[EpubReaderV3] Saving to books:", { id: epubId, percent, cfi });
           await dataLayer.saveBook({
             ...book,
             percentage: percent,
             last_location_cfi: cfi,
             _modified: Date.now()
           });
-          console.log("[EpubReaderV3] Progress synced to books:", { percent, cfi });
         } else {
           // Criar entrada para livro estático
           const staticBook = BOOKS.find(b => b.id === epubId);
@@ -96,63 +86,94 @@ const EpubReaderV3 = () => {
               added_date: Date.now(),
               _modified: Date.now()
             });
-            console.log("[EpubReaderV3] Created book entry:", staticBook.title);
           }
         }
       }
+      console.log("[EpubReaderV3] DB Persistence complete");
     } catch (error) {
-      console.error("[EpubReaderV3] Error syncing progress:", error);
+      console.error("[EpubReaderV3] DB Persistence error:", error);
     }
-    
-    // Atualizar baseline diário
+
+    // Atualizar baseline e widgets (operações "leves")
     const base = getDailyBaseline(epubId, todayISO);
     const baselinePercent = base ? base.percent : percent;
     if (!base && percent > 0) {
       setDailyBaseline(epubId, todayISO, { words: 0, percent });
     }
-    
-    // Calcular progresso diário e atualizar widget
+
     const plan = getReadingPlan(epubId);
-    const daysRemaining = computeDaysRemaining(plan?.targetDateISO);
-    const dailyTargetPercent = daysRemaining ? Math.ceil(Math.max(0, 100 - baselinePercent) / daysRemaining) : null;
-    const achievedPercentToday = Math.max(0, percent - baselinePercent);
-    const dailyProgressPercent = computeDailyProgressPercent(achievedPercentToday, dailyTargetPercent) ?? 0;
-    
-    // Atualizar widget nativo
-    if (canUseNative()) {
-      try {
-        const hasGoal = dailyTargetPercent != null && dailyTargetPercent > 0;
-        await updateDailyProgressWidget(dailyProgressPercent, hasGoal);
-        await WidgetUpdater.update?.();
-      } catch { }
+    if (plan) { // Calc apenas se tiver plano
+      const daysRemaining = computeDaysRemaining(plan.targetDateISO);
+      const dailyTargetPercent = daysRemaining ? Math.ceil(Math.max(0, 100 - baselinePercent) / daysRemaining) : null;
+      const achievedPercentToday = Math.max(0, percent - baselinePercent);
+      const dailyProgressPercent = computeDailyProgressPercent(achievedPercentToday, dailyTargetPercent) ?? 0;
+
+      if (canUseNative()) {
+        try {
+          const hasGoal = dailyTargetPercent != null && dailyTargetPercent > 0;
+          updateDailyProgressWidget(dailyProgressPercent, hasGoal);
+          WidgetUpdater.update?.();
+        } catch { }
+      }
     }
   }, [epubId]);
 
+  // Função agendadora (debounce)
+  const scheduleSave = useCallback((cfi: string, percent: number) => {
+    latestCfiRef.current = cfi;
+    latestPercentRef.current = percent;
+
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
+    // Aguarda 1s de inatividade para salvar
+    timeoutRef.current = setTimeout(() => {
+      saveToRxDB(cfi, percent);
+    }, 1000);
+  }, [saveToRxDB]);
+
+  // Cleanup effect: Salva imediatamente se houver pendências ao desmontar
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+
+      const latest = latestCfiRef.current;
+      const saved = lastSavedCfiRef.current;
+
+      if (latest && latest !== saved) {
+        console.log("[EpubReaderV3] Unmount detected with pending changes. Flushing save...", latest);
+        const percent = latestPercentRef.current;
+        // Chama saveToRxDB diretamente (sem await pois é cleanup)
+        saveToRxDB(latest, percent);
+      }
+    };
+  }, [saveToRxDB]);
+
   // Callback quando a localização muda
   const handleLocationChanged = useCallback((newLocation: string) => {
-    console.log("[EpubReaderV3] locationChanged:", newLocation);
     setLocation(newLocation);
-    
-    // Salvar no localStorage
+
+    // Salvar sincrono no LocalStorage (Hot Cache) com Timestamp
     try {
-      localStorage.setItem(getLocationKey(epubId), newLocation);
-      console.log("[EpubReaderV3] Saved to localStorage");
-    } catch (err) {
-      console.error("[EpubReaderV3] Failed to save:", err);
-    }
-    
+      const state = { cfi: newLocation, timestamp: Date.now() };
+      localStorage.setItem(`epubLoc:${epubId}`, JSON.stringify(state));
+    } catch (e) { console.error('LocalStorage write failed', e); }
+
     // Calcular porcentagem de progresso
     const rendition = renditionRef.current;
     if (rendition) {
       try {
         const currentLoc = rendition.currentLocation() as any;
         let percent = 0;
-        
+
         // Usar displayed.percentage como fallback
         if (currentLoc?.start?.displayed?.percentage) {
           percent = Math.round(currentLoc.start.displayed.percentage * 100);
         }
-        
+
         // Tentar usar locations se disponível
         const book = (rendition as any).book;
         if (book?.locations?.length?.()) {
@@ -161,20 +182,20 @@ const EpubReaderV3 = () => {
             percent = Math.round(p * 100);
           }
         }
-        
-        // Sincronizar progresso
-        syncProgress(newLocation, percent);
+
+        // Agendar salvamento DB
+        scheduleSave(newLocation, percent);
       } catch (err) {
         console.warn("[EpubReaderV3] Error calculating progress:", err);
       }
     }
-  }, [epubId, syncProgress]);
+  }, [epubId, scheduleSave]);
 
   // Callback para obter acesso ao rendition
   const handleGetRendition = useCallback((rendition: Rendition) => {
     renditionRef.current = rendition;
     console.log("[EpubReaderV3] Got rendition");
-    
+
     // Gerar locations para cálculo de porcentagem preciso
     const book = (rendition as any).book;
     if (book) {
@@ -191,33 +212,98 @@ const EpubReaderV3 = () => {
     }
   }, []);
 
-  // Carregar EPUB
+  // Carregar EPUB e Progresso em Paralelo (HYBRID STRATEGY)
   useEffect(() => {
     if (!epubId) return;
-    
+
     let cancelled = false;
     setLoading(true);
     setError(null);
-    
+
     const load = async () => {
       try {
-        const isUserUpload = epubId.startsWith("user-");
-        
-        if (isUserUpload) {
-          // EPUB do usuário (IndexedDB)
-          const blob = await getUserEpubBlob(epubId);
-          if (!blob) throw new Error("EPUB não encontrado");
-          const ab = await blob.arrayBuffer();
-          if (!cancelled) setEpubUrl(ab);
-        } else {
-          // EPUB estático
-          const meta = BOOKS.find(b => b.id === epubId);
-          const src = meta?.sourceUrl || `/epubs/${epubId}.epub`;
-          const url = resolveEpubSource(src);
-          if (!cancelled) setEpubUrl(url);
+        console.log("[EpubReaderV3] Loading content and progress...");
+
+        // 1. Loader do Conteúdo
+        const contentPromise = (async () => {
+          const isUserUpload = epubId.startsWith("user-");
+          if (isUserUpload) {
+            const blob = await getUserEpubBlob(epubId);
+            if (!blob) throw new Error("EPUB não encontrado");
+            return await blob.arrayBuffer();
+          } else {
+            const meta = BOOKS.find(b => b.id === epubId);
+            const src = meta?.sourceUrl || `/epubs/${epubId}.epub`;
+            return resolveEpubSource(src);
+          }
+        })();
+
+        // 2. Load Local State (Hot Cache)
+        const getLocalState = (id: string) => {
+          try {
+            const raw = localStorage.getItem(`epubLoc:${id}`);
+            if (!raw) return null;
+            if (raw.startsWith('{')) return JSON.parse(raw) as { cfi: string; timestamp: number };
+            return { cfi: raw, timestamp: 0 };
+          } catch { return null; }
+        };
+        const localState = getLocalState(epubId);
+
+        // 3. Loader do Progresso Remoto (RxDB)
+        const remotePromise = (async () => {
+          try {
+            // Tentar user_epubs primeiro
+            const userEpub = await dataLayer.getUserEpub(epubId);
+            if (userEpub?.last_location_cfi) {
+              return { cfi: userEpub.last_location_cfi, ts: new Date(userEpub._modified).getTime() };
+            }
+            // Tentar books depois (para livros estáticos)
+            const book = await dataLayer.getBook(epubId);
+            if (book?.last_location_cfi) {
+              return { cfi: book.last_location_cfi, ts: new Date(book._modified).getTime() };
+            }
+          } catch (e) {
+            console.warn("[EpubReaderV3] Error fetching progress from RxDB:", e);
+          }
+          return null;
+        })();
+
+        const [content, remoteState] = await Promise.all([contentPromise, remotePromise]);
+
+        if (!cancelled) {
+          setEpubUrl(content);
+
+          // RECONCILIAÇÃO: Quem ganha?
+          let finalCfi: string | number = 0;
+
+          if (localState && remoteState) {
+            // Ambos existem: compara timestamps (Local vence se for mais novo)
+            if (localState.timestamp > remoteState.ts) {
+              console.log("[EpubReaderV3] Conflict: Local is newer. Using Local.", { local: localState.timestamp, remote: remoteState.ts });
+              finalCfi = localState.cfi;
+            } else {
+              console.log("[EpubReaderV3] Conflict: Remote is newer/equal. Using Remote.", { local: localState.timestamp, remote: remoteState.ts });
+              finalCfi = remoteState.cfi;
+              // Atualiza local para ficar sync
+              try { localStorage.setItem(`epubLoc:${epubId}`, JSON.stringify({ cfi: finalCfi, timestamp: remoteState.ts })); } catch { }
+            }
+          } else if (localState) {
+            console.log("[EpubReaderV3] Only Local exists. Using Local.");
+            finalCfi = localState.cfi;
+          } else if (remoteState) {
+            console.log("[EpubReaderV3] Only Remote exists. Using Remote.");
+            finalCfi = remoteState.cfi;
+            // Cacheia localmente
+            try { localStorage.setItem(`epubLoc:${epubId}`, JSON.stringify({ cfi: finalCfi, timestamp: remoteState.ts })); } catch { }
+          } else {
+            console.log("[EpubReaderV3] No saved state. Starting at beginning.");
+            finalCfi = 0;
+          }
+
+          setLocation(finalCfi);
+          setLoading(false);
+          console.log("[EpubReaderV3] Ready. Starting at:", finalCfi);
         }
-        
-        if (!cancelled) setLoading(false);
       } catch (err) {
         console.error("[EpubReaderV3] Load error:", err);
         if (!cancelled) {
@@ -226,24 +312,9 @@ const EpubReaderV3 = () => {
         }
       }
     };
-    
+
     load();
     return () => { cancelled = true; };
-  }, [epubId]);
-
-  // Recarregar posição salva quando epubId muda
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(getLocationKey(epubId));
-      if (saved) {
-        console.log("[EpubReaderV3] Restoring location:", saved);
-        setLocation(saved);
-      } else {
-        setLocation(0);
-      }
-    } catch {
-      setLocation(0);
-    }
   }, [epubId]);
 
   if (error) {
@@ -251,7 +322,7 @@ const EpubReaderV3 = () => {
       <div className="h-screen flex items-center justify-center bg-background">
         <div className="text-center">
           <p className="text-red-500 mb-4">{error}</p>
-          <button 
+          <button
             onClick={() => navigate("/biblioteca")}
             className="text-primary underline"
           >
@@ -272,10 +343,10 @@ const EpubReaderV3 = () => {
 
   return (
     <div className="h-screen w-full">
-      <SEO 
-        title={`EPUB — ${epubId}`} 
-        description="Leitor EPUB" 
-        canonical={`/epub/${epubId}`} 
+      <SEO
+        title={`EPUB — ${epubId}`}
+        description="Leitor EPUB"
+        canonical={`/epub/${epubId}`}
       />
       <ReactReader
         url={epubUrl}
