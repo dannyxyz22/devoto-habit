@@ -401,14 +401,18 @@ export class ReplicationManager {
             // Fetch server rows for this user to detect existing file_hash entries
             const { data: serverRows, error: fetchErr } = await supabase
                 .from('user_epubs')
-                .select('id,file_hash,user_id')
+                .select('id,file_hash,user_id,percentage,last_location_cfi') // Fetch progress data
                 .eq('user_id', userId);
             if (fetchErr) {
                 console.warn('[User EPUBs Reconciliation] Fetch server rows error:', fetchErr);
             }
 
-            const serverByHash = new Map<string, { id: string }>();
-            (serverRows || []).forEach(r => serverByHash.set(r.file_hash, { id: r.id }));
+            const serverByHash = new Map<string, { id: string; percentage?: number; last_location_cfi?: string }>();
+            (serverRows || []).forEach(r => serverByHash.set(r.file_hash, {
+                id: r.id,
+                percentage: r.percentage ?? undefined,
+                last_location_cfi: r.last_location_cfi ?? undefined
+            }));
 
             // Align local IDs with server IDs where the same file_hash already exists
             for (const d of localDocs) {
@@ -417,7 +421,19 @@ export class ReplicationManager {
                 if (match && json.id !== match.id) {
                     try {
                         // Replace local doc with server id to avoid conflicts in replication
-                        const replacement = { ...json, id: match.id } as any;
+                        // IMPORTANT: Adopt server progress to prevent overwriting it with local 0%
+                        const replacement = {
+                            ...json,
+                            id: match.id,
+                            // Verify if local is newer or has progress before blindly taking server?
+                            // In this re-onboarding case, local is likely 0. 
+                            // If local has progress, we might want to keep it?
+                            // But safest is: if local is 0, take server.
+                            percentage: (json.percentage || 0) > (match.percentage || 0) ? json.percentage : (match.percentage ?? json.percentage),
+                            last_location_cfi: (json.percentage || 0) > (match.percentage || 0) ? json.last_location_cfi : (match.last_location_cfi ?? json.last_location_cfi),
+                            _modified: Date.now() // Ensure it's treated as a fresh update locally
+                        } as any;
+
                         await d.remove();
                         await db.user_epubs.insert(replacement);
                         console.log('[User EPUBs Reconciliation] Aligned local doc id to server id for hash', json.file_hash);
@@ -427,13 +443,24 @@ export class ReplicationManager {
                 }
             }
 
-            // Upsert remaining (or aligned) local docs to Supabase with onConflict on file_hash+user_id
-            const upsertPayload = localJsons.map(j => ({ ...j, user_id: userId }));
+            // Upsert ONLY local docs that strictly do NOT exist on server
+            // This prevents overwriting existing server data with local defaults
+            const newDocs = localJsons.filter(j => !serverByHash.has(j.file_hash));
+
+            if (newDocs.length === 0) {
+                console.log('[User EPUBs Reconciliation] No new documents to upsert.');
+                return;
+            }
+
+            // Upsert remaining (new) local docs to Supabase
+            const upsertPayload = newDocs.map(j => ({ ...j, user_id: userId }));
             const { error: upsertErr } = await supabase
                 .from('user_epubs')
                 .upsert(upsertPayload, { onConflict: 'user_id,file_hash' });
             if (upsertErr) {
                 console.warn('[User EPUBs Reconciliation] Upsert error:', upsertErr);
+            } else {
+                console.log(`[User EPUBs Reconciliation] Upserted ${upsertPayload.length} new docs.`);
             }
         } catch (err) {
             console.warn('[User EPUBs Reconciliation] Failed:', err);
