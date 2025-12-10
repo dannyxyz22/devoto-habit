@@ -196,8 +196,9 @@ class RxDBDataLayerImpl implements DataLayer {
         if (existingBook) {
             // Use atomicPatch to avoid CONFLICT errors
             // Only update fields that are actually provided
+            // Ensure strictly monotonic timestamp to avoid sync rejection if local clock is behind server
             const updates: any = {
-                _modified: Date.now()
+                _modified: Math.max(Date.now(), (existingBook.get('_modified') || 0) + 1)
             };
 
             // Add fields that are explicitly provided
@@ -214,13 +215,15 @@ class RxDBDataLayerImpl implements DataLayer {
             if (bookData.percentage !== undefined) updates.percentage = bookData.percentage;
 
             await existingBook.incrementalPatch(updates);
-            console.log('[DataLayer] Book updated:', { 
-                id: existingBook.id, 
-                title: existingBook.title, 
+            console.log('[DataLayer] Book updated:', {
+                id: existingBook.id,
+                title: existingBook.title,
                 percentage: updates.percentage,
                 last_location_cfi: updates.last_location_cfi,
                 _modified: updates._modified
             });
+            // Force immediate sync (Safe to use because saveToRxDB is already debounced)
+            replicationManager.quickSync().catch(e => console.warn('[DataLayer] ⚠️ Quick sync failed:', e));
             return existingBook.toJSON();
         } else {
             const dataToSave = {
@@ -244,6 +247,8 @@ class RxDBDataLayerImpl implements DataLayer {
                 added_date_readable: new Date(newBook.added_date).toLocaleString(),
                 _modified: newBook._modified
             });
+            // Force immediate sync
+            replicationManager.quickSync().catch(e => console.warn('[DataLayer] ⚠️ Quick sync failed:', e));
             return newBook.toJSON();
         }
     }
@@ -277,7 +282,10 @@ class RxDBDataLayerImpl implements DataLayer {
 
         if (existingSettings) {
             // Use atomicPatch with only the fields that changed
-            const updates: any = { _modified: Date.now() };
+            // Use atomicPatch with only the fields that changed
+            const updates: any = {
+                _modified: Math.max(Date.now(), (existingSettings.get('_modified') || 0) + 1)
+            };
             if (settingsData.daily_goal_minutes !== undefined) updates.daily_goal_minutes = settingsData.daily_goal_minutes;
             if (settingsData.theme !== undefined) updates.theme = settingsData.theme;
 
@@ -334,7 +342,7 @@ class RxDBDataLayerImpl implements DataLayer {
             // Use atomicPatch to avoid CONFLICT errors during replication
             // Only update fields that are explicitly provided
             const updates: any = {
-                _modified: Date.now()
+                _modified: Math.max(Date.now(), (existingEpub.get('_modified') || 0) + 1)
             };
 
             if (epubData.title !== undefined) updates.title = epubData.title;
@@ -359,6 +367,8 @@ class RxDBDataLayerImpl implements DataLayer {
                 }
             }
 
+            // Force immediate sync
+            replicationManager.quickSync().catch(e => console.warn('[DataLayer] ⚠️ Quick sync failed:', e));
             return existingEpub.toJSON();
         } else {
             const dataToSave = {
@@ -370,6 +380,8 @@ class RxDBDataLayerImpl implements DataLayer {
             } as import('@/lib/database/schema').RxUserEpubDocumentType;
 
             const newEpub = await db.user_epubs.insert(dataToSave);
+            // Force immediate sync
+            replicationManager.quickSync().catch(e => console.warn('[DataLayer] ⚠️ Quick sync failed:', e));
             return newEpub.toJSON();
         }
     }

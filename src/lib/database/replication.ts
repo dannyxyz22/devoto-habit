@@ -19,12 +19,12 @@ export class ReplicationManager {
 
     async startReplication() {
         console.log('ReplicationManager: Starting Supabase replication...');
-        
+
         if (!supabase) {
             console.warn('ReplicationManager: Supabase client not initialized, skipping replication');
             return;
         }
-        
+
         // Verify Supabase authentication
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         if (sessionError) {
@@ -36,13 +36,13 @@ export class ReplicationManager {
             return;
         }
         console.log('ReplicationManager: Authenticated as:', session.user.email, 'User ID:', session.user.id);
-        
+
         // Verify RLS policies
         try {
             const { count, error: testError } = await supabase
                 .from('books')
                 .select('id', { count: 'exact', head: true });
-            
+
             if (testError) {
                 console.error('ReplicationManager: RLS Test failed:', testError);
             } else {
@@ -51,7 +51,7 @@ export class ReplicationManager {
         } catch (err) {
             console.error('ReplicationManager: RLS Test exception:', err);
         }
-        
+
         const db = await getDatabase();
 
         // Stop existing replications if any
@@ -86,6 +86,7 @@ export class ReplicationManager {
                         if (rest.cover_url && rest.cover_url.startsWith('data:')) {
                             delete rest.cover_url;
                         }
+                        console.log('[Replication Books] ⬆️ Pushing doc:', { id: rest.id, title: rest.title, percent: rest.percentage });
                         return rest;
                     }
                 }
@@ -142,6 +143,7 @@ export class ReplicationManager {
                         if (rest.cover_url && rest.cover_url.startsWith('data:')) {
                             delete rest.cover_url;
                         }
+                        console.log('[Replication UserEpubs] ⬆️ Pushing doc:', { id: rest.id, percent: rest.percentage });
                         return rest;
                     }
                 }
@@ -163,7 +165,7 @@ export class ReplicationManager {
                     console.error(`[${name} Replication] Error:`, err);
                 });
             });
-            
+
             // Start replications
             for (const state of this.replicationStates) {
                 if (typeof (state as any).start === 'function') {
@@ -194,9 +196,9 @@ export class ReplicationManager {
             // The replicateSupabase plugin should handle this, but as a fallback we do it manually
             const booksState = this.replicationStates[0];
             const userEpubsState = this.replicationStates[1];
-            
+
             const realtimeChannel = supabase.channel('db-changes')
-                .on('postgres_changes', 
+                .on('postgres_changes',
                     { event: '*', schema: 'public', table: 'books' },
                     (payload) => {
                         console.log('🔔 [Realtime] Books change from server:', payload.eventType);
@@ -218,8 +220,15 @@ export class ReplicationManager {
                 )
                 .subscribe((status) => {
                     console.log('🔔 [Realtime] Channel status:', status);
+                    if (status === 'TIMED_OUT' || status === 'CHANNEL_ERROR') {
+                        console.warn('⚠️ [Realtime] Channel unstable. Restarting replication...');
+                        // Debounce restart to prevent loops
+                        setTimeout(() => {
+                            this.startReplication().catch(e => console.error('Restart failed:', e));
+                        }, 2000);
+                    }
                 });
-            
+
             // Store for cleanup
             (this as any).realtimeChannel = realtimeChannel;
 
@@ -242,7 +251,7 @@ export class ReplicationManager {
                 console.warn('ReplicationManager: Error removing realtime channel:', err);
             }
         }
-        
+
         if (this.replicationStates.length > 0) {
             console.log('ReplicationManager: Stopping replication...');
             try {
@@ -265,7 +274,7 @@ export class ReplicationManager {
      */
     async quickSync(): Promise<void> {
         console.log('ReplicationManager: Quick sync triggered...');
-        
+
         if (this.replicationStates.length === 0) {
             console.warn('ReplicationManager: No active replications for quick sync');
             // Try to start replication if not active
@@ -274,11 +283,11 @@ export class ReplicationManager {
         }
 
         const names = ['Books', 'User EPUBs', 'Settings'];
-        
+
         for (let i = 0; i < this.replicationStates.length; i++) {
             const state = this.replicationStates[i];
             const name = names[i];
-            
+
             if (state && typeof (state as any).reSync === 'function') {
                 console.log(`[${name}] Triggering reSync...`);
                 (state as any).reSync();
@@ -296,21 +305,21 @@ export class ReplicationManager {
      */
     async forceFullResync() {
         console.log('ReplicationManager: Forcing full re-sync (clearing checkpoints)...');
-        
+
         try {
             // Stop current replication
             await this.stopReplication();
-            
+
             // Clear RxDB internal storage for checkpoints
             const db = await getDatabase();
-            
+
             // Try to clear checkpoints by removing internal docs
             const checkpointIds = [
                 'books-replication',
-                'user-epubs-replication', 
+                'user-epubs-replication',
                 'settings-replication'
             ];
-            
+
             // Method 1: Try to access and clear via internals (if available)
             for (const id of checkpointIds) {
                 try {
@@ -327,7 +336,7 @@ export class ReplicationManager {
                     console.warn(`ReplicationManager: Method 1 failed for ${id}:`, err);
                 }
             }
-            
+
             // Method 2: Try to clear via internal collections (alternative approach)
             try {
                 const internals = (db as any).internals;
@@ -343,15 +352,15 @@ export class ReplicationManager {
             } catch (err) {
                 console.warn('ReplicationManager: Method 2 failed:', err);
             }
-            
+
             console.log('ReplicationManager: Checkpoint clearing attempted, restarting replication...');
-            
+
             // Small delay to ensure cleanup is complete
             await new Promise(resolve => setTimeout(resolve, 100));
-            
+
             // Restart replication (will pull all documents from scratch)
             await this.startReplication();
-            
+
         } catch (error) {
             console.error('ReplicationManager: Failed to force full re-sync:', error);
             throw error;

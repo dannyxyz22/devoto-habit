@@ -159,7 +159,7 @@ const Library = () => {
             if (!cancelled) setSrc(cachedUrl);
             return; // Found in cache, no need to fetch
           }
-          
+
           // No cache found - only fetch if we have a coverUrl
           // Use a CORS proxy for external URLs to avoid CORS errors
           if (coverUrl && !cancelled) {
@@ -168,7 +168,7 @@ const Library = () => {
               setSrc(coverUrl);
               return;
             }
-            
+
             if (coverUrl.startsWith('http')) {
               // Use weserv.nl proxy to bypass CORS
               const proxyUrl = `https://images.weserv.nl/?url=${encodeURIComponent(coverUrl)}&w=300&q=80`;
@@ -316,7 +316,7 @@ const Library = () => {
         console.warn('[Library] Auto-sync failed (non-critical):', err);
       }
     };
-    
+
     autoSync();
   }, []);
 
@@ -663,13 +663,13 @@ const Library = () => {
             <BookPlus className="h-4 w-4 mr-2" />
             Adicionar livro físico
           </Button>
-          <Button 
+          <Button
             onClick={async () => {
               try {
                 // Check if user is logged in first
                 const { authService } = await import('@/services/auth/SupabaseAuthService');
                 const { user } = await authService.getUser();
-                
+
                 if (!user) {
                   toast({
                     title: 'Login necessário',
@@ -678,7 +678,7 @@ const Library = () => {
                   navigate('/login');
                   return;
                 }
-                
+
                 const { replicationManager } = await import('@/lib/database/replication');
                 toast({
                   title: 'Sincronizando...',
@@ -695,7 +695,7 @@ const Library = () => {
                   variant: 'destructive',
                 });
               }
-            }} 
+            }}
             variant="outline"
             size="sm"
           >
@@ -724,7 +724,7 @@ const Library = () => {
                   });
                   return;
                 }
-                
+
                 if (book.isPhysical) {
                   navigate(`/physical/${book.id}`);
                 } else {
@@ -734,7 +734,7 @@ const Library = () => {
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
-                  
+
                   // Check if EPUB is not available locally
                   if (book.type === 'epub' && book.isUserUpload && !book.hasLocalFile) {
                     toast({
@@ -743,7 +743,7 @@ const Library = () => {
                     });
                     return;
                   }
-                  
+
                   if (book.isPhysical) {
                     navigate(`/physical/${book.id}`);
                   } else {
@@ -821,7 +821,10 @@ const Library = () => {
               )}
               {book.type === 'epub' && (() => {
                 // Use percentage from RxDB (book.percentage) or fallback to local storage
-                const percent = book.percentage !== undefined ? book.percentage : getProgress(book.id).percent;
+                // We take the max to ensure that if local has more progress (e.g. offline reading), it shows.
+                const localProgress = getProgress(book.id).percent || 0;
+                const dbProgress = book.percentage || 0;
+                const percent = Math.max(localProgress, dbProgress);
 
                 return percent > 0 ? (
                   <div className="mb-4">
@@ -964,22 +967,22 @@ const Library = () => {
 
       {/* Delete local data button at the bottom */}
       <div className="container mx-auto mt-12 mb-8 flex justify-center">
-        <Button 
+        <Button
           onClick={async () => {
             if (!confirm('⚠️ Isso vai DELETAR o banco local e baixar tudo do Supabase. Continuar?')) {
               return;
             }
-            
+
             try {
               toast({
                 title: 'Deletando banco local...',
                 description: 'Aguarde, isso vai recarregar a página',
               });
-              
+
               // Delete IndexedDB databases
               const dbs = await indexedDB.databases();
               console.log('🗑️ Found databases:', dbs);
-              
+
               for (const db of dbs) {
                 if (db.name?.includes('devoto')) {
                   console.log('🗑️ Deleting:', db.name);
@@ -994,12 +997,12 @@ const Library = () => {
                   });
                 }
               }
-              
+
               console.log('✅ Database deleted, reloading...');
-              
+
               // Reload the page to recreate database
               window.location.reload();
-              
+
             } catch (error) {
               console.error('Delete error:', error);
               toast({
@@ -1008,7 +1011,7 @@ const Library = () => {
                 variant: 'destructive',
               });
             }
-          }} 
+          }}
           variant="ghost"
           size="sm"
           className="text-muted-foreground hover:text-destructive"
