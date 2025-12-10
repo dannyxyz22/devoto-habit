@@ -809,7 +809,14 @@ const Library = () => {
                 <div className="mb-4">
                   <div className="flex justify-between text-sm text-muted-foreground mb-1">
                     <span>Progresso</span>
-                    <span>{book.currentPage || 0} / {book.totalPages} páginas</span>
+                    <span className="flex gap-1">
+                      <span className="font-medium text-foreground">
+                        {Math.round(((book.currentPage || 0) / book.totalPages) * 100)}%
+                      </span>
+                      <span>
+                        ({book.currentPage || 0} / {book.totalPages})
+                      </span>
+                    </span>
                   </div>
                   <div className="w-full bg-secondary rounded-full h-2">
                     <div
