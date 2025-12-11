@@ -1005,7 +1005,11 @@ const Library = () => {
                 }
               }
 
-              console.log('✅ Database deleted, reloading...');
+              // Clear localStorage
+              console.log('🗑️ Clearing localStorage...');
+              localStorage.clear();
+
+              console.log('✅ Database and localStorage deleted, reloading...');
 
               // Reload the page to recreate database
               window.location.reload();
