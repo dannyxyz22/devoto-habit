@@ -21,12 +21,13 @@ import {
   addReadingMinutes,
   getProgress,
   getStreak,
-  hasReadToday,
+  hasReadTodaySync,
   markReadToday,
   setProgress,
   getReadingPlan,
   getDailyBaseline,
   setDailyBaseline,
+  setLastBookId,
   type Streak,
 } from "@/lib/storage";
 import {
@@ -132,7 +133,7 @@ const Reader = () => {
   // Remember last opened book for quick resume from Hero CTA
   useEffect(() => {
     if (bookId) {
-      try { localStorage.setItem('lastBookId', bookId); } catch { }
+      setLastBookId(bookId);
     }
   }, [bookId]);
 
@@ -278,7 +279,7 @@ const Reader = () => {
   // Check if daily goal was just completed and auto-mark reading
   const [wasGoalCompleted, setWasGoalCompleted] = useState(false);
   useEffect(() => {
-    if (dailyProgressPercent === 100 && !wasGoalCompleted && !hasReadToday()) {
+    if (dailyProgressPercent === 100 && !wasGoalCompleted && !hasReadTodaySync()) {
       setWasGoalCompleted(true);
       onReadToday();
     } else if (dailyProgressPercent !== 100) {
@@ -339,7 +340,7 @@ const Reader = () => {
   };
 
   const onReadToday = () => {
-    if (hasReadToday()) {
+    if (hasReadTodaySync()) {
       toast({
         title: "Já marcado",
         description: "Você já marcou a leitura de hoje.",
@@ -499,7 +500,7 @@ const Reader = () => {
                   >
                     Concluir capítulo
                   </Button>
-                  {(!hasReadToday() && (dailyProgressPercent == null || dailyProgressPercent < 100)) && (
+                  {(!hasReadTodaySync() && (dailyProgressPercent == null || dailyProgressPercent < 100)) && (
                     <Button
                       className="w-full md:w-auto"
                       onClick={onReadToday}
@@ -508,7 +509,7 @@ const Reader = () => {
                       Marcar leitura de hoje
                     </Button>
                   )}
-                  {(hasReadToday() || (dailyProgressPercent != null && dailyProgressPercent >= 100)) && (
+                  {(hasReadTodaySync() || (dailyProgressPercent != null && dailyProgressPercent >= 100)) && (
                     <p className="text-xs text-muted-foreground self-center">
                       Leitura do dia já contabilizada
                     </p>

@@ -2,7 +2,7 @@ import { replicateSupabase } from 'rxdb/plugins/replication-supabase';
 import { supabase } from '@/lib/supabase';
 import { getDatabase } from '@/lib/database/db';
 import { RxReplicationState } from 'rxdb/plugins/replication';
-import { RxBookDocumentType, RxSettingsDocumentType, RxUserEpubDocumentType } from '@/lib/database/schema';
+import { RxBookDocumentType, RxSettingsDocumentType, RxUserEpubDocumentType, RxReadingPlanDocumentType, RxDailyBaselineDocumentType, RxUserStatsDocumentType } from '@/lib/database/schema';
 
 export class ReplicationManager {
     private static instance: ReplicationManager;
@@ -149,7 +149,76 @@ export class ReplicationManager {
                 }
             });
 
-            this.replicationStates = [booksReplication, userEpubsReplication, settingsReplication];
+            // Replicate Reading Plans
+            const readingPlansReplication = await replicateSupabase<RxReadingPlanDocumentType>({
+                tableName: 'reading_plans',
+                client: supabase,
+                collection: db.reading_plans,
+                replicationIdentifier: 'reading-plans-replication',
+                live: true,
+                pull: {
+                    batchSize: 50,
+                    modifier: (doc) => {
+                        if (!doc.target_date_iso) delete doc.target_date_iso;
+                        return doc;
+                    }
+                },
+                push: {
+                    batchSize: 50,
+                    modifier: (doc) => {
+                        const { created_at, updated_at, ...rest } = doc as any;
+                        console.log('[Replication ReadingPlans] ⬆️ Pushing doc:', { id: rest.id, book_id: rest.book_id });
+                        return rest;
+                    }
+                }
+            });
+
+            // Replicate Daily Baselines
+            const dailyBaselinesReplication = await replicateSupabase<RxDailyBaselineDocumentType>({
+                tableName: 'daily_baselines',
+                client: supabase,
+                collection: db.daily_baselines,
+                replicationIdentifier: 'daily-baselines-replication',
+                live: true,
+                pull: {
+                    batchSize: 100
+                },
+                push: {
+                    batchSize: 100,
+                    modifier: (doc) => {
+                        const { created_at, updated_at, ...rest } = doc as any;
+                        return rest;
+                    }
+                }
+            });
+
+            // Replicate User Stats
+            const userStatsReplication = await replicateSupabase<RxUserStatsDocumentType>({
+                tableName: 'user_stats',
+                client: supabase,
+                collection: db.user_stats,
+                replicationIdentifier: 'user-stats-replication',
+                live: true,
+                pull: {
+                    batchSize: 10,
+                    modifier: (doc) => {
+                        if (!doc.last_read_iso) delete doc.last_read_iso;
+                        if (!doc.last_book_id) delete doc.last_book_id;
+                        if (!doc.minutes_by_date) doc.minutes_by_date = {};
+                        return doc;
+                    }
+                },
+                push: {
+                    batchSize: 10,
+                    modifier: (doc) => {
+                        const { created_at, updated_at, ...rest } = doc as any;
+                        console.log('[Replication UserStats] ⬆️ Pushing:', { user_id: rest.user_id, streak: rest.streak_current });
+                        return rest;
+                    }
+                }
+            });
+
+            this.replicationStates = [booksReplication, userEpubsReplication, settingsReplication, readingPlansReplication, dailyBaselinesReplication, userStatsReplication];
 
             // Validate all replication states were created successfully
             const invalidStates = this.replicationStates.filter(s => !s);
@@ -159,7 +228,7 @@ export class ReplicationManager {
 
             // Subscribe to error$ for each replication to catch issues
             this.replicationStates.forEach((state, index) => {
-                const names = ['Books', 'User EPUBs', 'Settings'];
+                const names = ['Books', 'User EPUBs', 'Settings', 'Reading Plans', 'Daily Baselines', 'User Stats'];
                 const name = names[index];
                 (state as any).error$.subscribe((err: any) => {
                     console.error(`[${name} Replication] Error:`, err);

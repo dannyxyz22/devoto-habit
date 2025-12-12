@@ -1,5 +1,5 @@
 import { BOOKS } from './books';
-import { getReadingPlan, getProgress, getDailyBaseline, setDailyBaseline } from './storage';
+import { getReadingPlan, getProgress, getDailyBaseline, setDailyBaseline, getLastBookIdAsync } from './storage';
 import { computeTotalWords, computeWordsUpToPosition, computeWordsUpToInclusiveTarget, computeDaysRemaining, computeDailyTargetWords, computeAchievedWordsToday, computeDailyProgressPercent } from './reading';
 import { updateDailyProgressWidget } from '@/main';
 
@@ -10,7 +10,7 @@ export async function performDailyWidgetRefresh() {
     // Choose active book same heuristic as Index
     let activeBookId: string | null = null;
     try {
-      const last = localStorage.getItem('lastBookId');
+      const last = await getLastBookIdAsync();
       if (last) activeBookId = last;
       if (!activeBookId) {
         for (const b of BOOKS) {

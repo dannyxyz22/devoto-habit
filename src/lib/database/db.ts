@@ -2,7 +2,20 @@ import { createRxDatabase, RxDatabase, RxCollection, addRxPlugin } from 'rxdb';
 import { getRxStorageDexie } from 'rxdb/plugins/storage-dexie';
 import { RxDBMigrationSchemaPlugin } from 'rxdb/plugins/migration-schema';
 import { RxDBUpdatePlugin } from 'rxdb/plugins/update';
-import { bookSchema, settingsSchema, userEpubSchema, RxBookDocumentType, RxSettingsDocumentType, RxUserEpubDocumentType } from './schema';
+import { 
+    bookSchema, 
+    settingsSchema, 
+    userEpubSchema, 
+    readingPlanSchema,
+    dailyBaselineSchema,
+    userStatsSchema,
+    RxBookDocumentType, 
+    RxSettingsDocumentType, 
+    RxUserEpubDocumentType,
+    RxReadingPlanDocumentType,
+    RxDailyBaselineDocumentType,
+    RxUserStatsDocumentType
+} from './schema';
 import { ensureStaticBooks } from './staticBooksInit';
 
 // Add required plugins
@@ -14,6 +27,9 @@ export type DevotoDatabaseCollections = {
     books: RxCollection<RxBookDocumentType>;
     user_epubs: RxCollection<RxUserEpubDocumentType>;
     settings: RxCollection<RxSettingsDocumentType>;
+    reading_plans: RxCollection<RxReadingPlanDocumentType>;
+    daily_baselines: RxCollection<RxDailyBaselineDocumentType>;
+    user_stats: RxCollection<RxUserStatsDocumentType>;
 };
 export type DevotoDatabase = RxDatabase<DevotoDatabaseCollections>;
 let dbPromise: Promise<DevotoDatabase> | null = null;
@@ -65,6 +81,15 @@ const _createDatabase = async (): Promise<DevotoDatabase> => {
         },
         settings: {
             schema: settingsSchema
+        },
+        reading_plans: {
+            schema: readingPlanSchema
+        },
+        daily_baselines: {
+            schema: dailyBaselineSchema
+        },
+        user_stats: {
+            schema: userStatsSchema
         }
     });
 

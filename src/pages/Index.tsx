@@ -7,14 +7,15 @@ import { WidgetUpdater, canUseNative } from "@/lib/widgetUpdater";
 import { SEO } from "@/components/app/SEO";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { Progress } from "@/components/ui/progress";
 import { BOOKS, type BookMeta } from "@/lib/books";
 import { getUserEpubs } from "@/lib/userEpubs";
 import { dataLayer } from "@/services/data/RxDBDataLayer";
+import { getDatabase } from "@/lib/database/db";
 import { differenceInCalendarDays, formatISO, parseISO } from "date-fns";
 import { useTodayISO } from "@/hooks/use-today";
-import { getStreak, getReadingPlan, getProgress, getDailyBaseline, setDailyBaseline, getStats, type Streak } from "@/lib/storage";
+import { getStreak, getReadingPlan, getProgress, getDailyBaseline, setDailyBaseline, getStats, getLastBookIdAsync, setLastBookId, type Streak } from "@/lib/storage";
 import {
   type Part,
   computeTotalWords,
@@ -39,40 +40,136 @@ const Index = () => {
   const [activeIsPhysical, setActiveIsPhysical] = useState(false);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  
+  // Reactive progress from RxDB subscription
+  const [activeBookProgress, setActiveBookProgress] = useState<{ partIndex: number; chapterIndex: number; percent: number }>(
+    { partIndex: 0, chapterIndex: 0, percent: 0 }
+  );
+  
+  // Subscribe to RxDB for reactive progress updates
+  useEffect(() => {
+    if (!activeBookId) {
+      setActiveBookProgress({ partIndex: 0, chapterIndex: 0, percent: 0 });
+      return;
+    }
+    
+    // Load initial from localStorage immediately
+    const localProgress = getProgress(activeBookId);
+    setActiveBookProgress(localProgress);
+    
+    let subscription: { unsubscribe: () => void } | null = null;
+    
+    const setupSubscription = async () => {
+      try {
+        const db = await getDatabase();
+        
+        // Track if we found anything in RxDB
+        let foundInEpubs = false;
+        let foundInBooks = false;
+        
+        // Subscribe to user_epubs for user-uploaded EPUB progress
+        const epubSub = db.user_epubs.findOne({
+          selector: { id: activeBookId, _deleted: false }
+        }).$.subscribe(epub => {
+          if (epub) {
+            foundInEpubs = true;
+            const data = epub.toJSON();
+            const dbPercent = data.percentage || 0;
+            // Take max of DB and current state (which may have localStorage)
+            setActiveBookProgress(prev => ({
+              partIndex: 0,
+              chapterIndex: 0,
+              percent: Math.max(prev.percent, dbPercent)
+            }));
+          }
+        });
+        
+        // Subscribe to books for physical books and static EPUBs
+        const bookSub = db.books.findOne({
+          selector: { id: activeBookId, _deleted: false }
+        }).$.subscribe(book => {
+          if (book) {
+            foundInBooks = true;
+            const data = book.toJSON();
+            const dbPercent = data.percentage || 0;
+            // Take max of DB and current state
+            setActiveBookProgress(prev => ({
+              partIndex: data.part_index || prev.partIndex,
+              chapterIndex: data.chapter_index || prev.chapterIndex,
+              percent: Math.max(prev.percent, dbPercent)
+            }));
+          }
+        });
+        
+        // Combine subscriptions
+        subscription = {
+          unsubscribe: () => {
+            epubSub.unsubscribe();
+            bookSub.unsubscribe();
+          }
+        };
+      } catch (err) {
+        console.error('[Index] Failed to setup RxDB subscription:', err);
+      }
+    };
+    
+    setupSubscription();
+    
+    return () => {
+      subscription?.unsubscribe();
+    };
+  }, [activeBookId]);
+  
+  // Refresh streak when page becomes visible
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        setStreak(getStreak());
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', handleVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', handleVisibility);
+    };
+  }, []);
 
   // Detect prior usage and choose an active book
   useEffect(() => {
-    try {
-      const ls = window.localStorage;
-      let u = false;
-      for (let i = 0; i < ls.length; i++) {
-        const key = ls.key(i) || "";
-        if (key.startsWith("progress:") || key.startsWith("plan:")) { u = true; break; }
-      }
-      if (!u) {
-        const sk = ls.getItem("streak");
-        const st = sk ? JSON.parse(sk) : null;
-        if (st?.lastReadISO) u = true;
-      }
-      if (!u) {
-        const stat = ls.getItem("stats");
-        const s = stat ? JSON.parse(stat) : null;
-        if (s?.minutesByDate && Object.keys(s.minutesByDate).length > 0) u = true;
-      }
-      setUsed(u);
-
-      // Pick active book: lastBookId, or first with plan, else null
-      let chosen: string | null = null;
-      const last = ls.getItem("lastBookId");
-      if (last) chosen = last;
-      if (!chosen) {
-        for (const b of BOOKS) {
-          const plan = getReadingPlan(b.id);
-          if (plan?.targetDateISO) { chosen = b.id; break; }
+    (async () => {
+      try {
+        const ls = window.localStorage;
+        let u = false;
+        for (let i = 0; i < ls.length; i++) {
+          const key = ls.key(i) || "";
+          if (key.startsWith("progress:") || key.startsWith("plan:")) { u = true; break; }
         }
-      }
-      setActiveBookId(chosen);
-    } catch { }
+        if (!u) {
+          const sk = ls.getItem("streak");
+          const st = sk ? JSON.parse(sk) : null;
+          if (st?.lastReadISO) u = true;
+        }
+        if (!u) {
+          const stat = ls.getItem("stats");
+          const s = stat ? JSON.parse(stat) : null;
+          if (s?.minutesByDate && Object.keys(s.minutesByDate).length > 0) u = true;
+        }
+        setUsed(u);
+
+        // Pick active book: lastBookId, or first with plan, else null
+        let chosen: string | null = null;
+        const last = await getLastBookIdAsync();
+        if (last) chosen = last;
+        if (!chosen) {
+          for (const b of BOOKS) {
+            const plan = getReadingPlan(b.id);
+            if (plan?.targetDateISO) { chosen = b.id; break; }
+          }
+        }
+        setActiveBookId(chosen);
+      } catch { }
+    })();
   }, []);
 
   // Load user books (EPUBs and Physical)
@@ -149,7 +246,8 @@ const Index = () => {
 
   // Compute plan progress and daily goal similar to Reader
   const plan = useMemo(() => activeBookId ? getReadingPlan(activeBookId) : { targetDateISO: null }, [activeBookId]);
-  const p = useMemo(() => activeBookId ? getProgress(activeBookId) : { partIndex: 0, chapterIndex: 0, percent: 0 }, [activeBookId]);
+  // Use reactive progress from RxDB subscription
+  const p = activeBookProgress;
   const totalWords = useMemo(() => computeTotalWords(parts), [parts]);
 
   const isPercentBased = activeIsEpub || activeIsPhysical;
@@ -353,7 +451,7 @@ const Index = () => {
                 <p className="text-sm text-muted-foreground mt-1">{p.percent || 0}% lido</p>
                 <div className="mt-2">
                   <Button asChild variant="link">
-                    <Link to={activeIsPhysical ? `/physical/${activeBookId}` : `/epub/${activeBookId}`}>Continuar leitura</Link>
+                    <Link to={activeIsPhysical ? `/physical/${activeBookId}` : `/epub/${activeBookId}`} onClick={() => setLastBookId(activeBookId)}>Continuar leitura</Link>
                   </Button>
                 </div>
               </>
@@ -366,7 +464,7 @@ const Index = () => {
                 </p>
                 <div className="mt-2">
                   <Button asChild variant="link">
-                    <Link to={`/leitor/${activeBookId}`}>Continuar leitura</Link>
+                    <Link to={`/leitor/${activeBookId}`} onClick={() => setLastBookId(activeBookId)}>Continuar leitura</Link>
                   </Button>
                 </div>
               </>

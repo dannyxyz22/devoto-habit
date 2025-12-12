@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SEO } from "@/components/app/SEO";
-import { setProgress, getProgress, getDailyBaseline, setDailyBaseline } from "@/lib/storage";
+import { setProgress, getProgress, getDailyBaseline, setDailyBaseline, setLastBookId } from "@/lib/storage";
 import { useToast } from "@/components/ui/use-toast";
 import { format } from "date-fns";
 import { BookOpen, Plus } from "lucide-react";
@@ -165,7 +165,7 @@ export default function PhysicalBookTracker() {
             });
 
             // Update last book ID
-            localStorage.setItem('lastBookId', bookId);
+            setLastBookId(bookId);
         } catch (error) {
             console.error("Error updating progress:", error);
             toast({
@@ -206,7 +206,7 @@ export default function PhysicalBookTracker() {
                 title: "Progresso atualizado!",
                 description: `Você está na página ${newPage} de ${book.totalPages}`,
             });
-            localStorage.setItem('lastBookId', bookId);
+            setLastBookId(bookId);
         } catch (error) {
             console.error("Error quick adding pages:", error);
             toast({

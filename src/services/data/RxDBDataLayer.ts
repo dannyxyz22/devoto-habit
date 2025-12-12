@@ -1,6 +1,6 @@
 import { DataLayer } from './DataLayer';
 import { getDatabase } from '@/lib/database/db';
-import { RxBookDocumentType, RxSettingsDocumentType } from '@/lib/database/schema';
+import { RxBookDocumentType, RxSettingsDocumentType, RxReadingPlanDocumentType, RxDailyBaselineDocumentType, RxUserStatsDocumentType } from '@/lib/database/schema';
 import { authService } from '@/services/auth/SupabaseAuthService';
 import { replicationManager } from '@/lib/database/replication';
 import { ensureStaticBooks } from '@/lib/database/staticBooksInit';
@@ -396,6 +396,195 @@ class RxDBDataLayerImpl implements DataLayer {
                 _deleted: true,
                 _modified: Date.now()
             });
+        }
+    }
+
+    // ========== Reading Plans ==========
+
+    async getReadingPlan(bookId: string): Promise<RxReadingPlanDocumentType | null> {
+        const db = await getDatabase();
+        const userId = await this.getUserId();
+
+        // Try to find by composite ID first (user_id:book_id), then by book_id alone
+        const compositeId = `${userId}:${bookId}`;
+        let plan = await db.reading_plans.findOne(compositeId).exec();
+
+        if (!plan) {
+            // Fallback: search by book_id for local-user plans
+            const plans = await db.reading_plans.find({
+                selector: {
+                    book_id: bookId,
+                    _deleted: { $eq: false }
+                }
+            }).exec();
+            plan = plans[0] || null;
+        }
+
+        return plan ? plan.toJSON() : null;
+    }
+
+    async saveReadingPlan(planData: Partial<RxReadingPlanDocumentType>): Promise<RxReadingPlanDocumentType> {
+        const db = await getDatabase();
+        const userId = await this.getUserId();
+
+        const bookId = planData.book_id!;
+        const id = planData.id || `${userId}:${bookId}`;
+
+        const existingPlan = await db.reading_plans.findOne(id).exec();
+
+        if (existingPlan) {
+            const updates: any = {
+                _modified: Math.max(Date.now(), (existingPlan.get('_modified') || 0) + 1)
+            };
+
+            if (planData.target_date_iso !== undefined) updates.target_date_iso = planData.target_date_iso;
+            if (planData.target_part_index !== undefined) updates.target_part_index = planData.target_part_index;
+            if (planData.target_chapter_index !== undefined) updates.target_chapter_index = planData.target_chapter_index;
+            if (planData.start_part_index !== undefined) updates.start_part_index = planData.start_part_index;
+            if (planData.start_chapter_index !== undefined) updates.start_chapter_index = planData.start_chapter_index;
+            if (planData.start_words !== undefined) updates.start_words = planData.start_words;
+            if (planData.start_percent !== undefined) updates.start_percent = planData.start_percent;
+
+            await existingPlan.incrementalPatch(updates);
+            replicationManager.quickSync().catch(e => console.warn('[DataLayer] ⚠️ Quick sync failed:', e));
+            return existingPlan.toJSON();
+        } else {
+            const dataToSave = {
+                id,
+                user_id: userId,
+                book_id: bookId,
+                target_date_iso: planData.target_date_iso,
+                target_part_index: planData.target_part_index,
+                target_chapter_index: planData.target_chapter_index,
+                start_part_index: planData.start_part_index,
+                start_chapter_index: planData.start_chapter_index,
+                start_words: planData.start_words,
+                start_percent: planData.start_percent,
+                _modified: Date.now(),
+                _deleted: false
+            } as RxReadingPlanDocumentType;
+
+            const newPlan = await db.reading_plans.insert(dataToSave);
+            replicationManager.quickSync().catch(e => console.warn('[DataLayer] ⚠️ Quick sync failed:', e));
+            return newPlan.toJSON();
+        }
+    }
+
+    async deleteReadingPlan(bookId: string): Promise<void> {
+        const db = await getDatabase();
+        const userId = await this.getUserId();
+
+        const compositeId = `${userId}:${bookId}`;
+        const plan = await db.reading_plans.findOne(compositeId).exec();
+
+        if (plan) {
+            await plan.incrementalPatch({
+                _deleted: true,
+                _modified: Date.now()
+            });
+        }
+    }
+
+    // ========== Daily Baselines ==========
+
+    async getDailyBaseline(bookId: string, dateISO: string): Promise<RxDailyBaselineDocumentType | null> {
+        const db = await getDatabase();
+        const userId = await this.getUserId();
+
+        const id = `${userId}:${bookId}:${dateISO}`;
+        const baseline = await db.daily_baselines.findOne(id).exec();
+
+        return baseline ? baseline.toJSON() : null;
+    }
+
+    async saveDailyBaseline(baselineData: Partial<RxDailyBaselineDocumentType>): Promise<RxDailyBaselineDocumentType> {
+        const db = await getDatabase();
+        const userId = await this.getUserId();
+
+        const bookId = baselineData.book_id!;
+        const dateISO = baselineData.date_iso!;
+        const id = baselineData.id || `${userId}:${bookId}:${dateISO}`;
+
+        const existingBaseline = await db.daily_baselines.findOne(id).exec();
+
+        if (existingBaseline) {
+            const updates: any = {
+                _modified: Math.max(Date.now(), (existingBaseline.get('_modified') || 0) + 1)
+            };
+
+            if (baselineData.words !== undefined) updates.words = baselineData.words;
+            if (baselineData.percent !== undefined) updates.percent = baselineData.percent;
+
+            await existingBaseline.incrementalPatch(updates);
+            replicationManager.quickSync().catch(e => console.warn('[DataLayer] ⚠️ Quick sync failed:', e));
+            return existingBaseline.toJSON();
+        } else {
+            const dataToSave = {
+                id,
+                user_id: userId,
+                book_id: bookId,
+                date_iso: dateISO,
+                words: baselineData.words ?? 0,
+                percent: baselineData.percent ?? 0,
+                _modified: Date.now(),
+                _deleted: false
+            } as RxDailyBaselineDocumentType;
+
+            const newBaseline = await db.daily_baselines.insert(dataToSave);
+            replicationManager.quickSync().catch(e => console.warn('[DataLayer] ⚠️ Quick sync failed:', e));
+            return newBaseline.toJSON();
+        }
+    }
+
+    // ========== User Stats ==========
+
+    async getUserStats(): Promise<RxUserStatsDocumentType | null> {
+        const db = await getDatabase();
+        const userId = await this.getUserId();
+
+        const stats = await db.user_stats.findOne(userId).exec();
+        return stats ? stats.toJSON() : null;
+    }
+
+    async saveUserStats(statsData: Partial<RxUserStatsDocumentType>): Promise<RxUserStatsDocumentType> {
+        const db = await getDatabase();
+        const userId = await this.getUserId();
+
+        const existingStats = await db.user_stats.findOne(userId).exec();
+
+        if (existingStats) {
+            const updates: any = {
+                _modified: Math.max(Date.now(), (existingStats.get('_modified') || 0) + 1)
+            };
+
+            if (statsData.streak_current !== undefined) updates.streak_current = statsData.streak_current;
+            if (statsData.streak_longest !== undefined) updates.streak_longest = statsData.streak_longest;
+            if (statsData.last_read_iso !== undefined) updates.last_read_iso = statsData.last_read_iso;
+            if (statsData.freeze_available !== undefined) updates.freeze_available = statsData.freeze_available;
+            if (statsData.total_minutes !== undefined) updates.total_minutes = statsData.total_minutes;
+            if (statsData.last_book_id !== undefined) updates.last_book_id = statsData.last_book_id;
+            if (statsData.minutes_by_date !== undefined) updates.minutes_by_date = statsData.minutes_by_date;
+
+            await existingStats.incrementalPatch(updates);
+            replicationManager.quickSync().catch(e => console.warn('[DataLayer] ⚠️ Quick sync failed:', e));
+            return existingStats.toJSON();
+        } else {
+            const dataToSave = {
+                user_id: userId,
+                streak_current: statsData.streak_current ?? 0,
+                streak_longest: statsData.streak_longest ?? 0,
+                last_read_iso: statsData.last_read_iso,
+                freeze_available: statsData.freeze_available ?? true,
+                total_minutes: statsData.total_minutes ?? 0,
+                last_book_id: statsData.last_book_id,
+                minutes_by_date: statsData.minutes_by_date ?? {},
+                _modified: Date.now(),
+                _deleted: false
+            } as RxUserStatsDocumentType;
+
+            const newStats = await db.user_stats.insert(dataToSave);
+            replicationManager.quickSync().catch(e => console.warn('[DataLayer] ⚠️ Quick sync failed:', e));
+            return newStats.toJSON();
         }
     }
 }

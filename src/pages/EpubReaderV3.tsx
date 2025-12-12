@@ -6,7 +6,7 @@ import { BOOKS } from "@/lib/books";
 import { resolveEpubSource } from "@/lib/utils";
 import { getUserEpubBlob } from "@/lib/userEpubs";
 import { SEO } from "@/components/app/SEO";
-import { getDailyBaseline, setDailyBaseline, setProgress, getReadingPlan } from "@/lib/storage";
+import { getDailyBaseline, setDailyBaseline, setProgress, getReadingPlan, setLastBookId } from "@/lib/storage";
 import { updateDailyProgressWidget } from "@/main";
 import { WidgetUpdater, canUseNative } from "@/lib/widgetUpdater";
 import { format } from "date-fns";
@@ -302,6 +302,10 @@ const EpubReaderV3 = () => {
 
           setLocation(finalCfi);
           setLoading(false);
+          
+          // Save as current book
+          setLastBookId(epubId);
+          
           console.log("[EpubReaderV3] Ready. Starting at:", finalCfi);
         }
       } catch (err) {

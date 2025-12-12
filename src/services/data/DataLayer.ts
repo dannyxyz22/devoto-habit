@@ -1,4 +1,4 @@
-import { RxBookDocumentType, RxSettingsDocumentType, RxUserEpubDocumentType } from '@/lib/database/schema';
+import { RxBookDocumentType, RxSettingsDocumentType, RxUserEpubDocumentType, RxReadingPlanDocumentType, RxDailyBaselineDocumentType, RxUserStatsDocumentType } from '@/lib/database/schema';
 
 export interface DataLayer {
     /**
@@ -50,4 +50,45 @@ export interface DataLayer {
      * Delete EPUB metadata (Soft delete)
      */
     deleteUserEpub(id: string): Promise<void>;
+
+    // ========== Reading Plans ==========
+
+    /**
+     * Get reading plan for a book
+     */
+    getReadingPlan(bookId: string): Promise<RxReadingPlanDocumentType | null>;
+
+    /**
+     * Save or update reading plan
+     */
+    saveReadingPlan(plan: Partial<RxReadingPlanDocumentType>): Promise<RxReadingPlanDocumentType>;
+
+    /**
+     * Delete reading plan for a book
+     */
+    deleteReadingPlan(bookId: string): Promise<void>;
+
+    // ========== Daily Baselines ==========
+
+    /**
+     * Get daily baseline for a book on a specific date
+     */
+    getDailyBaseline(bookId: string, dateISO: string): Promise<RxDailyBaselineDocumentType | null>;
+
+    /**
+     * Save daily baseline for a book
+     */
+    saveDailyBaseline(baseline: Partial<RxDailyBaselineDocumentType>): Promise<RxDailyBaselineDocumentType>;
+
+    // ========== User Stats ==========
+
+    /**
+     * Get user stats (streak, reading time, last book)
+     */
+    getUserStats(): Promise<RxUserStatsDocumentType | null>;
+
+    /**
+     * Save user stats
+     */
+    saveUserStats(stats: Partial<RxUserStatsDocumentType>): Promise<RxUserStatsDocumentType>;
 }

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { BOOKS } from "@/lib/books";
 import { UserMenu } from "./UserMenu";
 import { useToast } from "@/components/ui/use-toast";
+import { getLastBookIdAsync } from "@/lib/storage";
 
 
 export const Hero = () => {
@@ -14,47 +15,49 @@ export const Hero = () => {
   const [debugCount, setDebugCount] = useState(0);
 
   useEffect(() => {
-    try {
-      const ls = window.localStorage;
-      let used = false;
-      // Any saved progress or plan implies prior interaction
-      for (let i = 0; i < ls.length; i++) {
-        const key = ls.key(i) || "";
-        if (key.startsWith("progress:") || key.startsWith("plan:")) {
-          used = true;
-          break;
-        }
-      }
-      // Streak or stats also count
-      if (!used) {
-        const streak = ls.getItem("streak");
-        if (streak) {
-          const s = JSON.parse(streak || "null");
-          if (s?.lastReadISO) used = true;
-        }
-      }
-      if (!used) {
-        const stats = ls.getItem("stats");
-        if (stats) {
-          const st = JSON.parse(stats || "null");
-          if (st?.minutesByDate && Object.keys(st.minutesByDate).length > 0) used = true;
-        }
-      }
-      if (used) {
-        setCtaLabel("Continuar");
-        const last = ls.getItem('lastBookId');
-        if (last) {
-          if (last.startsWith('physical-')) {
-            setCtaHref(`/physical/${last}`);
-          } else if (last.startsWith('user-')) {
-            setCtaHref(`/epub/${last}`);
-          } else {
-            const meta = BOOKS.find(b => b.id === last);
-            setCtaHref(meta?.type === 'epub' ? `/epub/${last}` : `/leitor/${last}`);
+    (async () => {
+      try {
+        const ls = window.localStorage;
+        let used = false;
+        // Any saved progress or plan implies prior interaction
+        for (let i = 0; i < ls.length; i++) {
+          const key = ls.key(i) || "";
+          if (key.startsWith("progress:") || key.startsWith("plan:")) {
+            used = true;
+            break;
           }
         }
-      }
-    } catch { }
+        // Streak or stats also count
+        if (!used) {
+          const streak = ls.getItem("streak");
+          if (streak) {
+            const s = JSON.parse(streak || "null");
+            if (s?.lastReadISO) used = true;
+          }
+        }
+        if (!used) {
+          const stats = ls.getItem("stats");
+          if (stats) {
+            const st = JSON.parse(stats || "null");
+            if (st?.minutesByDate && Object.keys(st.minutesByDate).length > 0) used = true;
+          }
+        }
+        if (used) {
+          setCtaLabel("Continuar");
+          const last = await getLastBookIdAsync();
+          if (last) {
+            if (last.startsWith('physical-')) {
+              setCtaHref(`/physical/${last}`);
+            } else if (last.startsWith('user-')) {
+              setCtaHref(`/epub/${last}`);
+            } else {
+              const meta = BOOKS.find(b => b.id === last);
+              setCtaHref(meta?.type === 'epub' ? `/epub/${last}` : `/leitor/${last}`);
+            }
+          }
+        }
+      } catch { }
+    })();
   }, []);
 
   const handleSecretDebug = () => {

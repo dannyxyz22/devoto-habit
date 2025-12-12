@@ -10,7 +10,7 @@ import { SEO } from "@/components/app/SEO";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { setReadingPlan, getProgress, getReadingPlan, setDailyBaseline, setProgress, getDailyBaseline } from "@/lib/storage";
+import { setReadingPlan, getProgress, getReadingPlan, setDailyBaseline, setProgress, getDailyBaseline, setLastBookId } from "@/lib/storage";
 import { toast } from "@/hooks/use-toast";
 import { formatISO } from "date-fns";
 import { resolveEpubSource } from "@/lib/utils";
@@ -949,6 +949,8 @@ const Library = () => {
                 {/* Reading and goal buttons - disabled when EPUB is not available */}
                 <Button
                   onClick={() => {
+                    // Save as current book before navigating
+                    setLastBookId(book.id);
                     if (book.isPhysical) {
                       navigate(`/physical/${book.id}`);
                     } else {
