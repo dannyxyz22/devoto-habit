@@ -40,10 +40,18 @@ const EpubReaderV3 = () => {
   const latestPercentRef = useRef<number>(0);
   const lastSavedCfiRef = useRef<string | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const locationsReadyRef = useRef<boolean>(false);
+  const initialPercentRef = useRef<number>(0); // Store initial percent from DB to avoid overwriting with 0
 
   // Função core de salvamento (estável, não recriada)
   const saveToRxDB = useCallback(async (cfi: string, percent: number) => {
     if (!epubId) return;
+
+    // Don't save 0% if locations aren't ready yet - would overwrite valid progress
+    if (percent === 0 && !locationsReadyRef.current) {
+      console.log("[EpubReaderV3] Skipping save: percent is 0 and locations not ready");
+      return;
+    }
 
     // Atualiza tracking do último salvo
     lastSavedCfiRef.current = cfi;
@@ -205,12 +213,29 @@ const EpubReaderV3 = () => {
             console.log("[EpubReaderV3] Generating locations...");
             book.locations.generate(500).then(() => {
               console.log("[EpubReaderV3] Locations generated");
+              locationsReadyRef.current = true;
+              
+              // Now that locations are ready, recalculate and save the correct percentage
+              const rendition = renditionRef.current;
+              if (rendition && latestCfiRef.current) {
+                try {
+                  const p = book.locations.percentageFromCfi(latestCfiRef.current);
+                  if (typeof p === "number" && !isNaN(p)) {
+                    const percent = Math.round(p * 100);
+                    console.log("[EpubReaderV3] Recalculated percent after locations ready:", percent);
+                    // Only save if we have a meaningful percent or user has navigated
+                    if (percent > 0 || latestCfiRef.current !== lastSavedCfiRef.current) {
+                      saveToRxDB(latestCfiRef.current, percent);
+                    }
+                  }
+                } catch {}
+              }
             });
           } catch { }
         }, 1000);
       });
     }
-  }, []);
+  }, [saveToRxDB]);
 
   // Carregar EPUB e Progresso em Paralelo (HYBRID STRATEGY)
   useEffect(() => {
