@@ -7,7 +7,7 @@ import { WidgetUpdater, canUseNative } from "@/lib/widgetUpdater";
 import { SEO } from "@/components/app/SEO";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Progress } from "@/components/ui/progress";
 import { BOOKS, type BookMeta } from "@/lib/books";
 import { getUserEpubs } from "@/lib/userEpubs";
@@ -15,7 +15,7 @@ import { dataLayer } from "@/services/data/RxDBDataLayer";
 import { getDatabase } from "@/lib/database/db";
 import { differenceInCalendarDays, formatISO, parseISO } from "date-fns";
 import { useTodayISO } from "@/hooks/use-today";
-import { getStreak, getReadingPlan, getProgress, getDailyBaseline, setDailyBaseline, getStats, getLastBookIdAsync, setLastBookId, type Streak } from "@/lib/storage";
+import { getStreak, getReadingPlan, getProgress, getDailyBaseline, setDailyBaseline, getStats, getLastBookIdAsync, setLastBookId, type Streak, type ReadingPlan } from "@/lib/storage";
 import {
   type Part,
   computeTotalWords,
@@ -45,6 +45,13 @@ const Index = () => {
   const [activeBookProgress, setActiveBookProgress] = useState<{ partIndex: number; chapterIndex: number; percent: number }>(
     { partIndex: 0, chapterIndex: 0, percent: 0 }
   );
+  
+  // Reactive plan from RxDB subscription
+  const [activePlan, setActivePlan] = useState<ReadingPlan>({ targetDateISO: null });
+  
+  // Reactive baseline from RxDB subscription
+  const todayISO = useTodayISO();
+  const [activeBaseline, setActiveBaseline] = useState<{ words: number; percent: number } | null>(null);
   
   // Subscribe to RxDB for reactive progress updates
   useEffect(() => {
@@ -120,20 +127,150 @@ const Index = () => {
     };
   }, [activeBookId]);
   
-  // Refresh streak when page becomes visible
+  // Subscribe to user_stats for reactive streak and lastBookId updates
   useEffect(() => {
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        setStreak(getStreak());
+    console.log('[Index] 🚀 useEffect user_stats subscription STARTING');
+    
+    // Load from localStorage immediately
+    setStreak(getStreak());
+    
+    // Also load lastBookId from localStorage immediately
+    const cachedLastBookId = localStorage.getItem('lastBookId');
+    console.log('[Index] 📦 localStorage lastBookId:', cachedLastBookId);
+    if (cachedLastBookId) {
+      console.log('[Index] ✅ Setting activeBookId from localStorage:', cachedLastBookId);
+      setActiveBookId(cachedLastBookId);
+    }
+    
+    let subscription: { unsubscribe: () => void } | null = null;
+    
+    const setupSubscription = async () => {
+      try {
+        console.log('[Index] 🔌 Setting up RxDB user_stats subscription...');
+        const db = await getDatabase();
+        const sub = db.user_stats.find({
+          selector: { _deleted: false }
+        }).$.subscribe(docs => {
+          console.log('[Index] 📡 user_stats subscription emitted:', docs?.length, 'docs');
+          if (docs && docs.length > 0) {
+            const stats = docs[0].toJSON();
+            console.log('[Index] 📊 user_stats data:', { 
+              last_book_id: stats.last_book_id, 
+              streak_current: stats.streak_current,
+              last_read_iso: stats.last_read_iso 
+            });
+            setStreak({
+              current: stats.streak_current || 0,
+              longest: stats.streak_longest || 0,
+              lastReadISO: stats.last_read_iso || null,
+              freezeAvailable: stats.freeze_available ?? true
+            });
+            // Always sync activeBookId from user_stats (reactive to local and cloud changes)
+            if (stats.last_book_id) {
+              console.log('[Index] ✅ Setting activeBookId from RxDB:', stats.last_book_id);
+              setActiveBookId(stats.last_book_id);
+            } else {
+              console.log('[Index] ⚠️ No last_book_id in user_stats');
+            }
+          } else {
+            console.log('[Index] ⚠️ user_stats subscription: no docs found');
+          }
+        });
+        subscription = { unsubscribe: () => sub.unsubscribe() };
+        console.log('[Index] ✅ RxDB subscription active');
+      } catch (err) {
+        console.error('[Index] ❌ Failed to setup user_stats subscription:', err);
       }
     };
-    document.addEventListener('visibilitychange', handleVisibility);
-    window.addEventListener('focus', handleVisibility);
+    
+    setupSubscription();
+    
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibility);
-      window.removeEventListener('focus', handleVisibility);
+      console.log('[Index] 🧹 Cleaning up user_stats subscription');
+      subscription?.unsubscribe();
     };
-  }, []);
+  }, []); // No dependencies - subscribe once and react to all changes
+  
+  // Subscribe to reading_plans for reactive plan updates
+  useEffect(() => {
+    if (!activeBookId) {
+      setActivePlan({ targetDateISO: null });
+      return;
+    }
+    
+    // Load from localStorage immediately
+    setActivePlan(getReadingPlan(activeBookId));
+    
+    let subscription: { unsubscribe: () => void } | null = null;
+    
+    const setupSubscription = async () => {
+      try {
+        const db = await getDatabase();
+        const sub = db.reading_plans.findOne({
+          selector: { book_id: activeBookId, _deleted: false }
+        }).$.subscribe(doc => {
+          if (doc) {
+            const plan = doc.toJSON();
+            setActivePlan({
+              targetDateISO: plan.target_date_iso ?? null,
+              targetPartIndex: plan.target_part_index,
+              targetChapterIndex: plan.target_chapter_index
+            });
+          }
+        });
+        subscription = { unsubscribe: () => sub.unsubscribe() };
+      } catch (err) {
+        console.error('[Index] Failed to setup reading_plans subscription:', err);
+      }
+    };
+    
+    setupSubscription();
+    
+    return () => {
+      subscription?.unsubscribe();
+    };
+  }, [activeBookId]);
+  
+  // Subscribe to daily_baselines for reactive baseline updates
+  useEffect(() => {
+    if (!activeBookId) {
+      setActiveBaseline(null);
+      return;
+    }
+    
+    // Load from localStorage immediately
+    const localBaseline = getDailyBaseline(activeBookId, todayISO);
+    setActiveBaseline(localBaseline);
+    
+    let subscription: { unsubscribe: () => void } | null = null;
+    
+    const setupSubscription = async () => {
+      try {
+        const db = await getDatabase();
+        const baselineId = `${activeBookId}:${todayISO}`;
+        const sub = db.daily_baselines.findOne({
+          selector: { id: baselineId, _deleted: false }
+        }).$.subscribe(doc => {
+          if (doc) {
+            const baseline = doc.toJSON();
+            setActiveBaseline({
+              words: baseline.words || 0,
+              percent: baseline.percent || 0
+            });
+          }
+        });
+        subscription = { unsubscribe: () => sub.unsubscribe() };
+      } catch (err) {
+        console.error('[Index] Failed to setup daily_baselines subscription:', err);
+      }
+    };
+    
+    setupSubscription();
+    
+    return () => {
+      subscription?.unsubscribe();
+    };
+  }, [activeBookId, todayISO]);
 
   // Detect prior usage and choose an active book
   useEffect(() => {
@@ -141,9 +278,20 @@ const Index = () => {
       try {
         const ls = window.localStorage;
         let u = false;
-        for (let i = 0; i < ls.length; i++) {
-          const key = ls.key(i) || "";
-          if (key.startsWith("progress:") || key.startsWith("plan:")) { u = true; break; }
+        
+        // Check for lastBookId first (most reliable indicator of prior usage)
+        const lastBookId = ls.getItem("lastBookId");
+        if (lastBookId) {
+          u = true;
+          console.log('[Index] 🔍 Prior usage detected via lastBookId:', lastBookId);
+        }
+        
+        // Also check legacy patterns
+        if (!u) {
+          for (let i = 0; i < ls.length; i++) {
+            const key = ls.key(i) || "";
+            if (key.startsWith("progress:") || key.startsWith("plan:")) { u = true; break; }
+          }
         }
         if (!u) {
           const sk = ls.getItem("streak");
@@ -155,19 +303,23 @@ const Index = () => {
           const s = stat ? JSON.parse(stat) : null;
           if (s?.minutesByDate && Object.keys(s.minutesByDate).length > 0) u = true;
         }
+        
+        console.log('[Index] 🔍 Prior usage result:', u);
         setUsed(u);
 
-        // Pick active book: lastBookId, or first with plan, else null
-        let chosen: string | null = null;
+        // Fallback: if no lastBookId was set via subscription, try to pick first book with plan
+        // The subscription from user_stats will set activeBookId if available
+        // This is just a fallback for first-time users or when no lastBookId exists
         const last = await getLastBookIdAsync();
-        if (last) chosen = last;
-        if (!chosen) {
+        if (!last) {
           for (const b of BOOKS) {
             const plan = getReadingPlan(b.id);
-            if (plan?.targetDateISO) { chosen = b.id; break; }
+            if (plan?.targetDateISO) { 
+              setActiveBookId(b.id); 
+              break; 
+            }
           }
         }
-        setActiveBookId(chosen);
       } catch { }
     })();
   }, []);
@@ -244,8 +396,8 @@ const Index = () => {
     }
   }, [activeBookId, allBooks]);
 
-  // Compute plan progress and daily goal similar to Reader
-  const plan = useMemo(() => activeBookId ? getReadingPlan(activeBookId) : { targetDateISO: null }, [activeBookId]);
+  // Use reactive plan from RxDB subscription
+  const plan = activePlan;
   // Use reactive progress from RxDB subscription
   const p = activeBookProgress;
   const totalWords = useMemo(() => computeTotalWords(parts), [parts]);
@@ -271,14 +423,17 @@ const Index = () => {
   }, [activeBookId]);
 
   const remainingWords = Math.max(0, targetWords - wordsUpToCurrent);
-  const todayISO = useTodayISO();
-  // Derive today's baseline synchronously to avoid transient old percent after day change
+  // Note: todayISO is defined at the top of the component
+  // Use reactive baseline from RxDB subscription, with fallback
   const baselineForToday = useMemo(() => {
     if (!activeBookId) return isPercentBased ? (p.percent || 0) : wordsUpToCurrent;
+    // Use reactive baseline from subscription
+    if (activeBaseline) return isPercentBased ? activeBaseline.percent : activeBaseline.words;
+    // Fallback to localStorage
     const base = getDailyBaseline(activeBookId, todayISO);
     if (base) return isPercentBased ? base.percent : base.words;
     return isPercentBased ? (p.percent || 0) : wordsUpToCurrent;
-  }, [activeBookId, isPercentBased, todayISO, wordsUpToCurrent, p.percent]);
+  }, [activeBookId, isPercentBased, todayISO, wordsUpToCurrent, p.percent, activeBaseline]);
 
   // Persist baseline if missing, with guards and logs
   useEffect(() => {

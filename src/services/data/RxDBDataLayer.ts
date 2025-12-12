@@ -582,7 +582,8 @@ class RxDBDataLayerImpl implements DataLayer {
                 _deleted: false
             } as RxUserStatsDocumentType;
 
-            const newStats = await db.user_stats.insert(dataToSave);
+            // Use upsert to handle race conditions where document may have been created between findOne and insert
+            const newStats = await db.user_stats.upsert(dataToSave);
             replicationManager.quickSync().catch(e => console.warn('[DataLayer] ⚠️ Quick sync failed:', e));
             return newStats.toJSON();
         }

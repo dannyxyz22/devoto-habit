@@ -274,13 +274,24 @@ export const getLastBookIdAsync = async (): Promise<string | null> => {
 };
 
 export const setLastBookId = async (bookId: string) => {
-  try {
-    await dataLayer.saveUserStats({ last_book_id: bookId });
-  } catch (e) {
-    console.warn('[storage] Failed to save last book ID to RxDB:', e);
+  console.log('[storage] 🔖 setLastBookId called with:', bookId);
+  
+  // Update localStorage cache FIRST for immediate availability
+  try { 
+    localStorage.setItem('lastBookId', bookId); 
+    console.log('[storage] ✅ localStorage updated with lastBookId:', bookId);
+  } catch (e) { 
+    console.error('[storage] ❌ localStorage update failed:', e);
   }
-  // Also update localStorage cache for quick sync reads
-  try { localStorage.setItem('lastBookId', bookId); } catch { }
+  
+  // Then persist to RxDB (async)
+  try {
+    console.log('[storage] 💾 Saving to RxDB user_stats...');
+    await dataLayer.saveUserStats({ last_book_id: bookId });
+    console.log('[storage] ✅ RxDB user_stats updated with last_book_id:', bookId);
+  } catch (e) {
+    console.warn('[storage] ❌ Failed to save last book ID to RxDB:', e);
+  }
 };
 
 // Plan start data (for reading goal calculations)
