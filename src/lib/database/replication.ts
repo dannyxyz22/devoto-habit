@@ -57,6 +57,9 @@ export class ReplicationManager {
         // Stop existing replications if any
         await this.stopReplication();
 
+        // FIRST: Migrate any local-user data to the real user_id BEFORE starting replication
+        await this.migrateLocalUserData();
+
         // We'll setup Realtime listener after replications are created
         // to trigger reSync when changes come from other clients
 
@@ -82,6 +85,8 @@ export class ReplicationManager {
                     batchSize: 50,
                     modifier: (doc) => {
                         const { created_at, updated_at, ...rest } = doc as any;
+                        // Skip documents with local-user (pre-login data)
+                        if (rest.user_id === 'local-user') return null;
                         // Filter out base64 cover_url, but keep external URLs
                         if (rest.cover_url && rest.cover_url.startsWith('data:')) {
                             delete rest.cover_url;
@@ -112,7 +117,13 @@ export class ReplicationManager {
                     }
                 },
                 push: {
-                    batchSize: 10
+                    batchSize: 10,
+                    modifier: (doc) => {
+                        const { created_at, updated_at, ...rest } = doc as any;
+                        // Skip documents with local-user (pre-login data)
+                        if (rest.user_id === 'local-user') return null;
+                        return rest;
+                    }
                 }
             });
 
@@ -139,6 +150,8 @@ export class ReplicationManager {
                     batchSize: 50,
                     modifier: (doc) => {
                         const { created_at, updated_at, ...rest } = doc as any;
+                        // Skip documents with local-user (pre-login data)
+                        if (rest.user_id === 'local-user') return null;
                         // Filter out base64 cover_url, keep external URLs only
                         if (rest.cover_url && rest.cover_url.startsWith('data:')) {
                             delete rest.cover_url;
@@ -166,7 +179,13 @@ export class ReplicationManager {
                 push: {
                     batchSize: 50,
                     modifier: (doc) => {
+                        console.log('[Replication ReadingPlans] modifier called with:', { user_id: (doc as any).user_id, id: (doc as any).id });
                         const { created_at, updated_at, ...rest } = doc as any;
+                        // Skip documents with local-user (pre-login data)
+                        if (rest.user_id === 'local-user') {
+                            console.log('[Replication ReadingPlans] ⏭️ SKIPPING local-user doc');
+                            return null;
+                        }
                         console.log('[Replication ReadingPlans] ⬆️ Pushing doc:', { id: rest.id, book_id: rest.book_id });
                         return rest;
                     }
@@ -187,6 +206,8 @@ export class ReplicationManager {
                     batchSize: 100,
                     modifier: (doc) => {
                         const { created_at, updated_at, ...rest } = doc as any;
+                        // Skip documents with local-user (pre-login data)
+                        if (rest.user_id === 'local-user') return null;
                         return rest;
                     }
                 }
@@ -218,6 +239,11 @@ export class ReplicationManager {
                     batchSize: 10,
                     modifier: (doc) => {
                         const { created_at, updated_at, ...rest } = doc as any;
+                        // Skip documents with local-user (pre-login data) - includes deleted docs
+                        if (rest.user_id === 'local-user') {
+                            console.log('[Replication UserStats] ⏭️ Skipping local-user document:', { user_id: rest.user_id, deleted: rest._deleted });
+                            return null;
+                        }
                         // Ensure minutes_by_date is a string for Supabase TEXT column
                         if (rest.minutes_by_date !== undefined && typeof rest.minutes_by_date !== 'string') {
                             rest.minutes_by_date = JSON.stringify(rest.minutes_by_date);
@@ -694,6 +720,204 @@ export class ReplicationManager {
         } catch (err) {
             console.warn('[User Stats Reconciliation] Failed:', err);
         }
+    }
+
+    /**
+     * Migrate documents with user_id='local-user' to the real authenticated user_id.
+     * This handles data created before login that needs to be synced.
+     */
+    public async migrateLocalUserData() {
+        try {
+            const db = await getDatabase();
+            const { data: auth } = await supabase.auth.getUser();
+            const realUserId = auth?.user?.id;
+            
+            if (!realUserId) {
+                console.log('[Migration] Skipped: no authenticated user');
+                return;
+            }
+
+            console.log('[Migration] Starting migration from local-user to:', realUserId);
+            let totalMigrated = 0;
+
+            // Migrate books
+            const localBooks = await db.books.find({ selector: { user_id: 'local-user' } }).exec();
+            for (const book of localBooks) {
+                const bookData = book.toJSON();
+                const newId = `${realUserId}:${bookData.id.replace('local-user:', '')}`;
+                
+                // Check if already exists with real user_id
+                const existing = await db.books.findOne(newId).exec();
+                if (!existing) {
+                    await db.books.insert({
+                        ...bookData,
+                        id: newId,
+                        user_id: realUserId,
+                        _modified: Date.now()
+                    });
+                }
+                // Remove the local-user version
+                await book.remove();
+                totalMigrated++;
+            }
+            if (localBooks.length > 0) {
+                console.log(`[Migration] Migrated ${localBooks.length} books`);
+            }
+
+            // Migrate user_epubs
+            const localEpubs = await db.user_epubs.find({ selector: { user_id: 'local-user' } }).exec();
+            for (const epub of localEpubs) {
+                const epubData = epub.toJSON();
+                const newId = `${realUserId}:${epubData.id.replace('local-user:', '')}`;
+                
+                const existing = await db.user_epubs.findOne(newId).exec();
+                if (!existing) {
+                    await db.user_epubs.insert({
+                        ...epubData,
+                        id: newId,
+                        user_id: realUserId,
+                        _modified: Date.now()
+                    });
+                }
+                await epub.remove();
+                totalMigrated++;
+            }
+            if (localEpubs.length > 0) {
+                console.log(`[Migration] Migrated ${localEpubs.length} user_epubs`);
+            }
+
+            // Migrate reading_plans
+            const localPlans = await db.reading_plans.find({ selector: { user_id: 'local-user' } }).exec();
+            for (const plan of localPlans) {
+                const planData = plan.toJSON();
+                const newId = planData.id.replace('local-user:', `${realUserId}:`);
+                
+                const existing = await db.reading_plans.findOne(newId).exec();
+                if (!existing) {
+                    await db.reading_plans.insert({
+                        ...planData,
+                        id: newId,
+                        user_id: realUserId,
+                        _modified: Date.now()
+                    });
+                }
+                await plan.remove();
+                totalMigrated++;
+            }
+            if (localPlans.length > 0) {
+                console.log(`[Migration] Migrated ${localPlans.length} reading_plans`);
+            }
+
+            // Migrate daily_baselines
+            const localBaselines = await db.daily_baselines.find({ selector: { user_id: 'local-user' } }).exec();
+            for (const baseline of localBaselines) {
+                const baselineData = baseline.toJSON();
+                const newId = baselineData.id.replace('local-user:', `${realUserId}:`);
+                
+                const existing = await db.daily_baselines.findOne(newId).exec();
+                if (!existing) {
+                    await db.daily_baselines.insert({
+                        ...baselineData,
+                        id: newId,
+                        user_id: realUserId,
+                        _modified: Date.now()
+                    });
+                }
+                await baseline.remove();
+                totalMigrated++;
+            }
+            if (localBaselines.length > 0) {
+                console.log(`[Migration] Migrated ${localBaselines.length} daily_baselines`);
+            }
+
+            // Migrate user_stats (special case: primary key is user_id itself)
+            const localStats = await db.user_stats.findOne('local-user').exec();
+            if (localStats) {
+                const statsData = localStats.toJSON();
+                
+                // Check if real user stats already exist
+                const existingStats = await db.user_stats.findOne(realUserId).exec();
+                if (!existingStats) {
+                    await db.user_stats.insert({
+                        ...statsData,
+                        user_id: realUserId,
+                        _modified: Date.now()
+                    });
+                    console.log('[Migration] Migrated user_stats');
+                } else {
+                    // Merge: keep the better stats (higher streak, more minutes, etc.)
+                    const existingData = existingStats.toJSON();
+                    const mergedStats = {
+                        streak_current: Math.max(statsData.streak_current || 0, existingData.streak_current || 0),
+                        streak_longest: Math.max(statsData.streak_longest || 0, existingData.streak_longest || 0),
+                        total_minutes: Math.max(statsData.total_minutes || 0, existingData.total_minutes || 0),
+                        last_book_id: statsData.last_book_id || existingData.last_book_id,
+                        last_read_iso: statsData.last_read_iso || existingData.last_read_iso,
+                        // Merge minutes_by_date
+                        minutes_by_date: this.mergeMinutesByDate(
+                            statsData.minutes_by_date,
+                            existingData.minutes_by_date
+                        ),
+                        _modified: Date.now()
+                    };
+                    await existingStats.incrementalPatch(mergedStats);
+                    console.log('[Migration] Merged user_stats with existing');
+                }
+                // Remove local-user stats
+                await localStats.remove();
+                totalMigrated++;
+            }
+
+            // Migrate settings
+            const localSettings = await db.settings.findOne('local-user').exec();
+            if (localSettings) {
+                const settingsData = localSettings.toJSON();
+                
+                const existingSettings = await db.settings.findOne(realUserId).exec();
+                if (!existingSettings) {
+                    await db.settings.insert({
+                        ...settingsData,
+                        user_id: realUserId,
+                        _modified: Date.now()
+                    });
+                    console.log('[Migration] Migrated settings');
+                }
+                await localSettings.remove();
+                totalMigrated++;
+            }
+
+            if (totalMigrated > 0) {
+                console.log(`[Migration] ✅ Complete! Migrated ${totalMigrated} documents from local-user to ${realUserId}`);
+            } else {
+                console.log('[Migration] No local-user data to migrate');
+            }
+        } catch (err) {
+            console.error('[Migration] Failed:', err);
+        }
+    }
+
+    /**
+     * Helper to merge minutes_by_date objects (stored as JSON strings)
+     */
+    private mergeMinutesByDate(a: string | Record<string, number> | undefined, b: string | Record<string, number> | undefined): string {
+        const parseIfString = (val: string | Record<string, number> | undefined): Record<string, number> => {
+            if (!val) return {};
+            if (typeof val === 'string') {
+                try { return JSON.parse(val); } catch { return {}; }
+            }
+            return val;
+        };
+        
+        const objA = parseIfString(a);
+        const objB = parseIfString(b);
+        
+        // Merge: for each date, take the max value
+        const merged: Record<string, number> = { ...objB };
+        for (const [date, minutes] of Object.entries(objA)) {
+            merged[date] = Math.max(merged[date] || 0, minutes);
+        }
+        
+        return JSON.stringify(merged);
     }
 }
 
