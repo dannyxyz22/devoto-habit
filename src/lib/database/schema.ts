@@ -293,7 +293,7 @@ export const userStatsSchemaLiteral = {
             type: 'string'
         },
         minutes_by_date: {
-            type: 'object'
+            type: 'string'
         },
         _modified: {
             type: 'number'

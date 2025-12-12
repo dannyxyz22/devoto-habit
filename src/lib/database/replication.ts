@@ -193,6 +193,7 @@ export class ReplicationManager {
             });
 
             // Replicate User Stats
+            // minutes_by_date is now stored as JSON string in both RxDB and Supabase
             const userStatsReplication = await replicateSupabase<RxUserStatsDocumentType>({
                 tableName: 'user_stats',
                 client: supabase,
@@ -204,7 +205,12 @@ export class ReplicationManager {
                     modifier: (doc) => {
                         if (!doc.last_read_iso) delete doc.last_read_iso;
                         if (!doc.last_book_id) delete doc.last_book_id;
-                        if (!doc.minutes_by_date) doc.minutes_by_date = {};
+                        // Ensure minutes_by_date is a string (it should already be TEXT in Supabase)
+                        if (doc.minutes_by_date === null || doc.minutes_by_date === undefined) {
+                            doc.minutes_by_date = '{}';
+                        } else if (typeof doc.minutes_by_date !== 'string') {
+                            doc.minutes_by_date = JSON.stringify(doc.minutes_by_date);
+                        }
                         return doc;
                     }
                 },
@@ -212,7 +218,12 @@ export class ReplicationManager {
                     batchSize: 10,
                     modifier: (doc) => {
                         const { created_at, updated_at, ...rest } = doc as any;
-                        console.log('[Replication UserStats] ⬆️ Pushing:', { user_id: rest.user_id, streak: rest.streak_current });
+                        // Ensure minutes_by_date is a string for Supabase TEXT column
+                        if (rest.minutes_by_date !== undefined && typeof rest.minutes_by_date !== 'string') {
+                            rest.minutes_by_date = JSON.stringify(rest.minutes_by_date);
+                        }
+                        if (!rest.minutes_by_date) rest.minutes_by_date = '{}';
+                        console.log('[Replication UserStats] ⬆️ Pushing:', { user_id: rest.user_id, streak: rest.streak_current, last_book_id: rest.last_book_id });
                         return rest;
                     }
                 }
@@ -303,6 +314,12 @@ export class ReplicationManager {
 
             // Reconcile user_epubs to avoid push conflicts
             await this.reconcileUserEpubs();
+            
+            // Reconcile books to avoid push conflicts
+            await this.reconcileBooks();
+            
+            // Reconcile user_stats to avoid push conflicts (handles minutes_by_date object issue)
+            await this.reconcileUserStats();
 
         } catch (error) {
             console.error('ReplicationManager: Failed to start replication:', error);
@@ -533,6 +550,149 @@ export class ReplicationManager {
             }
         } catch (err) {
             console.warn('[User EPUBs Reconciliation] Failed:', err);
+        }
+    }
+
+    /**
+     * Reconcile local books with Supabase by upserting missing rows.
+     * This prevents RC_PUSH conflicts when offline-created docs are migrated after login.
+     */
+    public async reconcileBooks() {
+        try {
+            const db = await getDatabase();
+            const { data: auth } = await supabase.auth.getUser();
+            const userId = auth?.user?.id;
+            if (!userId) {
+                console.log('[Books Reconciliation] Skipped: no authenticated user');
+                return;
+            }
+            
+            // Fetch local books
+            const localDocs = await db.books.find({
+                selector: { _deleted: false }
+            }).exec();
+
+            if (localDocs.length === 0) {
+                console.log('[Books Reconciliation] No local books to reconcile');
+                return;
+            }
+
+            // Get local book data
+            const localJsons = localDocs.map(d => d.toJSON());
+            const localIds = localJsons.map(j => j.id);
+
+            // Check which ones already exist on server
+            const { data: serverBooks, error: fetchErr } = await supabase
+                .from('books')
+                .select('id')
+                .eq('user_id', userId)
+                .in('id', localIds);
+
+            if (fetchErr) {
+                console.warn('[Books Reconciliation] Fetch error:', fetchErr);
+                return;
+            }
+
+            const serverIds = new Set((serverBooks || []).map(b => b.id));
+            
+            // Find books that exist locally but not on server
+            const newDocs = localJsons.filter(j => !serverIds.has(j.id));
+
+            if (newDocs.length === 0) {
+                console.log('[Books Reconciliation] All books already synced.');
+                return;
+            }
+
+            console.log(`[Books Reconciliation] Upserting ${newDocs.length} books...`);
+
+            // Upsert new books to Supabase
+            const upsertPayload = newDocs.map(j => ({ 
+                ...j, 
+                user_id: userId,
+                // Remove any fields that shouldn't be synced
+                created_at: undefined,
+                updated_at: undefined
+            }));
+            
+            const { error: upsertErr } = await supabase
+                .from('books')
+                .upsert(upsertPayload, { onConflict: 'id,user_id' });
+                
+            if (upsertErr) {
+                console.warn('[Books Reconciliation] Upsert error:', upsertErr);
+            } else {
+                console.log(`[Books Reconciliation] Upserted ${upsertPayload.length} books.`);
+            }
+        } catch (err) {
+            console.warn('[Books Reconciliation] Failed:', err);
+        }
+    }
+
+    /**
+     * Reconcile local user_stats with Supabase.
+     * This handles the minutes_by_date object field that causes RC_PUSH errors.
+     */
+    public async reconcileUserStats() {
+        try {
+            const db = await getDatabase();
+            const { data: auth } = await supabase.auth.getUser();
+            const userId = auth?.user?.id;
+            if (!userId) {
+                console.log('[User Stats Reconciliation] Skipped: no authenticated user');
+                return;
+            }
+            
+            // Fetch local user_stats
+            const localDoc = await db.user_stats.findOne(userId).exec();
+            
+            if (!localDoc) {
+                console.log('[User Stats Reconciliation] No local user_stats to reconcile');
+                return;
+            }
+
+            const localData = localDoc.toJSON();
+            
+            // Check if exists on server
+            const { data: serverData, error: fetchErr } = await supabase
+                .from('user_stats')
+                .select('user_id, _modified')
+                .eq('user_id', userId)
+                .single();
+
+            if (fetchErr && fetchErr.code !== 'PGRST116') { // PGRST116 = not found
+                console.warn('[User Stats Reconciliation] Fetch error:', fetchErr);
+                return;
+            }
+
+            // Prepare upsert payload - ensure minutes_by_date is a string
+            const minutesByDateStr = typeof localData.minutes_by_date === 'string' 
+                ? localData.minutes_by_date 
+                : JSON.stringify(localData.minutes_by_date || {});
+            const upsertPayload = {
+                user_id: userId,
+                streak_current: localData.streak_current || 0,
+                streak_longest: localData.streak_longest || 0,
+                last_read_iso: localData.last_read_iso || null,
+                freeze_available: localData.freeze_available ?? true,
+                total_minutes: localData.total_minutes || 0,
+                last_book_id: localData.last_book_id || null,
+                minutes_by_date: minutesByDateStr,
+                _modified: localData._modified,
+                _deleted: localData._deleted || false
+            };
+
+            // Upsert to Supabase
+            const { error: upsertErr } = await supabase
+                .from('user_stats')
+                .upsert(upsertPayload, { onConflict: 'user_id' });
+                
+            if (upsertErr) {
+                console.warn('[User Stats Reconciliation] Upsert error:', upsertErr);
+            } else {
+                console.log('[User Stats Reconciliation] Upserted user_stats successfully');
+            }
+        } catch (err) {
+            console.warn('[User Stats Reconciliation] Failed:', err);
         }
     }
 }

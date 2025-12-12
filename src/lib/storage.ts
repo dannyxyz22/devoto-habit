@@ -134,7 +134,11 @@ export const getStatsAsync = async (): Promise<Stats> => {
   try {
     const stats = await dataLayer.getUserStats();
     if (stats && stats.minutes_by_date) {
-      return { minutesByDate: stats.minutes_by_date as Record<string, number> };
+      // minutes_by_date is stored as JSON string in RxDB
+      const minutesByDate = typeof stats.minutes_by_date === 'string' 
+        ? JSON.parse(stats.minutes_by_date) 
+        : stats.minutes_by_date;
+      return { minutesByDate: minutesByDate as Record<string, number> };
     }
   } catch (e) {
     console.warn('[storage] Failed to get stats from RxDB:', e);
@@ -155,7 +159,7 @@ export const addReadingMinutes = async (ms: number) => {
   
   try {
     await dataLayer.saveUserStats({
-      minutes_by_date: s.minutesByDate,
+      minutes_by_date: JSON.stringify(s.minutesByDate),
       total_minutes: totalMinutes,
     });
   } catch (e) {

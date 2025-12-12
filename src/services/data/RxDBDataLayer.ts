@@ -563,12 +563,21 @@ class RxDBDataLayerImpl implements DataLayer {
             if (statsData.freeze_available !== undefined) updates.freeze_available = statsData.freeze_available;
             if (statsData.total_minutes !== undefined) updates.total_minutes = statsData.total_minutes;
             if (statsData.last_book_id !== undefined) updates.last_book_id = statsData.last_book_id;
-            if (statsData.minutes_by_date !== undefined) updates.minutes_by_date = statsData.minutes_by_date;
+            if (statsData.minutes_by_date !== undefined) {
+                updates.minutes_by_date = typeof statsData.minutes_by_date === 'string' 
+                    ? statsData.minutes_by_date 
+                    : JSON.stringify(statsData.minutes_by_date);
+            }
 
             await existingStats.incrementalPatch(updates);
             replicationManager.quickSync().catch(e => console.warn('[DataLayer] ⚠️ Quick sync failed:', e));
             return existingStats.toJSON();
         } else {
+            const minutesByDateStr = statsData.minutes_by_date !== undefined
+                ? (typeof statsData.minutes_by_date === 'string' 
+                    ? statsData.minutes_by_date 
+                    : JSON.stringify(statsData.minutes_by_date))
+                : '{}';
             const dataToSave = {
                 user_id: userId,
                 streak_current: statsData.streak_current ?? 0,
@@ -577,7 +586,7 @@ class RxDBDataLayerImpl implements DataLayer {
                 freeze_available: statsData.freeze_available ?? true,
                 total_minutes: statsData.total_minutes ?? 0,
                 last_book_id: statsData.last_book_id,
-                minutes_by_date: statsData.minutes_by_date ?? {},
+                minutes_by_date: minutesByDateStr,
                 _modified: Date.now(),
                 _deleted: false
             } as RxUserStatsDocumentType;
