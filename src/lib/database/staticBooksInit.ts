@@ -25,6 +25,14 @@ export async function ensureStaticBooks(db: DevotoDatabase, userId: string = 'lo
             const existingBook = await db.books.findOne(book.id).exec();
 
             if (existingBook) {
+                // PROTECTION: If we are initializing as 'local-user' (default on boot),
+                // but the book is already assigned to a real logged-in user (UUID),
+                // DO NOT overwrite it back to 'local-user'.
+                if (userId === 'local-user' && existingBook.user_id !== 'local-user') {
+                    console.log(`[StaticBooks] 🛡️ Valid user_id found (${existingBook.user_id}), skipping reset to local-user for: ${book.title}`);
+                    continue;
+                }
+
                 // If user_id changed, update it
                 if (existingBook.user_id !== userId) {
                     await existingBook.update({

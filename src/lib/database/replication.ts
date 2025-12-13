@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { getDatabase } from '@/lib/database/db';
 import { RxReplicationState } from 'rxdb/plugins/replication';
 import { RxBookDocumentType, RxSettingsDocumentType, RxUserEpubDocumentType, RxReadingPlanDocumentType, RxDailyBaselineDocumentType, RxUserStatsDocumentType } from '@/lib/database/schema';
+import { BOOKS } from '@/lib/books';
 
 export class ReplicationManager {
     private static instance: ReplicationManager;
@@ -59,7 +60,7 @@ export class ReplicationManager {
 
         // FIRST: Migrate any local-user data to the real user_id BEFORE starting replication
         await this.migrateLocalUserData();
-        
+
         // SECOND: Reconcile local data with Supabase via UPSERT to avoid 409 Conflict errors
         // This ensures documents that exist both locally and on server are synced properly
         console.log('ReplicationManager: Reconciling local data with Supabase...');
@@ -298,7 +299,7 @@ export class ReplicationManager {
                     new Promise((_, reject) => setTimeout(() => reject(new Error('Replication timeout')), 10000))
                 ]);
                 console.log('ReplicationManager: Initial replication complete ✓');
-                
+
                 // Dispatch a global event to notify listeners that replication is complete
                 window.dispatchEvent(new CustomEvent('rxdb-initial-replication-complete'));
                 console.log('ReplicationManager: Dispatched rxdb-initial-replication-complete event');
@@ -356,10 +357,10 @@ export class ReplicationManager {
 
             // Reconcile user_epubs to avoid push conflicts
             await this.reconcileUserEpubs();
-            
+
             // Reconcile books to avoid push conflicts
             await this.reconcileBooks();
-            
+
             // Reconcile user_stats to avoid push conflicts (handles minutes_by_date object issue)
             await this.reconcileUserStats();
 
@@ -608,7 +609,7 @@ export class ReplicationManager {
                 console.log('[Books Reconciliation] Skipped: no authenticated user');
                 return;
             }
-            
+
             // Fetch local books
             const localDocs = await db.books.find({
                 selector: { _deleted: false }
@@ -636,7 +637,7 @@ export class ReplicationManager {
             }
 
             const serverIds = new Set((serverBooks || []).map(b => b.id));
-            
+
             // Find books that exist locally but not on server
             const newDocs = localJsons.filter(j => !serverIds.has(j.id));
 
@@ -648,18 +649,18 @@ export class ReplicationManager {
             console.log(`[Books Reconciliation] Upserting ${newDocs.length} books...`);
 
             // Upsert new books to Supabase
-            const upsertPayload = newDocs.map(j => ({ 
-                ...j, 
+            const upsertPayload = newDocs.map(j => ({
+                ...j,
                 user_id: userId,
                 // Remove any fields that shouldn't be synced
                 created_at: undefined,
                 updated_at: undefined
             }));
-            
+
             const { error: upsertErr } = await supabase
                 .from('books')
                 .upsert(upsertPayload, { onConflict: 'id,user_id' });
-                
+
             if (upsertErr) {
                 console.warn('[Books Reconciliation] Upsert error:', upsertErr);
             } else {
@@ -683,17 +684,17 @@ export class ReplicationManager {
                 console.log('[User Stats Reconciliation] Skipped: no authenticated user');
                 return;
             }
-            
+
             // Fetch local user_stats
             const localDoc = await db.user_stats.findOne(userId).exec();
-            
+
             if (!localDoc) {
                 console.log('[User Stats Reconciliation] No local user_stats to reconcile');
                 return;
             }
 
             const localData = localDoc.toJSON();
-            
+
             // Check if exists on server
             const { data: serverData, error: fetchErr } = await supabase
                 .from('user_stats')
@@ -707,8 +708,8 @@ export class ReplicationManager {
             }
 
             // Prepare upsert payload - ensure minutes_by_date is a string
-            const minutesByDateStr = typeof localData.minutes_by_date === 'string' 
-                ? localData.minutes_by_date 
+            const minutesByDateStr = typeof localData.minutes_by_date === 'string'
+                ? localData.minutes_by_date
                 : JSON.stringify(localData.minutes_by_date || {});
             const upsertPayload = {
                 user_id: userId,
@@ -727,7 +728,7 @@ export class ReplicationManager {
             const { error: upsertErr } = await supabase
                 .from('user_stats')
                 .upsert(upsertPayload, { onConflict: 'user_id' });
-                
+
             if (upsertErr) {
                 console.warn('[User Stats Reconciliation] Upsert error:', upsertErr);
             } else {
@@ -750,7 +751,7 @@ export class ReplicationManager {
                 console.log('[Reading Plans Reconciliation] Skipped: no authenticated user');
                 return;
             }
-            
+
             // Fetch local reading_plans
             const localDocs = await db.reading_plans.find({
                 selector: { _deleted: false }
@@ -786,17 +787,17 @@ export class ReplicationManager {
 
             console.log(`[Reading Plans Reconciliation] Upserting ${newDocs.length} plans...`);
 
-            const upsertPayload = newDocs.map(j => ({ 
-                ...j, 
+            const upsertPayload = newDocs.map(j => ({
+                ...j,
                 user_id: userId,
                 created_at: undefined,
                 updated_at: undefined
             }));
-            
+
             const { error: upsertErr } = await supabase
                 .from('reading_plans')
                 .upsert(upsertPayload, { onConflict: 'id,user_id' });
-                
+
             if (upsertErr) {
                 console.warn('[Reading Plans Reconciliation] Upsert error:', upsertErr);
             } else {
@@ -819,7 +820,7 @@ export class ReplicationManager {
                 console.log('[Daily Baselines Reconciliation] Skipped: no authenticated user');
                 return;
             }
-            
+
             // Fetch local daily_baselines
             const localDocs = await db.daily_baselines.find({
                 selector: { _deleted: false }
@@ -855,17 +856,17 @@ export class ReplicationManager {
 
             console.log(`[Daily Baselines Reconciliation] Upserting ${newDocs.length} baselines...`);
 
-            const upsertPayload = newDocs.map(j => ({ 
-                ...j, 
+            const upsertPayload = newDocs.map(j => ({
+                ...j,
                 user_id: userId,
                 created_at: undefined,
                 updated_at: undefined
             }));
-            
+
             const { error: upsertErr } = await supabase
                 .from('daily_baselines')
                 .upsert(upsertPayload, { onConflict: 'id,user_id' });
-                
+
             if (upsertErr) {
                 console.warn('[Daily Baselines Reconciliation] Upsert error:', upsertErr);
             } else {
@@ -885,7 +886,7 @@ export class ReplicationManager {
             const db = await getDatabase();
             const { data: auth } = await supabase.auth.getUser();
             const realUserId = auth?.user?.id;
-            
+
             if (!realUserId) {
                 console.log('[Migration] Skipped: no authenticated user');
                 return;
@@ -898,21 +899,40 @@ export class ReplicationManager {
             const localBooks = await db.books.find({ selector: { user_id: 'local-user' } }).exec();
             for (const book of localBooks) {
                 const bookData = book.toJSON();
-                const newId = `${realUserId}:${bookData.id.replace('local-user:', '')}`;
-                
-                // Check if already exists with real user_id
-                const existing = await db.books.findOne(newId).exec();
-                if (!existing) {
-                    await db.books.insert({
-                        ...bookData,
-                        id: newId,
-                        user_id: realUserId,
-                        _modified: Date.now()
+
+                // Check if this is a static book - if so, PRESERVE the ID, just update user_id
+                const isStatic = BOOKS.some(b => b.id === bookData.id);
+
+                if (isStatic) {
+                    // Update in-place so we don't lose the ID or create duplicates
+                    await book.update({
+                        $set: {
+                            user_id: realUserId,
+                            _modified: Date.now()
+                        }
                     });
+                    console.log(`[Migration] Updated static book ownership: ${bookData.id}`);
+                    totalMigrated++;
+                } else {
+                    // Start NON-STATIC logic
+                    // User uploaded books get namespaced ID to avoid conflicts
+                    const newId = `${realUserId}:${bookData.id.replace('local-user:', '')}`;
+
+                    // Check if already exists with real user_id
+                    const existing = await db.books.findOne(newId).exec();
+                    if (!existing) {
+                        await db.books.insert({
+                            ...bookData,
+                            id: newId,
+                            user_id: realUserId,
+                            _modified: Date.now()
+                        });
+                    }
+                    // Remove the local-user version
+                    await book.remove();
+                    totalMigrated++;
+                    // End NON-STATIC logic
                 }
-                // Remove the local-user version
-                await book.remove();
-                totalMigrated++;
             }
             if (localBooks.length > 0) {
                 console.log(`[Migration] Migrated ${localBooks.length} books`);
@@ -923,7 +943,7 @@ export class ReplicationManager {
             for (const epub of localEpubs) {
                 const epubData = epub.toJSON();
                 const newId = `${realUserId}:${epubData.id.replace('local-user:', '')}`;
-                
+
                 const existing = await db.user_epubs.findOne(newId).exec();
                 if (!existing) {
                     await db.user_epubs.insert({
@@ -945,7 +965,7 @@ export class ReplicationManager {
             for (const plan of localPlans) {
                 const planData = plan.toJSON();
                 const newId = planData.id.replace('local-user:', `${realUserId}:`);
-                
+
                 const existing = await db.reading_plans.findOne(newId).exec();
                 if (!existing) {
                     await db.reading_plans.insert({
@@ -967,7 +987,7 @@ export class ReplicationManager {
             for (const baseline of localBaselines) {
                 const baselineData = baseline.toJSON();
                 const newId = baselineData.id.replace('local-user:', `${realUserId}:`);
-                
+
                 const existing = await db.daily_baselines.findOne(newId).exec();
                 if (!existing) {
                     await db.daily_baselines.insert({
@@ -988,7 +1008,7 @@ export class ReplicationManager {
             const localStats = await db.user_stats.findOne('local-user').exec();
             if (localStats) {
                 const statsData = localStats.toJSON();
-                
+
                 // Check if real user stats already exist
                 const existingStats = await db.user_stats.findOne(realUserId).exec();
                 if (!existingStats) {
@@ -1026,7 +1046,7 @@ export class ReplicationManager {
             const localSettings = await db.settings.findOne('local-user').exec();
             if (localSettings) {
                 const settingsData = localSettings.toJSON();
-                
+
                 const existingSettings = await db.settings.findOne(realUserId).exec();
                 if (!existingSettings) {
                     await db.settings.insert({
@@ -1061,16 +1081,16 @@ export class ReplicationManager {
             }
             return val;
         };
-        
+
         const objA = parseIfString(a);
         const objB = parseIfString(b);
-        
+
         // Merge: for each date, take the max value
         const merged: Record<string, number> = { ...objB };
         for (const [date, minutes] of Object.entries(objA)) {
             merged[date] = Math.max(merged[date] || 0, minutes);
         }
-        
+
         return JSON.stringify(merged);
     }
 }
