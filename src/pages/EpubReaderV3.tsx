@@ -6,7 +6,7 @@ import { BOOKS } from "@/lib/books";
 import { resolveEpubSource } from "@/lib/utils";
 import { getUserEpubBlob } from "@/lib/userEpubs";
 import { SEO } from "@/components/app/SEO";
-import { getDailyBaseline, setDailyBaseline, setProgress, getReadingPlan } from "@/lib/storage";
+import { getDailyBaseline, setDailyBaseline, setProgress, getReadingPlan, getProgress } from "@/lib/storage";
 import { updateDailyProgressWidget } from "@/main";
 import { WidgetUpdater, canUseNative } from "@/lib/widgetUpdater";
 import { format } from "date-fns";
@@ -191,6 +191,20 @@ const EpubReaderV3 = () => {
           }
         }
 
+        // --- FIX: Update local progress storage for Library UI ---
+        // Only update if we have a valid percentage or if locations are confirmed ready (meaning 0% is real)
+        if (percent > 0 || locationsReadyRef.current) {
+          try {
+            // Get existing progress to preserve chapter/part indexes if they exist
+            const currentProgress = getProgress(epubId);
+            setProgress(epubId, {
+              ...currentProgress,
+              percent: percent
+            });
+          } catch (e) { console.warn("[EpubReaderV3] Failed to update local progress:", e); }
+        }
+        // -------------------------------------------------------
+
         // Agendar salvamento DB
         scheduleSave(newLocation, percent);
       } catch (err) {
@@ -214,7 +228,7 @@ const EpubReaderV3 = () => {
             book.locations.generate(500).then(() => {
               console.log("[EpubReaderV3] Locations generated");
               locationsReadyRef.current = true;
-              
+
               // Now that locations are ready, recalculate and save the correct percentage
               const rendition = renditionRef.current;
               if (rendition && latestCfiRef.current) {
@@ -228,7 +242,7 @@ const EpubReaderV3 = () => {
                       saveToRxDB(latestCfiRef.current, percent);
                     }
                   }
-                } catch {}
+                } catch { }
               }
             });
           } catch { }
@@ -327,10 +341,10 @@ const EpubReaderV3 = () => {
 
           setLocation(finalCfi);
           setLoading(false);
-          
+
           // Note: setLastBookId is called in the onClick handler that navigates here,
           // so we don't need to call it again here.
-          
+
           console.log("[EpubReaderV3] Ready. Starting at:", finalCfi);
         }
       } catch (err) {
