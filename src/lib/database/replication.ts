@@ -86,6 +86,7 @@ export class ReplicationManager {
                 live: true,
                 pull: {
                     batchSize: 50,
+
                     modifier: (doc) => {
                         console.log('[Cloud Debug] ⬇️ Pulled Book:', doc);
                         // Map nullable fields - cover_url is handled by Cache Storage in UI
@@ -120,6 +121,7 @@ export class ReplicationManager {
                 live: true,
                 pull: {
                     batchSize: 10,
+
                     modifier: (doc) => {
                         console.log('[Cloud Debug] ⬇️ Pulled Settings:', doc);
                         // Map nullable fields
@@ -151,6 +153,7 @@ export class ReplicationManager {
                 live: true,
                 pull: {
                     batchSize: 50,
+                    interval: 30000,
                     modifier: (doc) => {
                         console.log('[Cloud Debug] ⬇️ Pulled User Epub:', doc);
                         // Map nullable fields - cover_url is handled by Cache Storage in UI
@@ -187,6 +190,7 @@ export class ReplicationManager {
                 live: true,
                 pull: {
                     batchSize: 50,
+                    interval: 30000,
                     modifier: (doc) => {
                         console.log('[Cloud Debug] ⬇️ Pulled Reading Plan:', doc);
                         if (!doc.target_date_iso) delete doc.target_date_iso;
@@ -218,6 +222,7 @@ export class ReplicationManager {
                 live: true,
                 pull: {
                     batchSize: 100,
+                    interval: 30000,
                     modifier: (doc) => {
                         console.log('[Cloud Debug] ⬇️ Pulled Annual Baseline:', doc);
                         return doc;
@@ -244,6 +249,7 @@ export class ReplicationManager {
                 live: true,
                 pull: {
                     batchSize: 10,
+                    interval: 30000,
                     modifier: (doc) => {
                         console.log('[Cloud Debug] ⬇️ Pulled User Stats:', doc);
                         if (!doc.last_read_iso) delete doc.last_read_iso;
@@ -300,6 +306,15 @@ export class ReplicationManager {
                     await (state as any).start();
                 }
             }
+
+            // Set up polling fallback when Supabase Realtime is disabled.
+            // This will call quickSync every 30 seconds to pull any new changes.
+            const pollingIntervalMs = 30000;
+            const pollHandle = setInterval(() => {
+                replicationManager.quickSync().catch(e => console.warn('[Replication] quickSync failed:', e));
+            }, pollingIntervalMs);
+            // Store handle so it can be cleared on stopReplication if needed.
+            (this as any)._pollHandle = pollHandle;
 
             // Wait for initial sync
             try {
