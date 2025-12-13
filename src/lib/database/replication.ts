@@ -87,6 +87,7 @@ export class ReplicationManager {
                 pull: {
                     batchSize: 50,
                     modifier: (doc) => {
+                        console.log('[Cloud Debug] ⬇️ Pulled Book:', doc);
                         // Map nullable fields - cover_url is handled by Cache Storage in UI
                         if (!doc.author) delete doc.author;
                         if (!doc.file_hash) delete doc.file_hash;
@@ -120,6 +121,7 @@ export class ReplicationManager {
                 pull: {
                     batchSize: 10,
                     modifier: (doc) => {
+                        console.log('[Cloud Debug] ⬇️ Pulled Settings:', doc);
                         // Map nullable fields
                         if (!doc.theme) delete doc.theme;
                         if (!doc.font_size) delete doc.font_size;
@@ -150,6 +152,7 @@ export class ReplicationManager {
                 pull: {
                     batchSize: 50,
                     modifier: (doc) => {
+                        console.log('[Cloud Debug] ⬇️ Pulled User Epub:', doc);
                         // Map nullable fields - cover_url is handled by Cache Storage in UI
                         if (!doc.author) delete doc.author;
                         if (!doc.file_size) delete doc.file_size;
@@ -185,6 +188,7 @@ export class ReplicationManager {
                 pull: {
                     batchSize: 50,
                     modifier: (doc) => {
+                        console.log('[Cloud Debug] ⬇️ Pulled Reading Plan:', doc);
                         if (!doc.target_date_iso) delete doc.target_date_iso;
                         return doc;
                     }
@@ -213,7 +217,11 @@ export class ReplicationManager {
                 replicationIdentifier: 'daily-baselines-replication',
                 live: true,
                 pull: {
-                    batchSize: 100
+                    batchSize: 100,
+                    modifier: (doc) => {
+                        console.log('[Cloud Debug] ⬇️ Pulled Annual Baseline:', doc);
+                        return doc;
+                    }
                 },
                 push: {
                     batchSize: 100,
@@ -237,6 +245,7 @@ export class ReplicationManager {
                 pull: {
                     batchSize: 10,
                     modifier: (doc) => {
+                        console.log('[Cloud Debug] ⬇️ Pulled User Stats:', doc);
                         if (!doc.last_read_iso) delete doc.last_read_iso;
                         if (!doc.last_book_id) delete doc.last_book_id;
                         // Ensure minutes_by_date is a string (it should already be TEXT in Supabase)
