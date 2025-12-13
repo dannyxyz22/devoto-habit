@@ -308,8 +308,14 @@ class RxDBDataLayerImpl implements DataLayer {
         const { user } = await authService.getUser();
 
         // Log total EPUBs in database before filtering
-        const allEpubsCount = await db.user_epubs.count().exec();
-        console.log('[DataLayer.getUserEpubs] Total EPUBs in RxDB:', allEpubsCount, 'User:', user?.id || 'local-user');
+        const allEpubs = await db.user_epubs.find().exec();
+        console.log('[DataLayer.getUserEpubs] Total EPUBs in RxDB:', allEpubs.length, 'User:', user?.id || 'local-user');
+        console.log('[DataLayer.getUserEpubs] All EPUBs:', allEpubs.map(e => ({ 
+            id: e.id, 
+            user_id: e.user_id, 
+            title: e.title,
+            _deleted: e._deleted 
+        })));
 
         // When logged in, show only user's EPUBs
         // When logged out, show ALL locally cached EPUBs (for offline access)

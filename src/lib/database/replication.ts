@@ -59,6 +59,18 @@ export class ReplicationManager {
 
         // FIRST: Migrate any local-user data to the real user_id BEFORE starting replication
         await this.migrateLocalUserData();
+        
+        // SECOND: Reconcile local data with Supabase via UPSERT to avoid 409 Conflict errors
+        // This ensures documents that exist both locally and on server are synced properly
+        console.log('ReplicationManager: Reconciling local data with Supabase...');
+        await Promise.all([
+            this.reconcileBooks(),
+            this.reconcileUserEpubs(),
+            this.reconcileUserStats(),
+            this.reconcileReadingPlans(),
+            this.reconcileDailyBaselines(),
+        ]);
+        console.log('ReplicationManager: Reconciliation complete');
 
         // We'll setup Realtime listener after replications are created
         // to trigger reSync when changes come from other clients
@@ -286,6 +298,10 @@ export class ReplicationManager {
                     new Promise((_, reject) => setTimeout(() => reject(new Error('Replication timeout')), 10000))
                 ]);
                 console.log('ReplicationManager: Initial replication complete ✓');
+                
+                // Dispatch a global event to notify listeners that replication is complete
+                window.dispatchEvent(new CustomEvent('rxdb-initial-replication-complete'));
+                console.log('ReplicationManager: Dispatched rxdb-initial-replication-complete event');
             } catch (err) {
                 if ((err as Error).message === 'Replication timeout') {
                     console.warn('ReplicationManager: Replication timeout (continuing anyway)');
@@ -719,6 +735,144 @@ export class ReplicationManager {
             }
         } catch (err) {
             console.warn('[User Stats Reconciliation] Failed:', err);
+        }
+    }
+
+    /**
+     * Reconcile local reading_plans with Supabase by upserting.
+     */
+    public async reconcileReadingPlans() {
+        try {
+            const db = await getDatabase();
+            const { data: auth } = await supabase.auth.getUser();
+            const userId = auth?.user?.id;
+            if (!userId) {
+                console.log('[Reading Plans Reconciliation] Skipped: no authenticated user');
+                return;
+            }
+            
+            // Fetch local reading_plans
+            const localDocs = await db.reading_plans.find({
+                selector: { _deleted: false }
+            }).exec();
+
+            if (localDocs.length === 0) {
+                console.log('[Reading Plans Reconciliation] No local plans to reconcile');
+                return;
+            }
+
+            const localJsons = localDocs.map(d => d.toJSON());
+            const localIds = localJsons.map(j => j.id);
+
+            // Check which ones already exist on server
+            const { data: serverPlans, error: fetchErr } = await supabase
+                .from('reading_plans')
+                .select('id')
+                .eq('user_id', userId)
+                .in('id', localIds);
+
+            if (fetchErr) {
+                console.warn('[Reading Plans Reconciliation] Fetch error:', fetchErr);
+                return;
+            }
+
+            const serverIds = new Set((serverPlans || []).map(p => p.id));
+            const newDocs = localJsons.filter(j => !serverIds.has(j.id));
+
+            if (newDocs.length === 0) {
+                console.log('[Reading Plans Reconciliation] All plans already synced');
+                return;
+            }
+
+            console.log(`[Reading Plans Reconciliation] Upserting ${newDocs.length} plans...`);
+
+            const upsertPayload = newDocs.map(j => ({ 
+                ...j, 
+                user_id: userId,
+                created_at: undefined,
+                updated_at: undefined
+            }));
+            
+            const { error: upsertErr } = await supabase
+                .from('reading_plans')
+                .upsert(upsertPayload, { onConflict: 'id,user_id' });
+                
+            if (upsertErr) {
+                console.warn('[Reading Plans Reconciliation] Upsert error:', upsertErr);
+            } else {
+                console.log(`[Reading Plans Reconciliation] Upserted ${upsertPayload.length} plans`);
+            }
+        } catch (err) {
+            console.warn('[Reading Plans Reconciliation] Failed:', err);
+        }
+    }
+
+    /**
+     * Reconcile local daily_baselines with Supabase by upserting.
+     */
+    public async reconcileDailyBaselines() {
+        try {
+            const db = await getDatabase();
+            const { data: auth } = await supabase.auth.getUser();
+            const userId = auth?.user?.id;
+            if (!userId) {
+                console.log('[Daily Baselines Reconciliation] Skipped: no authenticated user');
+                return;
+            }
+            
+            // Fetch local daily_baselines
+            const localDocs = await db.daily_baselines.find({
+                selector: { _deleted: false }
+            }).exec();
+
+            if (localDocs.length === 0) {
+                console.log('[Daily Baselines Reconciliation] No local baselines to reconcile');
+                return;
+            }
+
+            const localJsons = localDocs.map(d => d.toJSON());
+            const localIds = localJsons.map(j => j.id);
+
+            // Check which ones already exist on server
+            const { data: serverBaselines, error: fetchErr } = await supabase
+                .from('daily_baselines')
+                .select('id')
+                .eq('user_id', userId)
+                .in('id', localIds);
+
+            if (fetchErr) {
+                console.warn('[Daily Baselines Reconciliation] Fetch error:', fetchErr);
+                return;
+            }
+
+            const serverIds = new Set((serverBaselines || []).map(b => b.id));
+            const newDocs = localJsons.filter(j => !serverIds.has(j.id));
+
+            if (newDocs.length === 0) {
+                console.log('[Daily Baselines Reconciliation] All baselines already synced');
+                return;
+            }
+
+            console.log(`[Daily Baselines Reconciliation] Upserting ${newDocs.length} baselines...`);
+
+            const upsertPayload = newDocs.map(j => ({ 
+                ...j, 
+                user_id: userId,
+                created_at: undefined,
+                updated_at: undefined
+            }));
+            
+            const { error: upsertErr } = await supabase
+                .from('daily_baselines')
+                .upsert(upsertPayload, { onConflict: 'id,user_id' });
+                
+            if (upsertErr) {
+                console.warn('[Daily Baselines Reconciliation] Upsert error:', upsertErr);
+            } else {
+                console.log(`[Daily Baselines Reconciliation] Upserted ${upsertPayload.length} baselines`);
+            }
+        } catch (err) {
+            console.warn('[Daily Baselines Reconciliation] Failed:', err);
         }
     }
 

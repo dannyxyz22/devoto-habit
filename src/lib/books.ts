@@ -14,6 +14,7 @@ export type BookMeta = {
   fileHash?: string;           // For EPUB deduplication
   hasLocalFile?: boolean;      // For cross-device EPUB sync
   percentage?: number;         // Reading progress percentage
+  needsReUpload?: boolean;     // For EPUBs synced from cloud without local blob
 };
 
 // Import asset via Vite so the URL is correctly handled in build

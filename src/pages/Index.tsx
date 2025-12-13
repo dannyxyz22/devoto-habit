@@ -66,20 +66,66 @@ const Index = () => {
     
     let subscription: { unsubscribe: () => void } | null = null;
     
-    const setupSubscription = async () => {
+    const loadFromRxDB = async () => {
       try {
         const db = await getDatabase();
         
-        // Track if we found anything in RxDB
-        let foundInEpubs = false;
-        let foundInBooks = false;
+        // Try user_epubs first
+        const epub = await db.user_epubs.findOne({
+          selector: { id: activeBookId, _deleted: false }
+        }).exec();
+        
+        if (epub) {
+          const data = epub.toJSON();
+          const dbPercent = data.percentage || 0;
+          console.log('[Index] 📚 loadFromRxDB - user_epubs found:', { 
+            id: activeBookId, 
+            percent: dbPercent,
+            user_id: data.user_id,
+            title: data.title
+          });
+          setActiveBookProgress(prev => ({
+            partIndex: 0,
+            chapterIndex: 0,
+            percent: Math.max(prev.percent, dbPercent)
+          }));
+          return true;
+        }
+        
+        // Try books collection
+        const book = await db.books.findOne({
+          selector: { id: activeBookId, _deleted: false }
+        }).exec();
+        
+        if (book) {
+          const data = book.toJSON();
+          const dbPercent = data.percentage || 0;
+          console.log('[Index] 📚 loadFromRxDB - books found:', { id: activeBookId, percent: dbPercent });
+          setActiveBookProgress(prev => ({
+            partIndex: data.part_index || prev.partIndex,
+            chapterIndex: data.chapter_index || prev.chapterIndex,
+            percent: Math.max(prev.percent, dbPercent)
+          }));
+          return true;
+        }
+        
+        console.log('[Index] 📚 loadFromRxDB - no book found for:', activeBookId);
+        return false;
+      } catch (err) {
+        console.error('[Index] loadFromRxDB failed:', err);
+        return false;
+      }
+    };
+    
+    const setupSubscription = async () => {
+      try {
+        const db = await getDatabase();
         
         // Subscribe to user_epubs for user-uploaded EPUB progress
         const epubSub = db.user_epubs.findOne({
           selector: { id: activeBookId, _deleted: false }
         }).$.subscribe(epub => {
           if (epub) {
-            foundInEpubs = true;
             const data = epub.toJSON();
             const dbPercent = data.percentage || 0;
             // Take max of DB and current state (which may have localStorage)
@@ -96,7 +142,6 @@ const Index = () => {
           selector: { id: activeBookId, _deleted: false }
         }).$.subscribe(book => {
           if (book) {
-            foundInBooks = true;
             const data = book.toJSON();
             const dbPercent = data.percentage || 0;
             // Take max of DB and current state
@@ -120,10 +165,22 @@ const Index = () => {
       }
     };
     
+    // Load from RxDB immediately
+    loadFromRxDB();
+    
     setupSubscription();
+    
+    // Listen for replication complete event
+    const handleReplicationComplete = () => {
+      console.log('[Index] 📥 Received rxdb-initial-replication-complete event (book progress)');
+      loadFromRxDB();
+    };
+    
+    window.addEventListener('rxdb-initial-replication-complete', handleReplicationComplete);
     
     return () => {
       subscription?.unsubscribe();
+      window.removeEventListener('rxdb-initial-replication-complete', handleReplicationComplete);
     };
   }, [activeBookId]);
   
@@ -143,6 +200,38 @@ const Index = () => {
     }
     
     let subscription: { unsubscribe: () => void } | null = null;
+    
+    const loadFromRxDB = async () => {
+      try {
+        const db = await getDatabase();
+        const docs = await db.user_stats.find({ selector: { _deleted: false } }).exec();
+        console.log('[Index] 🔄 Manual RxDB load - user_stats docs:', docs?.length);
+        if (docs && docs.length > 0) {
+          const stats = docs[0].toJSON();
+          console.log('[Index] 📊 Manual load user_stats data:', { 
+            last_book_id: stats.last_book_id, 
+            streak_current: stats.streak_current 
+          });
+          setStreak({
+            current: stats.streak_current || 0,
+            longest: stats.streak_longest || 0,
+            lastReadISO: stats.last_read_iso || null,
+            freezeAvailable: stats.freeze_available ?? true
+          });
+          if (stats.last_book_id) {
+            console.log('[Index] ✅ Setting activeBookId from manual load:', stats.last_book_id);
+            setActiveBookId(stats.last_book_id);
+            // Also mark as used since we have data from cloud
+            setUsed(true);
+          }
+          return true;
+        }
+        return false;
+      } catch (err) {
+        console.error('[Index] Manual RxDB load failed:', err);
+        return false;
+      }
+    };
     
     const setupSubscription = async () => {
       try {
@@ -169,6 +258,8 @@ const Index = () => {
             if (stats.last_book_id) {
               console.log('[Index] ✅ Setting activeBookId from RxDB:', stats.last_book_id);
               setActiveBookId(stats.last_book_id);
+              // Also mark as used since we have data from cloud
+              setUsed(true);
             } else {
               console.log('[Index] ⚠️ No last_book_id in user_stats');
             }
@@ -183,11 +274,25 @@ const Index = () => {
       }
     };
     
+    // Load from RxDB immediately
+    loadFromRxDB();
+    
+    // Setup reactive subscription
     setupSubscription();
+    
+    // Listen for the replication complete event
+    // This handles the case where subscription was set up before data was pulled from Supabase
+    const handleReplicationComplete = () => {
+      console.log('[Index] 📥 Received rxdb-initial-replication-complete event');
+      loadFromRxDB();
+    };
+    
+    window.addEventListener('rxdb-initial-replication-complete', handleReplicationComplete);
     
     return () => {
       console.log('[Index] 🧹 Cleaning up user_stats subscription');
       subscription?.unsubscribe();
+      window.removeEventListener('rxdb-initial-replication-complete', handleReplicationComplete);
     };
   }, []); // No dependencies - subscribe once and react to all changes
   
@@ -202,6 +307,29 @@ const Index = () => {
     setActivePlan(getReadingPlan(activeBookId));
     
     let subscription: { unsubscribe: () => void } | null = null;
+    
+    const loadFromRxDB = async () => {
+      try {
+        const db = await getDatabase();
+        const doc = await db.reading_plans.findOne({
+          selector: { book_id: activeBookId, _deleted: false }
+        }).exec();
+        if (doc) {
+          const plan = doc.toJSON();
+          console.log('[Index] 📅 loadFromRxDB - reading_plan found:', { book_id: activeBookId });
+          setActivePlan({
+            targetDateISO: plan.target_date_iso ?? null,
+            targetPartIndex: plan.target_part_index,
+            targetChapterIndex: plan.target_chapter_index
+          });
+          return true;
+        }
+        return false;
+      } catch (err) {
+        console.error('[Index] loadFromRxDB reading_plans failed:', err);
+        return false;
+      }
+    };
     
     const setupSubscription = async () => {
       try {
@@ -224,10 +352,22 @@ const Index = () => {
       }
     };
     
+    // Load from RxDB immediately
+    loadFromRxDB();
+    
     setupSubscription();
+    
+    // Listen for replication complete event
+    const handleReplicationComplete = () => {
+      console.log('[Index] 📥 Received rxdb-initial-replication-complete event (reading_plans)');
+      loadFromRxDB();
+    };
+    
+    window.addEventListener('rxdb-initial-replication-complete', handleReplicationComplete);
     
     return () => {
       subscription?.unsubscribe();
+      window.removeEventListener('rxdb-initial-replication-complete', handleReplicationComplete);
     };
   }, [activeBookId]);
   
@@ -243,6 +383,29 @@ const Index = () => {
     setActiveBaseline(localBaseline);
     
     let subscription: { unsubscribe: () => void } | null = null;
+    
+    const loadFromRxDB = async () => {
+      try {
+        const db = await getDatabase();
+        const baselineId = `${activeBookId}:${todayISO}`;
+        const doc = await db.daily_baselines.findOne({
+          selector: { id: baselineId, _deleted: false }
+        }).exec();
+        if (doc) {
+          const baseline = doc.toJSON();
+          console.log('[Index] 📏 loadFromRxDB - daily_baseline found:', { id: baselineId });
+          setActiveBaseline({
+            words: baseline.words || 0,
+            percent: baseline.percent || 0
+          });
+          return true;
+        }
+        return false;
+      } catch (err) {
+        console.error('[Index] loadFromRxDB daily_baselines failed:', err);
+        return false;
+      }
+    };
     
     const setupSubscription = async () => {
       try {
@@ -265,10 +428,22 @@ const Index = () => {
       }
     };
     
+    // Load from RxDB immediately
+    loadFromRxDB();
+    
     setupSubscription();
+    
+    // Listen for replication complete event
+    const handleReplicationComplete = () => {
+      console.log('[Index] 📥 Received rxdb-initial-replication-complete event (daily_baselines)');
+      loadFromRxDB();
+    };
+    
+    window.addEventListener('rxdb-initial-replication-complete', handleReplicationComplete);
     
     return () => {
       subscription?.unsubscribe();
+      window.removeEventListener('rxdb-initial-replication-complete', handleReplicationComplete);
     };
   }, [activeBookId, todayISO]);
 
@@ -304,6 +479,19 @@ const Index = () => {
           if (s?.minutesByDate && Object.keys(s.minutesByDate).length > 0) u = true;
         }
         
+        // Also check RxDB for user_stats (handles fresh login on new device)
+        if (!u) {
+          const db = await getDatabase();
+          const userStatsDocs = await db.user_stats.find({ selector: { _deleted: false } }).exec();
+          if (userStatsDocs.length > 0) {
+            const stats = userStatsDocs[0].toJSON();
+            if (stats.last_book_id || stats.streak_current > 0 || stats.total_minutes > 0) {
+              u = true;
+              console.log('[Index] 🔍 Prior usage detected via RxDB user_stats');
+            }
+          }
+        }
+        
         console.log('[Index] 🔍 Prior usage result:', u);
         setUsed(u);
 
@@ -327,11 +515,20 @@ const Index = () => {
   // Load user books (EPUBs and Physical)
   useEffect(() => {
     const loadBooks = async () => {
-      const [userEpubs, rxdbBooks] = await Promise.all([
+      console.log('[Index] 📖 Loading user books...');
+      const [userEpubs, rxdbBooks, allUserEpubsFromRxDB] = await Promise.all([
         getUserEpubs(),
         dataLayer.getBooks(),
+        dataLayer.getUserEpubs(), // Get all epubs from RxDB (including ones without local blob)
       ]);
+      
+      console.log('[Index] 📖 Loaded:', { 
+        userEpubs: userEpubs.length, 
+        rxdbBooks: rxdbBooks.length,
+        allUserEpubsFromRxDB: allUserEpubsFromRxDB.length 
+      });
 
+      // EPUBs with local blob (can be read)
       const userBooks: BookMeta[] = userEpubs.map(epub => ({
         id: epub.id,
         title: epub.title,
@@ -343,6 +540,28 @@ const Index = () => {
         isUserUpload: true,
         addedDate: epub.addedDate,
       }));
+      
+      // IDs of epubs that have local blobs
+      const localEpubIds = new Set(userEpubs.map(e => e.id));
+      
+      // EPUBs from RxDB without local blob (synced from another device, need re-upload)
+      const cloudOnlyEpubs: BookMeta[] = allUserEpubsFromRxDB
+        .filter(epub => !localEpubIds.has(epub.id))
+        .map(epub => ({
+          id: epub.id,
+          title: epub.title,
+          author: epub.author || '',
+          description: 'Synced from cloud - re-upload needed to read',
+          coverImage: epub.cover_url,
+          type: 'epub' as const,
+          isUserUpload: true,
+          needsReUpload: true, // Flag indicating blob is missing
+          addedDate: epub.added_date,
+        }));
+      
+      if (cloudOnlyEpubs.length > 0) {
+        console.log('[Index] 📖 Cloud-only EPUBs (need re-upload):', cloudOnlyEpubs.map(e => e.title));
+      }
 
       const physicalBooksMeta: BookMeta[] = rxdbBooks
         .filter(b => b.type === 'physical')
@@ -359,10 +578,88 @@ const Index = () => {
           addedDate: book._modified,
         }));
 
-      setAllBooks([...userBooks, ...physicalBooksMeta, ...BOOKS]);
+      setAllBooks([...userBooks, ...cloudOnlyEpubs, ...physicalBooksMeta, ...BOOKS]);
     };
+    
     loadBooks();
+    
+    // Listen for replication complete to reload books
+    const handleReplicationComplete = () => {
+      console.log('[Index] 📥 Received rxdb-initial-replication-complete event (books list)');
+      loadBooks();
+    };
+    
+    window.addEventListener('rxdb-initial-replication-complete', handleReplicationComplete);
+    
+    return () => {
+      window.removeEventListener('rxdb-initial-replication-complete', handleReplicationComplete);
+    };
   }, []);
+  
+  // Ensure active book is in allBooks list (handles case where user_id mismatch or not loaded yet)
+  useEffect(() => {
+    if (!activeBookId) return;
+    
+    const existsInAllBooks = allBooks.some(b => b.id === activeBookId);
+    if (existsInAllBooks) return;
+    
+    // Active book not in allBooks - try to load it directly from RxDB
+    const loadActiveBook = async () => {
+      const db = await getDatabase();
+      
+      // Try user_epubs first
+      const epub = await db.user_epubs.findOne({
+        selector: { id: activeBookId, _deleted: false }
+      }).exec();
+      
+      if (epub) {
+        const data = epub.toJSON();
+        console.log('[Index] 📖 Adding missing active book from user_epubs:', data.title);
+        const bookMeta: BookMeta = {
+          id: data.id,
+          title: data.title,
+          author: data.author || '',
+          description: 'Synced from cloud - re-upload needed to read',
+          coverImage: data.cover_url,
+          type: 'epub' as const,
+          isUserUpload: true,
+          needsReUpload: true,
+          addedDate: data.added_date,
+        };
+        setAllBooks(prev => {
+          // Avoid duplicates
+          if (prev.some(b => b.id === activeBookId)) return prev;
+          return [bookMeta, ...prev];
+        });
+        return;
+      }
+      
+      // Try books collection
+      const book = await db.books.findOne({
+        selector: { id: activeBookId, _deleted: false }
+      }).exec();
+      
+      if (book) {
+        const data = book.toJSON();
+        console.log('[Index] 📖 Adding missing active book from books:', data.title);
+        const bookMeta: BookMeta = {
+          id: data.id,
+          title: data.title,
+          author: data.author || '',
+          description: '',
+          coverImage: data.cover_url,
+          type: data.type as any || 'epub',
+          addedDate: data._modified,
+        };
+        setAllBooks(prev => {
+          if (prev.some(b => b.id === activeBookId)) return prev;
+          return [bookMeta, ...prev];
+        });
+      }
+    };
+    
+    loadActiveBook();
+  }, [activeBookId, allBooks]);
 
   // Load active book structure to compute progress when needed
   useEffect(() => {
