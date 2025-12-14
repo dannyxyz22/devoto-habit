@@ -540,6 +540,7 @@ const Index = () => {
         rxdbBooks: rxdbBooks.length,
         allUserEpubsFromRxDB: allUserEpubsFromRxDB.length
       });
+      console.log('[Index] 📚 rxdbBooks encontrados:', rxdbBooks);
 
       // EPUBs with local blob (can be read)
       const userBooks: BookMeta[] = userEpubs.map(epub => ({

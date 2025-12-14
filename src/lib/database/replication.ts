@@ -721,7 +721,7 @@ export class ReplicationManager {
             }
 
             const localData = localDoc.toJSON();
-            
+            console.log('[User Stats Reconciliation] [DEBUG] Local user_stats before upsert:', localData);
 
             // Check if exists on server
             const { data: serverData, error: fetchErr } = await supabase
@@ -751,16 +751,17 @@ export class ReplicationManager {
                 _modified: localData._modified,
                 _deleted: localData._deleted || false
             };
+            console.log('[User Stats Reconciliation] [DEBUG] Upsert payload:', upsertPayload);
 
             // Upsert to Supabase
-            const { error: upsertErr } = await supabase
+            const { error: upsertErr, data: upsertResult } = await supabase
                 .from('user_stats')
                 .upsert(upsertPayload, { onConflict: 'user_id' });
+            console.log('[User Stats Reconciliation] [DEBUG] Upsert result:', upsertResult, 'Error:', upsertErr);
 
             if (upsertErr) {
                 console.warn('[User Stats Reconciliation] Upsert error:', upsertErr);
             } else {
-                localDoc.remove();
                 console.log('[User Stats Reconciliation] Upserted user_stats successfully');
             }
         } catch (err) {
@@ -1067,7 +1068,13 @@ export class ReplicationManager {
                     console.log('[Migration] Merged user_stats with existing');
                 }
                 // Remove local-user stats
-                await localStats.remove();
+                console.log('[Migration] [DEBUG] About to remove local-user user_stats:', localStats.toJSON());
+                try {
+                    await localStats.remove();
+                    console.log('[Migration] [DEBUG] Successfully removed local-user user_stats');
+                } catch (err) {
+                    console.error('[Migration] [DEBUG] Error removing local-user user_stats:', err);
+                }
                 totalMigrated++;
             }
 
