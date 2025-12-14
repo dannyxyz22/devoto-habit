@@ -15,6 +15,9 @@ import type { PhysicalBook } from "@/lib/physicalBooks";
 import { getDatabase } from "@/lib/database/db";
 import { dataLayer } from "@/services/data/RxDBDataLayer";
 
+
+
+
 export default function PhysicalBookTracker() {
     const { bookId } = useParams<{ bookId: string }>();
     const navigate = useNavigate();
@@ -23,9 +26,44 @@ export default function PhysicalBookTracker() {
     const [book, setBook] = useState<PhysicalBook | null>(null);
     const [currentPage, setCurrentPage] = useState("");
     const [loading, setLoading] = useState(true);
+
+    const lastAppliedProgressVersionRef = useRef<number>(-1);
+
     
     // Track if user is currently editing to avoid overwriting their input
     const isUserEditing = useRef(false);
+
+
+    function setBookDebug(
+    updater: PhysicalBook | ((prev: PhysicalBook | null) => PhysicalBook | null),
+    source: string
+) {
+    setBook(prev => {
+        const next =
+            typeof updater === 'function'
+                ? updater(prev)
+                : updater;
+
+        console.group('[SET BOOK]');
+        console.log('SOURCE:', source);
+        console.log('FROM:', prev?.currentPage);
+        console.log('TO:', next?.currentPage);
+        console.trace();
+        console.groupEnd();
+
+        return next;
+    });
+}
+
+    //Debug do set currentPage
+    useEffect(() => {
+    if (!book) return;
+
+    console.group('[BOOK STATE]');
+    console.log('currentPage:', book.currentPage);
+    console.trace();
+    console.groupEnd();
+}, [book]);
 
     // Reactive subscription to book changes
     useEffect(() => {
@@ -55,6 +93,20 @@ export default function PhysicalBookTracker() {
                         return;
                     }
 
+                     const incomingVersion = rxBook.progress_version ?? 0;
+
+                    if (incomingVersion < lastAppliedProgressVersionRef.current) {
+                        console.warn('[SUBSCRIPTION] Ignored stale progress', {
+                            incomingVersion,
+                            lastApplied: lastAppliedProgressVersionRef.current,
+                            current_page: rxBook.current_page
+                        });
+                        return;
+                    }
+
+                    lastAppliedProgressVersionRef.current = incomingVersion;
+
+
                     const bookData = rxBook.toJSON();
                     const physicalBook: PhysicalBook = {
                         id: bookData.id,
@@ -69,7 +121,7 @@ export default function PhysicalBookTracker() {
                         publisher: "",
                     };
 
-                    setBook(physicalBook);
+                    setBookDebug(physicalBook, "setup subscription");
                     
                     // Only update input if user is not currently editing
                     if (!isUserEditing.current) {
@@ -138,16 +190,22 @@ export default function PhysicalBookTracker() {
         }
 
         try {
-            // Update via DataLayer
-            const rxBook = await dataLayer.getBook(bookId);
-            if (rxBook) {
-                await dataLayer.saveBook({
-                    ...rxBook,
-                    current_page: newPage,
-                    _modified: Date.now()
-                });
-            }
+            // 1. Avança a versão local ANTES da escrita
+            const nextVersion = lastAppliedProgressVersionRef.current + 1;
+            lastAppliedProgressVersionRef.current = nextVersion;
 
+            // 2. Atualização otimista do estado local
+            setBookDebug(
+                prev => prev
+                    ? { ...prev, currentPage: newPage }
+                    : prev,
+                "handleUpdateProgress"
+            );
+
+            // 3. Persistência única via DataLayer
+            await dataLayer.saveBookProgress(bookId, newPage);
+
+            // 4. Atualização de métricas locais
             const percent = Math.round((newPage / book.totalPages) * 100);
             setProgress(bookId, {
                 partIndex: 0,
@@ -157,15 +215,14 @@ export default function PhysicalBookTracker() {
                 totalPages: book.totalPages,
             });
 
-            setBook({ ...book, currentPage: newPage });
+            // 5. Metadado auxiliar
+            setLastBookId(bookId);
 
+            // 6. Feedback ao usuário
             toast({
                 title: "Progresso atualizado!",
                 description: `Você está na página ${newPage} de ${book.totalPages}`,
             });
-
-            // Update last book ID
-            setLastBookId(bookId);
         } catch (error) {
             console.error("Error updating progress:", error);
             toast({
@@ -174,6 +231,7 @@ export default function PhysicalBookTracker() {
                 variant: "destructive",
             });
         }
+
     };
 
     // Updated quick add: automatically persists progress and updates UI
@@ -182,31 +240,45 @@ export default function PhysicalBookTracker() {
         const newPage = Math.min(book.currentPage + pages, book.totalPages);
         setCurrentPage(newPage.toString());
         // Persist the new page count
+
+        const nextVersion = lastAppliedProgressVersionRef.current + 1;
+        lastAppliedProgressVersionRef.current = nextVersion;
+
+        setBookDebug(
+            prev => prev
+            ? { ...prev, currentPage: newPage }
+            : prev,
+            "handleQuickAdd"
+        );
+
         try {
             // Update via DataLayer
+            console.log(`Quick adding ${pages} pages to book ID ${bookId}`);
             const rxBook = await dataLayer.getBook(bookId);
             if (rxBook) {
-                await dataLayer.saveBook({
-                    ...rxBook,
-                    current_page: newPage,
-                    _modified: Date.now()
-                });
+                console.log('[DataLayer before] Save book with new current_page:', newPage);
+
+                dataLayer.saveBookProgress(bookId, newPage)
+                console.log('[DataLayer finished] Save book with new current_page:', newPage);
             }
 
             const percent = Math.round((newPage / book.totalPages) * 100);
+                 console.log('[Set progress before] Save book with new current_page:', newPage);
             setProgress(bookId, {
+           
                 partIndex: 0,
                 chapterIndex: 0,
                 percent,
                 currentPage: newPage,
                 totalPages: book.totalPages,
             });
-            setBook({ ...book, currentPage: newPage });
+                 console.log('[Set progress after] Save book with new current_page:', newPage);
+
             toast({
                 title: "Progresso atualizado!",
                 description: `Você está na página ${newPage} de ${book.totalPages}`,
             });
-            setLastBookId(bookId);
+            await setLastBookId(bookId);
         } catch (error) {
             console.error("Error quick adding pages:", error);
             toast({
@@ -215,6 +287,7 @@ export default function PhysicalBookTracker() {
                 variant: "destructive",
             });
         }
+        console.log('[Quick add finished] Save book with new current_page:', newPage);
     };
 
     if (loading) {

@@ -246,6 +246,7 @@ const Library = () => {
               .filter(b => b.type === 'physical')
               .map(b => {
                 const book = b.toJSON();
+                console.log('[Library] Physical book:', book, ' current page:', book.current_page);
                 return {
                   id: book.id,
                   title: book.title,

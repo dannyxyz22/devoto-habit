@@ -309,12 +309,13 @@ export class ReplicationManager {
 
             // Set up polling fallback when Supabase Realtime is disabled.
             // This will call quickSync every 30 seconds to pull any new changes.
-            const pollingIntervalMs = 30000;
+
+            /*const pollingIntervalMs = 30000;
             const pollHandle = setInterval(() => {
                 replicationManager.quickSync().catch(e => console.warn('[Replication] quickSync failed:', e));
             }, pollingIntervalMs);
             // Store handle so it can be cleared on stopReplication if needed.
-            (this as any)._pollHandle = pollHandle;
+            (this as any)._pollHandle = pollHandle;*/
 
             // Wait for initial sync
             try {
@@ -427,6 +428,8 @@ export class ReplicationManager {
      */
     async quickSync(): Promise<void> {
         console.log('ReplicationManager: Quick sync triggered...');
+        console.trace('ReplicationManager: quickSync stack trace');
+
 
         if (this.replicationStates.length === 0) {
             console.warn('ReplicationManager: No active replications for quick sync');

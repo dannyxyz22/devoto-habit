@@ -182,6 +182,27 @@ class RxDBDataLayerImpl implements DataLayer {
         return book ? book.toJSON() : null;
     }
 
+    async saveBookProgress(bookId: string, newPage: number) {
+    const db = await getDatabase();
+    const book = await db.books.findOne(bookId).exec();
+    if (!book) return;
+
+    const currentVersion = book.get('progress_version') ?? 0;
+
+    await book.incrementalPatch({
+        current_page: newPage,
+        progress_version: currentVersion + 1,
+        _modified: Math.max(Date.now(), (book.get('_modified') || 0) + 1)
+    });
+
+    console.log('[DataLayer] 📖 Progress updated', {
+        bookId,
+        newPage,
+        progress_version: currentVersion + 1
+    });
+}
+
+
     async saveBook(bookData: Partial<RxBookDocumentType>): Promise<RxBookDocumentType> {
         const db = await getDatabase();
         const userId = await this.getUserId();
@@ -219,11 +240,12 @@ class RxDBDataLayerImpl implements DataLayer {
                 id: existingBook.id,
                 title: existingBook.title,
                 percentage: updates.percentage,
+                current_page: updates.current_page,
                 last_location_cfi: updates.last_location_cfi,
                 _modified: updates._modified
             });
             // Force immediate sync (Safe to use because saveToRxDB is already debounced)
-            replicationManager.quickSync().catch(e => console.warn('[DataLayer] ⚠️ Quick sync failed:', e));
+            //replicationManager.quickSync().catch(e => console.warn('[DataLayer] ⚠️ Quick sync failed:', e));
             return existingBook.toJSON();
         } else {
             const dataToSave = {
@@ -310,11 +332,11 @@ class RxDBDataLayerImpl implements DataLayer {
         // Log total EPUBs in database before filtering
         const allEpubs = await db.user_epubs.find().exec();
         console.log('[DataLayer.getUserEpubs] Total EPUBs in RxDB:', allEpubs.length, 'User:', user?.id || 'local-user');
-        console.log('[DataLayer.getUserEpubs] All EPUBs:', allEpubs.map(e => ({ 
-            id: e.id, 
-            user_id: e.user_id, 
+        console.log('[DataLayer.getUserEpubs] All EPUBs:', allEpubs.map(e => ({
+            id: e.id,
+            user_id: e.user_id,
             title: e.title,
-            _deleted: e._deleted 
+            _deleted: e._deleted
         })));
 
         // When logged in, show only user's EPUBs
@@ -570,18 +592,21 @@ class RxDBDataLayerImpl implements DataLayer {
             if (statsData.total_minutes !== undefined) updates.total_minutes = statsData.total_minutes;
             if (statsData.last_book_id !== undefined) updates.last_book_id = statsData.last_book_id;
             if (statsData.minutes_by_date !== undefined) {
-                updates.minutes_by_date = typeof statsData.minutes_by_date === 'string' 
-                    ? statsData.minutes_by_date 
+                updates.minutes_by_date = typeof statsData.minutes_by_date === 'string'
+                    ? statsData.minutes_by_date
                     : JSON.stringify(statsData.minutes_by_date);
             }
 
             await existingStats.incrementalPatch(updates);
-            replicationManager.quickSync().catch(e => console.warn('[DataLayer] ⚠️ Quick sync failed:', e));
+
+            console.log('[DataLayer] User stats updated: incrementalPatch');
+            console.trace('[DataLayer] User stats incrementalPatch stack trace');
+            //replicationManager.quickSync().catch(e => console.warn('[DataLayer] ⚠️ Quick sync failed:', e));
             return existingStats.toJSON();
         } else {
             const minutesByDateStr = statsData.minutes_by_date !== undefined
-                ? (typeof statsData.minutes_by_date === 'string' 
-                    ? statsData.minutes_by_date 
+                ? (typeof statsData.minutes_by_date === 'string'
+                    ? statsData.minutes_by_date
                     : JSON.stringify(statsData.minutes_by_date))
                 : '{}';
             const dataToSave = {
@@ -599,7 +624,9 @@ class RxDBDataLayerImpl implements DataLayer {
 
             // Use upsert to handle race conditions where document may have been created between findOne and insert
             const newStats = await db.user_stats.upsert(dataToSave);
-            replicationManager.quickSync().catch(e => console.warn('[DataLayer] ⚠️ Quick sync failed:', e));
+                        console.log('[DataLayer] User stats updated: upsert');
+
+            //replicationManager.quickSync().catch(e => console.warn('[DataLayer] ⚠️ Quick sync failed:', e));
             return newStats.toJSON();
         }
     }

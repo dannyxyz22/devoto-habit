@@ -62,6 +62,10 @@ export const bookSchemaLiteral = {
         published_date: {
             type: 'string'
         },
+        progress_version: {
+            type: "number",
+             minimum: 0
+        },
         _modified: {
             type: 'number'
         },
@@ -69,7 +73,7 @@ export const bookSchemaLiteral = {
             type: 'boolean'
         }
     },
-    required: ['id', 'title', '_modified']
+    required: ['id', 'title', '_modified', 'progress_version']
 } as const;
 
 const schemaTyped = toTypedRxJsonSchema(bookSchemaLiteral);
