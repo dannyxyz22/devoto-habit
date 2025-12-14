@@ -721,6 +721,7 @@ export class ReplicationManager {
             }
 
             const localData = localDoc.toJSON();
+            
 
             // Check if exists on server
             const { data: serverData, error: fetchErr } = await supabase
@@ -759,6 +760,7 @@ export class ReplicationManager {
             if (upsertErr) {
                 console.warn('[User Stats Reconciliation] Upsert error:', upsertErr);
             } else {
+                localDoc.remove();
                 console.log('[User Stats Reconciliation] Upserted user_stats successfully');
             }
         } catch (err) {
