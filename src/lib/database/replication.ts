@@ -77,7 +77,7 @@ export class ReplicationManager {
         try {
             // Replicate Books
 
-            /*
+
             const booksReplication = await replicateSupabase<RxBookDocumentType>({
                 tableName: 'books',
                 client: supabase,
@@ -239,7 +239,7 @@ export class ReplicationManager {
             //     }
             // });
 
-            */
+
 
             // Replicate User Stats
             // minutes_by_date is now stored as JSON string in both RxDB and Supabase

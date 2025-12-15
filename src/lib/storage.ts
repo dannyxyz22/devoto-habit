@@ -96,7 +96,7 @@ export const markReadToday = async () => {
   }
   s.lastReadISO = today;
   s.longest = Math.max(s.longest, s.current);
-  
+
   // Save to RxDB
   try {
     await dataLayer.saveUserStats({
@@ -135,8 +135,8 @@ export const getStatsAsync = async (): Promise<Stats> => {
     const stats = await dataLayer.getUserStats();
     if (stats && stats.minutes_by_date) {
       // minutes_by_date is stored as JSON string in RxDB
-      const minutesByDate = typeof stats.minutes_by_date === 'string' 
-        ? JSON.parse(stats.minutes_by_date) 
+      const minutesByDate = typeof stats.minutes_by_date === 'string'
+        ? JSON.parse(stats.minutes_by_date)
         : stats.minutes_by_date;
       return { minutesByDate: minutesByDate as Record<string, number> };
     }
@@ -153,10 +153,10 @@ export const addReadingMinutes = async (ms: number) => {
   const s = await getStatsAsync();
   const key = formatISO(new Date(), { representation: "date" });
   s.minutesByDate[key] = (s.minutesByDate[key] || 0) + minutes;
-  
+
   // Calculate total minutes
   const totalMinutes = Object.values(s.minutesByDate).reduce((a, b) => a + b, 0);
-  
+
   try {
     await dataLayer.saveUserStats({
       minutes_by_date: JSON.stringify(s.minutesByDate),
@@ -279,19 +279,19 @@ export const getLastBookIdAsync = async (): Promise<string | null> => {
 
 export const setLastBookId = async (bookId: string) => {
   console.log('[storage] 🔖 setLastBookId called with:', bookId);
-  
+
   // Update localStorage cache FIRST for immediate availability
-  try { 
-    localStorage.setItem('lastBookId', bookId); 
+  try {
+    localStorage.setItem('lastBookId', bookId);
     console.log('[storage] ✅ localStorage updated with lastBookId:', bookId);
-  } catch (e) { 
+  } catch (e) {
     console.error('[storage] ❌ localStorage update failed:', e);
   }
-  
+
   // Then persist to RxDB (async)
   try {
     console.log('[storage] 💾 Saving to RxDB user_stats...');
-    await dataLayer.saveUserStats({ last_book_id: bookId , streak_current: 8 /* Forçar 8 para teste */ });
+    await dataLayer.saveUserStats({ last_book_id: bookId });
     console.log('[storage] ✅ RxDB user_stats updated with last_book_id:', bookId);
   } catch (e) {
     console.warn('[storage] ❌ Failed to save last book ID to RxDB:', e);
