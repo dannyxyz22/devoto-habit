@@ -291,7 +291,7 @@ export const setLastBookId = async (bookId: string) => {
   // Then persist to RxDB (async)
   try {
     console.log('[storage] 💾 Saving to RxDB user_stats...');
-    await dataLayer.saveUserStats({ last_book_id: bookId });
+    await dataLayer.saveUserStats({ last_book_id: bookId , streak_current: 8 /* Forçar 8 para teste */ });
     console.log('[storage] ✅ RxDB user_stats updated with last_book_id:', bookId);
   } catch (e) {
     console.warn('[storage] ❌ Failed to save last book ID to RxDB:', e);

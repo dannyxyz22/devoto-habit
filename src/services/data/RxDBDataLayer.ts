@@ -183,24 +183,24 @@ class RxDBDataLayerImpl implements DataLayer {
     }
 
     async saveBookProgress(bookId: string, newPage: number) {
-    const db = await getDatabase();
-    const book = await db.books.findOne(bookId).exec();
-    if (!book) return;
+        const db = await getDatabase();
+        const book = await db.books.findOne(bookId).exec();
+        if (!book) return;
 
-    const currentVersion = book.get('progress_version') ?? 0;
+        const currentVersion = book.get('progress_version') ?? 0;
 
-    await book.incrementalPatch({
-        current_page: newPage,
-        progress_version: currentVersion + 1,
-        _modified: Math.max(Date.now(), (book.get('_modified') || 0) + 1)
-    });
+        await book.incrementalPatch({
+            current_page: newPage,
+            progress_version: currentVersion + 1,
+            _modified: Math.max(Date.now(), (book.get('_modified') || 0) + 1)
+        });
 
-    console.log('[DataLayer] 📖 Progress updated', {
-        bookId,
-        newPage,
-        progress_version: currentVersion + 1
-    });
-}
+        console.log('[DataLayer] 📖 Progress updated', {
+            bookId,
+            newPage,
+            progress_version: currentVersion + 1
+        });
+    }
 
 
     async saveBook(bookData: Partial<RxBookDocumentType>): Promise<RxBookDocumentType> {
@@ -570,7 +570,11 @@ class RxDBDataLayerImpl implements DataLayer {
         const db = await getDatabase();
         const userId = await this.getUserId();
 
-        const stats = await db.user_stats.findOne(userId).exec();
+        // user_stats PK is now 'id', so we must search by user_id field
+        const stats = await db.user_stats.findOne({
+            selector: { user_id: userId }
+        }).exec();
+
         return stats ? stats.toJSON() : null;
     }
 
@@ -578,7 +582,10 @@ class RxDBDataLayerImpl implements DataLayer {
         const db = await getDatabase();
         const userId = await this.getUserId();
 
-        const existingStats = await db.user_stats.findOne(userId).exec();
+        // user_stats PK is now 'id', so we must search by user_id field
+        const existingStats = await db.user_stats.findOne({
+            selector: { user_id: userId }
+        }).exec();
 
         if (existingStats) {
             const updates: any = {
@@ -601,7 +608,6 @@ class RxDBDataLayerImpl implements DataLayer {
 
             console.log('[DataLayer] User stats updated: incrementalPatch');
             console.trace('[DataLayer] User stats incrementalPatch stack trace');
-            //replicationManager.quickSync().catch(e => console.warn('[DataLayer] ⚠️ Quick sync failed:', e));
             return existingStats.toJSON();
         } else {
             const minutesByDateStr = statsData.minutes_by_date !== undefined
@@ -609,7 +615,9 @@ class RxDBDataLayerImpl implements DataLayer {
                     ? statsData.minutes_by_date
                     : JSON.stringify(statsData.minutes_by_date))
                 : '{}';
+
             const dataToSave = {
+                id: statsData.id || crypto.randomUUID(), // Generate ID if missing
                 user_id: userId,
                 streak_current: statsData.streak_current ?? 0,
                 streak_longest: statsData.streak_longest ?? 0,
@@ -623,10 +631,10 @@ class RxDBDataLayerImpl implements DataLayer {
             } as RxUserStatsDocumentType;
 
             // Use upsert to handle race conditions where document may have been created between findOne and insert
+            // Note: with random ID, upsert is effectively insert, but safer if ID was provided
             const newStats = await db.user_stats.upsert(dataToSave);
-                        console.log('[DataLayer] User stats updated: upsert');
+            console.log('[DataLayer] User stats updated: upsert', newStats.id);
 
-            //replicationManager.quickSync().catch(e => console.warn('[DataLayer] ⚠️ Quick sync failed:', e));
             return newStats.toJSON();
         }
     }

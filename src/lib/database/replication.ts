@@ -64,13 +64,11 @@ export class ReplicationManager {
         // SECOND: Reconcile local data with Supabase via UPSERT to avoid 409 Conflict errors
         // This ensures documents that exist both locally and on server are synced properly
         console.log('ReplicationManager: Reconciling local data with Supabase...');
-        await Promise.all([
-            this.reconcileBooks(),
-            this.reconcileUserEpubs(),
-            this.reconcileUserStats(),
-            this.reconcileReadingPlans(),
-            this.reconcileDailyBaselines(),
-        ]);
+        await this.reconcileBooks();
+        await this.reconcileUserEpubs();
+        await this.reconcileUserStats();
+        await this.reconcileReadingPlans();
+        await this.reconcileDailyBaselines();
         console.log('ReplicationManager: Reconciliation complete');
 
         // We'll setup Realtime listener after replications are created
@@ -78,6 +76,8 @@ export class ReplicationManager {
 
         try {
             // Replicate Books
+
+            /*
             const booksReplication = await replicateSupabase<RxBookDocumentType>({
                 tableName: 'books',
                 client: supabase,
@@ -153,7 +153,6 @@ export class ReplicationManager {
                 live: true,
                 pull: {
                     batchSize: 50,
-                    interval: 30000,
                     modifier: (doc) => {
                         console.log('[Cloud Debug] ⬇️ Pulled User Epub:', doc);
                         // Map nullable fields - cover_url is handled by Cache Storage in UI
@@ -190,7 +189,6 @@ export class ReplicationManager {
                 live: true,
                 pull: {
                     batchSize: 50,
-                    interval: 30000,
                     modifier: (doc) => {
                         console.log('[Cloud Debug] ⬇️ Pulled Reading Plan:', doc);
                         if (!doc.target_date_iso) delete doc.target_date_iso;
@@ -214,30 +212,34 @@ export class ReplicationManager {
             });
 
             // Replicate Daily Baselines
-            const dailyBaselinesReplication = await replicateSupabase<RxDailyBaselineDocumentType>({
-                tableName: 'daily_baselines',
-                client: supabase,
-                collection: db.daily_baselines,
-                replicationIdentifier: 'daily-baselines-replication',
-                live: true,
-                pull: {
-                    batchSize: 100,
-                    interval: 30000,
-                    modifier: (doc) => {
-                        console.log('[Cloud Debug] ⬇️ Pulled Annual Baseline:', doc);
-                        return doc;
-                    }
-                },
-                push: {
-                    batchSize: 100,
-                    modifier: (doc) => {
-                        const { created_at, updated_at, ...rest } = doc as any;
-                        // Skip documents with local-user (pre-login data)
-                        if (rest.user_id === 'local-user') return null;
-                        return rest;
-                    }
-                }
-            });
+
+            //Comentei para facilitar o debug
+            //TODO: descomentar depois de testar
+            // const dailyBaselinesReplication = await replicateSupabase<RxDailyBaselineDocumentType>({
+            //     tableName: 'daily_baselines',
+            //     client: supabase,
+            //     collection: db.daily_baselines,
+            //     replicationIdentifier: 'daily-baselines-replication',
+            //     live: true,
+            //     pull: {
+            //         batchSize: 100,
+            //         modifier: (doc) => {
+            //             console.log('[Cloud Debug] ⬇️ Pulled Annual Baseline:', doc);
+            //             return doc;
+            //         }
+            //     },
+            //     push: {
+            //         batchSize: 100,
+            //         modifier: (doc) => {
+            //             const { created_at, updated_at, ...rest } = doc as any;
+            //             // Skip documents with local-user (pre-login data)
+            //             if (rest.user_id === 'local-user') return null;
+            //             return rest;
+            //         }
+            //     }
+            // });
+
+            */
 
             // Replicate User Stats
             // minutes_by_date is now stored as JSON string in both RxDB and Supabase
@@ -249,7 +251,6 @@ export class ReplicationManager {
                 live: true,
                 pull: {
                     batchSize: 10,
-                    interval: 30000,
                     modifier: (doc) => {
                         console.log('[Cloud Debug] ⬇️ Pulled User Stats:', doc);
                         if (!doc.last_read_iso) delete doc.last_read_iso;
@@ -265,25 +266,56 @@ export class ReplicationManager {
                 },
                 push: {
                     batchSize: 10,
-                    modifier: (doc) => {
-                        const { created_at, updated_at, ...rest } = doc as any;
-                        // Skip documents with local-user (pre-login data) - includes deleted docs
-                        if (rest.user_id === 'local-user') {
-                            console.log('[Replication UserStats] ⏭️ Skipping local-user document:', { user_id: rest.user_id, deleted: rest._deleted });
+                    modifier: async (doc) => {
+                        console.log('[Replication UserStats] 📋 Modifier received doc:', doc);
+
+                        const docData = doc as any;
+
+                        // 1. Block local-user
+                        if (docData.user_id === 'local-user') {
+                            console.log('[Replication UserStats] ⏭️ Modifier BLOCKED local-user');
                             return null;
                         }
-                        // Ensure minutes_by_date is a string for Supabase TEXT column
-                        if (rest.minutes_by_date !== undefined && typeof rest.minutes_by_date !== 'string') {
-                            rest.minutes_by_date = JSON.stringify(rest.minutes_by_date);
+
+                        // 2. Align ID with server (fix duplicate key error)
+                        const { data: existing } = await supabase
+                            .from('user_stats')
+                            .select('id')
+                            .eq('user_id', docData.user_id)
+                            .maybeSingle();
+
+                        if (existing) {
+                            console.log(`[Replication UserStats] 🔄 Aligning ID: Local ${docData.id} -> Server ${existing.id}`);
+                            docData.id = existing.id;
                         }
-                        if (!rest.minutes_by_date) rest.minutes_by_date = '{}';
-                        console.log('[Replication UserStats] ⬆️ Pushing:', { user_id: rest.user_id, streak: rest.streak_current, last_book_id: rest.last_book_id });
-                        return rest;
+
+                        // 3. Stringify minutes_by_date
+                        if (docData.minutes_by_date && typeof docData.minutes_by_date !== 'string') {
+                            docData.minutes_by_date = JSON.stringify(docData.minutes_by_date);
+                        }
+                        if (!docData.minutes_by_date) docData.minutes_by_date = '{}';
+
+                        // 4. MANUAL UPSERT to bypass default INSERT behavior (which causes 409 Conflict)
+                        console.log(`[Replication UserStats] ⬆️ Manually upserting doc to avoid 409 Conflict`, { id: docData.id });
+                        const { error } = await supabase
+                            .from('user_stats')
+                            .upsert(docData, { onConflict: 'id' });
+
+                        if (error) {
+                            console.error('[Replication UserStats] ❌ Manual upsert failed:', error);
+                            // We return null anyway, but log the error
+                        } else {
+                            console.log('[Replication UserStats] ✅ Manual upsert success');
+                        }
+
+                        // Return null to tell RxDB "I handled it / skip default push"
+                        return null;
                     }
-                }
+                } as any
             });
 
-            this.replicationStates = [booksReplication, userEpubsReplication, settingsReplication, readingPlansReplication, dailyBaselinesReplication, userStatsReplication];
+            //this.replicationStates = [booksReplication, userEpubsReplication, settingsReplication, readingPlansReplication, dailyBaselinesReplication, userStatsReplication];
+            this.replicationStates = [userStatsReplication];
 
             // Validate all replication states were created successfully
             const invalidStates = this.replicationStates.filter(s => !s);
@@ -300,12 +332,7 @@ export class ReplicationManager {
                 });
             });
 
-            // Start replications
-            for (const state of this.replicationStates) {
-                if (typeof (state as any).start === 'function') {
-                    await (state as any).start();
-                }
-            }
+
 
             // Set up polling fallback when Supabase Realtime is disabled.
             // This will call quickSync every 30 seconds to pull any new changes.
@@ -427,6 +454,9 @@ export class ReplicationManager {
      * Returns a promise that resolves when all reSyncs have been triggered.
      */
     async quickSync(): Promise<void> {
+        console.log('Quick sync triggered, but void implementation');
+        return;
+
         console.log('ReplicationManager: Quick sync triggered...');
         console.trace('ReplicationManager: quickSync stack trace');
 
@@ -702,72 +732,103 @@ export class ReplicationManager {
      * Reconcile local user_stats with Supabase.
      * This handles the minutes_by_date object field that causes RC_PUSH errors.
      */
+    /**
+     * Reconcile local user_stats with Supabase.
+     */
     public async reconcileUserStats() {
-        try {
-            const db = await getDatabase();
-            const { data: auth } = await supabase.auth.getUser();
-            const userId = auth?.user?.id;
-            if (!userId) {
-                console.log('[User Stats Reconciliation] Skipped: no authenticated user');
-                return;
-            }
+        const db = await getDatabase();
+        const { data: auth } = await supabase.auth.getUser();
+        const userId = auth?.user?.id;
 
-            // Fetch local user_stats
-            const localDoc = await db.user_stats.findOne(userId).exec();
-
-            if (!localDoc) {
-                console.log('[User Stats Reconciliation] No local user_stats to reconcile');
-                return;
-            }
-
-            const localData = localDoc.toJSON();
-            console.log('[User Stats Reconciliation] [DEBUG] Local user_stats before upsert:', localData);
-
-            // Check if exists on server
-            const { data: serverData, error: fetchErr } = await supabase
-                .from('user_stats')
-                .select('user_id, _modified')
-                .eq('user_id', userId)
-                .single();
-
-            if (fetchErr && fetchErr.code !== 'PGRST116') { // PGRST116 = not found
-                console.warn('[User Stats Reconciliation] Fetch error:', fetchErr);
-                return;
-            }
-
-            // Prepare upsert payload - ensure minutes_by_date is a string
-            const minutesByDateStr = typeof localData.minutes_by_date === 'string'
-                ? localData.minutes_by_date
-                : JSON.stringify(localData.minutes_by_date || {});
-            const upsertPayload = {
-                user_id: userId,
-                streak_current: localData.streak_current || 0,
-                streak_longest: localData.streak_longest || 0,
-                last_read_iso: localData.last_read_iso || null,
-                freeze_available: localData.freeze_available ?? true,
-                total_minutes: localData.total_minutes || 0,
-                last_book_id: localData.last_book_id || null,
-                minutes_by_date: minutesByDateStr,
-                _modified: localData._modified,
-                _deleted: localData._deleted || false
-            };
-            console.log('[User Stats Reconciliation] [DEBUG] Upsert payload:', upsertPayload);
-
-            // Upsert to Supabase
-            const { error: upsertErr, data: upsertResult } = await supabase
-                .from('user_stats')
-                .upsert(upsertPayload, { onConflict: 'user_id' });
-            console.log('[User Stats Reconciliation] [DEBUG] Upsert result:', upsertResult, 'Error:', upsertErr);
-
-            if (upsertErr) {
-                console.warn('[User Stats Reconciliation] Upsert error:', upsertErr);
-            } else {
-                console.log('[User Stats Reconciliation] Upserted user_stats successfully');
-            }
-        } catch (err) {
-            console.warn('[User Stats Reconciliation] Failed:', err);
+        if (!userId) {
+            console.log('[Reconcile] Skipped: no authenticated user');
+            return;
         }
+
+        // Find by user_id since it's no longer PK
+        const localDoc = await db.user_stats.findOne({
+            selector: { user_id: userId }
+        }).exec();
+
+        if (!localDoc) {
+            console.log('[Reconcile] No local user_stats for this user');
+            return;
+        }
+
+        const localData = localDoc.toJSON();
+
+        // Server fetch
+        const { data: serverDoc, error } = await supabase
+            .from('user_stats')
+            .select('*')
+            .eq('user_id', userId)
+            .maybeSingle();
+
+        if (error) {
+            console.warn('[Reconcile] Fetch error:', error);
+            return;
+        }
+
+        // Case 1: Missing on Server -> Create
+        if (!serverDoc) {
+            console.log('[Reconcile] Server missing user_stats, creating from local');
+
+            // Ensure ID exists (it should from local, but just in case)
+            const idToUse = localData.id || crypto.randomUUID();
+
+            await supabase
+                .from('user_stats')
+                .upsert({
+                    ...localData,
+                    id: idToUse,
+                    minutes_by_date:
+                        typeof localData.minutes_by_date === 'string'
+                            ? localData.minutes_by_date
+                            : JSON.stringify(localData.minutes_by_date || {}),
+                    _modified: undefined
+                }, { onConflict: 'user_id' }); // user_id should still be unique constraint on server
+
+            return;
+        }
+
+        // Case 2: Server Newer -> Update Local
+        if (serverDoc._modified > localData._modified) {
+            console.log('[Reconcile] Server newer, patching local');
+            await localDoc.incrementalPatch({
+                streak_current: serverDoc.streak_current,
+                streak_longest: serverDoc.streak_longest,
+                last_read_iso: serverDoc.last_read_iso,
+                freeze_available: serverDoc.freeze_available,
+                total_minutes: serverDoc.total_minutes,
+                last_book_id: serverDoc.last_book_id,
+                minutes_by_date: serverDoc.minutes_by_date,
+                _modified: serverDoc._modified,
+                _deleted: serverDoc._deleted
+            });
+            return;
+        }
+
+        // Case 3: Local Newer -> Upsert to Server
+        console.log('[Reconcile User Stats] Local newer or equal, UPSERT to server');
+        await supabase
+            .from('user_stats')
+            .upsert({
+                id: serverDoc.id, // Use server ID if we have it to avoid PK conflict? Or local ID?
+                // Actually if we matched by user_id, we should probably respect server ID if it exists?
+                // But localData.id is our source of truth for this doc.
+                // Let's use localData (it's the winner) but ensure we map to the right row.
+                // If ID differs, we might have an issue. Assuming they align or we rely on user_id unique constraint.
+                ...localData,
+                minutes_by_date:
+                    typeof localData.minutes_by_date === 'string'
+                        ? localData.minutes_by_date
+                        : JSON.stringify(localData.minutes_by_date || {}),
+                _deleted: localData._deleted ?? false
+            }, { onConflict: 'user_id' });
+
+        console.log('[Reconcile User Stats] Upsert complete');
     }
+
 
     /**
      * Reconcile local reading_plans with Supabase by upserting.
@@ -907,6 +968,55 @@ export class ReplicationManager {
         }
     }
 
+
+    public async migrateLocalUserStats(realUserId: string) {
+        const db = await getDatabase();
+
+        // user_stats now PK = id, so we search by user_id
+        const localStats = await db.user_stats.findOne({
+            selector: { user_id: 'local-user' }
+        }).exec();
+
+        if (!localStats) return;
+
+        const localData = localStats.toJSON();
+
+        // Verifica se já existe user_stats local para o usuário real
+        const existingStats = await db.user_stats.findOne({
+            selector: { user_id: realUserId }
+        }).exec();
+
+        if (!existingStats) {
+            // Adopt local-user stats by updating user_id (stays same document ID)
+            await localStats.incrementalPatch({
+                user_id: realUserId,
+                _modified: Date.now()
+            });
+            console.log('[Migration] user_stats ownership transferred to real user');
+        } else {
+            // Merge into existing stats
+            await existingStats.incrementalPatch({
+                streak_current: Math.max(existingStats.streak_current, localData.streak_current),
+                streak_longest: Math.max(existingStats.streak_longest, localData.streak_longest),
+                total_minutes: Math.max(existingStats.total_minutes, localData.total_minutes),
+                last_read_iso: localData.last_read_iso ?? existingStats.last_read_iso,
+                last_book_id: localData.last_book_id ?? existingStats.last_book_id,
+                minutes_by_date: this.mergeMinutesByDate(
+                    localData.minutes_by_date,
+                    existingStats.minutes_by_date
+                ),
+                _modified: Date.now()
+            });
+            console.log('[Migration] user_stats minimally merged locally');
+
+            // Remove the old local-user doc since we merged its data
+            await localStats.remove();
+            console.log('[Migration] local-user user_stats removed');
+        }
+    }
+
+
+
     /**
      * Migrate documents with user_id='local-user' to the real authenticated user_id.
      * This handles data created before login that needs to be synced.
@@ -1034,49 +1144,7 @@ export class ReplicationManager {
                 console.log(`[Migration] Migrated ${localBaselines.length} daily_baselines`);
             }
 
-            // Migrate user_stats (special case: primary key is user_id itself)
-            const localStats = await db.user_stats.findOne('local-user').exec();
-            if (localStats) {
-                const statsData = localStats.toJSON();
-
-                // Check if real user stats already exist
-                const existingStats = await db.user_stats.findOne(realUserId).exec();
-                if (!existingStats) {
-                    await db.user_stats.insert({
-                        ...statsData,
-                        user_id: realUserId,
-                        _modified: Date.now()
-                    });
-                    console.log('[Migration] Migrated user_stats');
-                } else {
-                    // Merge: keep the better stats (higher streak, more minutes, etc.)
-                    const existingData = existingStats.toJSON();
-                    const mergedStats = {
-                        streak_current: Math.max(statsData.streak_current || 0, existingData.streak_current || 0),
-                        streak_longest: Math.max(statsData.streak_longest || 0, existingData.streak_longest || 0),
-                        total_minutes: Math.max(statsData.total_minutes || 0, existingData.total_minutes || 0),
-                        last_book_id: statsData.last_book_id || existingData.last_book_id,
-                        last_read_iso: statsData.last_read_iso || existingData.last_read_iso,
-                        // Merge minutes_by_date
-                        minutes_by_date: this.mergeMinutesByDate(
-                            statsData.minutes_by_date,
-                            existingData.minutes_by_date
-                        ),
-                        _modified: Date.now()
-                    };
-                    await existingStats.incrementalPatch(mergedStats);
-                    console.log('[Migration] Merged user_stats with existing');
-                }
-                // Remove local-user stats
-                console.log('[Migration] [DEBUG] About to remove local-user user_stats:', localStats.toJSON());
-                try {
-                    await localStats.remove();
-                    console.log('[Migration] [DEBUG] Successfully removed local-user user_stats');
-                } catch (err) {
-                    console.error('[Migration] [DEBUG] Error removing local-user user_stats:', err);
-                }
-                totalMigrated++;
-            }
+            await this.migrateLocalUserStats(realUserId);
 
             // Migrate settings
             const localSettings = await db.settings.findOne('local-user').exec();

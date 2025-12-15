@@ -64,7 +64,7 @@ export const bookSchemaLiteral = {
         },
         progress_version: {
             type: "number",
-             minimum: 0
+            minimum: 0
         },
         _modified: {
             type: 'number'
@@ -271,9 +271,13 @@ export const dailyBaselineSchema: RxJsonSchema<RxDailyBaselineDocumentType> = da
 // User Stats Schema
 export const userStatsSchemaLiteral = {
     version: 0,
-    primaryKey: 'user_id',
+    primaryKey: 'id',
     type: 'object',
     properties: {
+        id: {
+            type: 'string',
+            maxLength: 100
+        },
         user_id: {
             type: 'string',
             maxLength: 100
@@ -306,7 +310,7 @@ export const userStatsSchemaLiteral = {
             type: 'boolean'
         }
     },
-    required: ['user_id', '_modified']
+    required: ['id', 'user_id', '_modified']
 } as const;
 
 const userStatsSchemaTyped = toTypedRxJsonSchema(userStatsSchemaLiteral);

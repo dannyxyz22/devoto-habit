@@ -222,6 +222,7 @@ const Index = () => {
         if (docs && docs.length > 0) {
           const stats = docs[0].toJSON();
           console.log('[Index] 📊 Manual load user_stats data:', {
+            user_id: stats.user_id,
             last_book_id: stats.last_book_id,
             streak_current: stats.streak_current
           });

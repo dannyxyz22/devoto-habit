@@ -93,6 +93,17 @@ const _createDatabase = async (): Promise<DevotoDatabase> => {
         }
     });
 
+    db.user_stats.preInsert((data, instance) => {
+  console.log('[HOOK] preInsert user_stats', data);
+  console.trace('[HOOK] preInsert user_stats trace');
+  return data;
+}, false);
+db.user_stats.preSave((data, instance) => {
+  console.log('[HOOK] preSave user_stats', data);
+console.trace('[HOOK] preSave user_stats trace');
+  return data;
+}, false);
+
     console.log('DatabaseService: Database created');
 
     // Initialize static books (EPUBs from books.ts)
