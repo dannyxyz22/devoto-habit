@@ -10,7 +10,7 @@ import { SEO } from "@/components/app/SEO";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { setReadingPlan, getProgress, getReadingPlan, setDailyBaseline, setProgress, getDailyBaseline, setLastBookId } from "@/lib/storage";
+import { setReadingPlan, getProgress, getReadingPlan, setDailyBaseline, setProgress, getDailyBaseline, setLastBookId, getLastBookIdAsync } from "@/lib/storage";
 import { toast } from "@/hooks/use-toast";
 import { formatISO } from "date-fns";
 import { resolveEpubSource } from "@/lib/utils";
@@ -19,7 +19,7 @@ import { getCoverObjectUrl, saveCoverBlob } from "@/lib/coverCache";
 import { saveUserEpub, getUserEpubs, deleteUserEpub, reUploadEpub } from "@/lib/userEpubs";
 import { getDatabase } from "@/lib/database/db";
 import { BookSearchDialog } from "@/components/app/BookSearchDialog";
-import { Upload, Trash2, BookPlus, AlertCircle, X } from "lucide-react";
+import { Upload, Trash2, BookPlus, AlertCircle, X, Bookmark } from "lucide-react";
 import { BookCover } from "@/components/book/BookCover";
 
 type Paragraph = { type: string; content: string };
@@ -41,6 +41,7 @@ const Library = () => {
   const [selectedIsEpub, setSelectedIsEpub] = useState<boolean>(false);
   const [selectedIsPhysical, setSelectedIsPhysical] = useState<boolean>(false);
   const [allBooks, setAllBooks] = useState<BookMeta[]>([]);
+  const [activeBookId, setActiveBookId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [showBookSearch, setShowBookSearch] = useState(false);
   const [dismissedOverlays, setDismissedOverlays] = useState<Set<string>>(new Set());
@@ -319,6 +320,20 @@ const Library = () => {
     };
 
     autoSync();
+  }, []);
+
+  // Load active book ID
+  useEffect(() => {
+    const loadActiveBook = async () => {
+      // Try local storage first for speed
+      const local = localStorage.getItem('lastBookId');
+      if (local) setActiveBookId(local);
+
+      // Then try async storage (RxDB)
+      const id = await getLastBookIdAsync();
+      if (id) setActiveBookId(id);
+    };
+    loadActiveBook();
   }, []);
 
   // Handle EPUB file upload
@@ -606,6 +621,10 @@ const Library = () => {
   };
 
   const sortedBooks = [...allBooks].sort((a, b) => {
+    // Active book always comes first
+    if (a.id === activeBookId) return -1;
+    if (b.id === activeBookId) return 1;
+
     if (sortBy === 'date') {
       return (b.addedDate || 0) - (a.addedDate || 0);
     } else {
@@ -783,6 +802,12 @@ const Library = () => {
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
+                  )}
+                  {book.id === activeBookId && (
+                    <div className="flex items-center gap-1 bg-primary/10 text-primary text-xs px-2 py-1 rounded-full whitespace-nowrap">
+                      <Bookmark className="h-3 w-3 fill-current" />
+                      <span>Lendo agora</span>
+                    </div>
                   )}
                 </div>
               </CardTitle>
