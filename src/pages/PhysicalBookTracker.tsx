@@ -48,36 +48,7 @@ export default function PhysicalBookTracker() {
     const [coverVersion, setCoverVersion] = useState(0);
 
 
-    function setBookDebug(
-        updater: PhysicalBook | ((prev: PhysicalBook | null) => PhysicalBook | null),
-        source: string
-    ) {
-        setBook(prev => {
-            const next =
-                typeof updater === 'function'
-                    ? updater(prev)
-                    : updater;
 
-            console.group('[SET BOOK]');
-            console.log('SOURCE:', source);
-            console.log('FROM:', prev?.currentPage);
-            console.log('TO:', next?.currentPage);
-            console.trace();
-            console.groupEnd();
-
-            return next;
-        });
-    }
-
-    //Debug do set currentPage
-    useEffect(() => {
-        if (!book) return;
-
-        console.group('[BOOK STATE]');
-        console.log('currentPage:', book.currentPage);
-        console.trace();
-        console.groupEnd();
-    }, [book]);
 
     // Reactive subscription to book changes
     useEffect(() => {
@@ -135,7 +106,7 @@ export default function PhysicalBookTracker() {
                         publisher: "",
                     };
 
-                    setBookDebug(physicalBook, "setup subscription");
+                    setBook(physicalBook);
 
                     // Only update input if user is not currently editing
                     if (!isUserEditing.current) {
@@ -209,11 +180,10 @@ export default function PhysicalBookTracker() {
             lastAppliedProgressVersionRef.current = nextVersion;
 
             // 2. Atualização otimista do estado local
-            setBookDebug(
+            setBook(
                 prev => prev
                     ? { ...prev, currentPage: newPage }
-                    : prev,
-                "handleUpdateProgress"
+                    : prev
             );
 
             // 3. Persistência única via DataLayer
@@ -341,11 +311,10 @@ export default function PhysicalBookTracker() {
         const nextVersion = lastAppliedProgressVersionRef.current + 1;
         lastAppliedProgressVersionRef.current = nextVersion;
 
-        setBookDebug(
+        setBook(
             prev => prev
                 ? { ...prev, currentPage: newPage }
-                : prev,
-            "handleQuickAdd"
+                : prev
         );
 
         try {
