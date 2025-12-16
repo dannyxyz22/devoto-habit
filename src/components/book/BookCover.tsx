@@ -6,6 +6,7 @@ interface BookCoverProps {
     coverUrl?: string | null;
     title: string;
     className?: string;
+    coverVersion?: number;
 }
 
 /**
@@ -17,8 +18,8 @@ interface BookCoverProps {
  * - Shows fallback icon when no cover is available
  * - Cleans up object URLs to prevent memory leaks
  */
-export function BookCover({ bookId, coverUrl, title, className = '' }: BookCoverProps) {
-    const cachedCoverSrc = useCoverImage(bookId, coverUrl);
+export function BookCover({ bookId, coverUrl, title, className = '', coverVersion }: BookCoverProps) {
+    const cachedCoverSrc = useCoverImage(bookId, coverUrl, coverVersion);
 
     if (!cachedCoverSrc) {
         return (

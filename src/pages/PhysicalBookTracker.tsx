@@ -14,6 +14,10 @@ import { BookOpen, Plus } from "lucide-react";
 import type { PhysicalBook } from "@/lib/physicalBooks";
 import { getDatabase } from "@/lib/database/db";
 import { dataLayer } from "@/services/data/RxDBDataLayer";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Pencil, Upload } from "lucide-react";
+import { saveCoverBlob } from "@/lib/coverCache";
 
 
 
@@ -29,41 +33,51 @@ export default function PhysicalBookTracker() {
 
     const lastAppliedProgressVersionRef = useRef<number>(-1);
 
-    
+
     // Track if user is currently editing to avoid overwriting their input
     const isUserEditing = useRef(false);
 
+    // Edit Dialog State
+    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+    const [editTitle, setEditTitle] = useState("");
+    const [editAuthor, setEditAuthor] = useState("");
+    const [editTotalPages, setEditTotalPages] = useState("");
+    const [editCoverFile, setEditCoverFile] = useState<File | null>(null);
+    const [editCoverPreview, setEditCoverPreview] = useState<string | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
+    const [coverVersion, setCoverVersion] = useState(0);
+
 
     function setBookDebug(
-    updater: PhysicalBook | ((prev: PhysicalBook | null) => PhysicalBook | null),
-    source: string
-) {
-    setBook(prev => {
-        const next =
-            typeof updater === 'function'
-                ? updater(prev)
-                : updater;
+        updater: PhysicalBook | ((prev: PhysicalBook | null) => PhysicalBook | null),
+        source: string
+    ) {
+        setBook(prev => {
+            const next =
+                typeof updater === 'function'
+                    ? updater(prev)
+                    : updater;
 
-        console.group('[SET BOOK]');
-        console.log('SOURCE:', source);
-        console.log('FROM:', prev?.currentPage);
-        console.log('TO:', next?.currentPage);
-        console.trace();
-        console.groupEnd();
+            console.group('[SET BOOK]');
+            console.log('SOURCE:', source);
+            console.log('FROM:', prev?.currentPage);
+            console.log('TO:', next?.currentPage);
+            console.trace();
+            console.groupEnd();
 
-        return next;
-    });
-}
+            return next;
+        });
+    }
 
     //Debug do set currentPage
     useEffect(() => {
-    if (!book) return;
+        if (!book) return;
 
-    console.group('[BOOK STATE]');
-    console.log('currentPage:', book.currentPage);
-    console.trace();
-    console.groupEnd();
-}, [book]);
+        console.group('[BOOK STATE]');
+        console.log('currentPage:', book.currentPage);
+        console.trace();
+        console.groupEnd();
+    }, [book]);
 
     // Reactive subscription to book changes
     useEffect(() => {
@@ -93,7 +107,7 @@ export default function PhysicalBookTracker() {
                         return;
                     }
 
-                     const incomingVersion = rxBook.progress_version ?? 0;
+                    const incomingVersion = rxBook.progress_version ?? 0;
 
                     if (incomingVersion < lastAppliedProgressVersionRef.current) {
                         console.warn('[SUBSCRIPTION] Ignored stale progress', {
@@ -122,7 +136,7 @@ export default function PhysicalBookTracker() {
                     };
 
                     setBookDebug(physicalBook, "setup subscription");
-                    
+
                     // Only update input if user is not currently editing
                     if (!isUserEditing.current) {
                         setCurrentPage(physicalBook.currentPage.toString());
@@ -234,6 +248,89 @@ export default function PhysicalBookTracker() {
 
     };
 
+    const handleOpenEditDialog = () => {
+        if (!book) return;
+        setEditTitle(book.title);
+        setEditAuthor(book.author);
+        setEditTotalPages(book.totalPages.toString());
+        setEditCoverFile(null);
+        setEditCoverPreview(null);
+        setIsEditDialogOpen(true);
+    };
+
+    const handleCoverFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            setEditCoverFile(file);
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setEditCoverPreview(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handleSaveMetadata = async () => {
+        if (!book || !bookId) return;
+
+        const newTotalPages = parseInt(editTotalPages, 10);
+        if (!editTitle.trim() || !editAuthor.trim() || isNaN(newTotalPages) || newTotalPages <= 0) {
+            toast({
+                title: "Dados inválidos",
+                description: "Verifique os campos preenchidos",
+                variant: "destructive",
+            });
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            // 1. Save cover if changed
+            if (editCoverFile) {
+                await saveCoverBlob(bookId, editCoverFile);
+                setCoverVersion(v => v + 1);
+            }
+
+            // 2. Update book metadata
+            await dataLayer.saveBook({
+                id: bookId,
+                title: editTitle.trim(),
+                author: editAuthor.trim(),
+                total_pages: newTotalPages,
+                // If we uploaded a new cover, we want to ensure we don't keep using an old external URL
+                // But we don't want to wipe it if we didn't change it.
+                // If editCoverFile is present, we can set cover_url to null or keep it as is?
+                // If we set it to null, useCoverImage will fail to find external URL and look in cache.
+                // If we keep it, useCoverImage checks cache FIRST. So it should be fine.
+                // However, if we want to be sure, we can clear it if a local file is provided.
+                ...(editCoverFile ? { cover_url: undefined } : {})
+            });
+
+            // 3. Update local state immediately for responsiveness
+            setBook(prev => prev ? {
+                ...prev,
+                title: editTitle.trim(),
+                author: editAuthor.trim(),
+                totalPages: newTotalPages
+            } : null);
+
+            setIsEditDialogOpen(false);
+            toast({
+                title: "Livro atualizado!",
+                description: "As informações foram salvas com sucesso.",
+            });
+        } catch (error) {
+            console.error("Error updating book:", error);
+            toast({
+                title: "Erro ao salvar",
+                description: "Não foi possível atualizar o livro.",
+                variant: "destructive",
+            });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
     // Updated quick add: automatically persists progress and updates UI
     const handleQuickAdd = async (pages: number) => {
         if (!book || !bookId) return;
@@ -246,8 +343,8 @@ export default function PhysicalBookTracker() {
 
         setBookDebug(
             prev => prev
-            ? { ...prev, currentPage: newPage }
-            : prev,
+                ? { ...prev, currentPage: newPage }
+                : prev,
             "handleQuickAdd"
         );
 
@@ -263,16 +360,16 @@ export default function PhysicalBookTracker() {
             }
 
             const percent = Math.round((newPage / book.totalPages) * 100);
-                 console.log('[Set progress before] Save book with new current_page:', newPage);
+            console.log('[Set progress before] Save book with new current_page:', newPage);
             setProgress(bookId, {
-           
+
                 partIndex: 0,
                 chapterIndex: 0,
                 percent,
                 currentPage: newPage,
                 totalPages: book.totalPages,
             });
-                 console.log('[Set progress after] Save book with new current_page:', newPage);
+            console.log('[Set progress after] Save book with new current_page:', newPage);
 
             toast({
                 title: "Progresso atualizado!",
@@ -327,9 +424,16 @@ export default function PhysicalBookTracker() {
                                 coverUrl={book.coverUrl}
                                 title={book.title}
                                 className="w-full h-48 rounded-t-lg"
+                                coverVersion={coverVersion}
                             />
                             <div className="flex-1">
-                                <CardTitle className="text-2xl mb-2">{book.title}</CardTitle>
+                                <div className="flex items-start justify-between gap-2">
+                                    <CardTitle className="text-2xl mb-2">{book.title}</CardTitle>
+                                    <Button variant="ghost" size="icon" onClick={handleOpenEditDialog} className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                                        <Pencil className="h-4 w-4" />
+                                        <span className="sr-only">Editar</span>
+                                    </Button>
+                                </div>
                                 <p className="text-muted-foreground">{book.author}</p>
                                 {book.publisher && (
                                     <p className="text-sm text-muted-foreground mt-1">{book.publisher}</p>
@@ -338,6 +442,83 @@ export default function PhysicalBookTracker() {
                         </div>
                     </CardHeader>
                 </Card>
+
+                <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Editar Livro</DialogTitle>
+                            <DialogDescription>
+                                Altere as informações do livro ou a capa.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 py-2">
+                            <div className="space-y-2">
+                                <Label htmlFor="edit-title">Título</Label>
+                                <Input
+                                    id="edit-title"
+                                    value={editTitle}
+                                    onChange={(e) => setEditTitle(e.target.value)}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="edit-author">Autor</Label>
+                                <Input
+                                    id="edit-author"
+                                    value={editAuthor}
+                                    onChange={(e) => setEditAuthor(e.target.value)}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="edit-pages">Total de Páginas</Label>
+                                <Input
+                                    id="edit-pages"
+                                    type="number"
+                                    value={editTotalPages}
+                                    onChange={(e) => setEditTotalPages(e.target.value)}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Capa do Livro</Label>
+                                <div className="flex items-center gap-4">
+                                    <div className="w-16 h-24 bg-muted rounded overflow-hidden flex-shrink-0 border">
+                                        {editCoverPreview ? (
+                                            <img src={editCoverPreview} alt="Preview" className="w-full h-full object-cover" />
+                                        ) : (
+                                            <BookCover
+                                                bookId={bookId}
+                                                title={book.title}
+                                                coverUrl={book.coverUrl}
+                                                className="w-full h-full"
+                                            />
+                                        )}
+                                    </div>
+                                    <div className="flex-1">
+                                        <Label htmlFor="cover-upload" className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-secondary text-secondary-foreground hover:bg-secondary/80 rounded-md text-sm font-medium transition-colors">
+                                            <Upload className="w-4 h-4" />
+                                            Escolher nova capa
+                                        </Label>
+                                        <Input
+                                            id="cover-upload"
+                                            type="file"
+                                            accept="image/*"
+                                            className="hidden"
+                                            onChange={handleCoverFileChange}
+                                        />
+                                        <p className="text-xs text-muted-foreground mt-2">
+                                            A imagem será salva apenas neste dispositivo.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancelar</Button>
+                            <Button onClick={handleSaveMetadata} disabled={isSaving}>
+                                {isSaving ? "Salvando..." : "Salvar Alterações"}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
 
                 <Card className="mb-6">
                     <CardHeader>

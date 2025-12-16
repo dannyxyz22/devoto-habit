@@ -13,7 +13,7 @@ import { getCoverObjectUrl, saveCoverBlob } from '@/lib/coverCache';
  * 2. If not cached and coverUrl is external (http/https), downloads and caches it
  * 3. If coverUrl is base64, uses it directly (won't be cached or synced)
  */
-export function useCoverImage(bookId: string | undefined, coverUrl: string | undefined | null): string | null {
+export function useCoverImage(bookId: string | undefined, coverUrl: string | undefined | null, coverVersion?: number): string | null {
     const [imageSrc, setImageSrc] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
 
@@ -103,7 +103,7 @@ export function useCoverImage(bookId: string | undefined, coverUrl: string | und
                 URL.revokeObjectURL(imageSrc);
             }
         };
-    }, [bookId, coverUrl]);
+    }, [bookId, coverUrl, coverVersion]);
 
     return imageSrc;
 }
