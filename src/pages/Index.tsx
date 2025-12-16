@@ -197,9 +197,27 @@ const Index = () => {
     };
   }, [activeBookId]);
 
+  const [userId, setUserId] = useState<string>('local-user');
+
+  // Listen for auth changes to update userId
+  useEffect(() => {
+    // Initial check
+    import('@/services/auth/SupabaseAuthService').then(({ authService }) => {
+      authService.getUser().then(({ user }) => {
+        setUserId(user ? user.id : 'local-user');
+      });
+
+      // Listen for changes
+      authService.onAuthStateChange((event, session) => {
+        console.log('[Index] 🔐 Auth state change:', event, session?.user?.id);
+        setUserId(session?.user ? session.user.id : 'local-user');
+      });
+    });
+  }, []);
+
   // Subscribe to user_stats for reactive streak and lastBookId updates
   useEffect(() => {
-    console.log('[Index] 🚀 useEffect user_stats subscription STARTING');
+    console.log('[Index] 🚀 useEffect user_stats subscription STARTING for user:', userId);
 
     // Load from localStorage immediately
     setStreak(getStreak());
@@ -217,8 +235,14 @@ const Index = () => {
     const loadFromRxDB = async () => {
       try {
         const db = await getDatabase();
-        const docs = await db.user_stats.find({ selector: { _deleted: false } }).exec();
-        console.log('[Index] 🔄 Manual RxDB load - user_stats docs:', docs?.length);
+        // Filter by specific user_id to avoid picking up stale data from other users
+        const docs = await db.user_stats.find({
+          selector: {
+            user_id: userId,
+            _deleted: false
+          }
+        }).exec();
+        console.log('[Index] 🔄 Manual RxDB load - user_stats docs:', docs?.length, 'for user:', userId);
         if (docs && docs.length > 0) {
           const stats = docs[0].toJSON();
           console.log('[Index] 📊 Manual load user_stats data:', {
@@ -249,15 +273,19 @@ const Index = () => {
 
     const setupSubscription = async () => {
       try {
-        console.log('[Index] 🔌 Setting up RxDB user_stats subscription...');
+        console.log('[Index] 🔌 Setting up RxDB user_stats subscription for user:', userId);
         const db = await getDatabase();
         const sub = db.user_stats.find({
-          selector: { _deleted: false }
+          selector: {
+            user_id: userId,
+            _deleted: false
+          }
         }).$.subscribe(docs => {
           console.log('[Index] 📡 user_stats subscription emitted:', docs?.length, 'docs');
           if (docs && docs.length > 0) {
             const stats = docs[0].toJSON();
             console.log('[Index] 📊 user_stats data:', {
+              user_id: stats.user_id,
               last_book_id: stats.last_book_id,
               streak_current: stats.streak_current,
               last_read_iso: stats.last_read_iso
@@ -278,7 +306,7 @@ const Index = () => {
               console.log('[Index] ⚠️ No last_book_id in user_stats');
             }
           } else {
-            console.log('[Index] ⚠️ user_stats subscription: no docs found');
+            console.log('[Index] ⚠️ user_stats subscription: no docs found for user:', userId);
           }
         });
         subscription = { unsubscribe: () => sub.unsubscribe() };
@@ -308,7 +336,7 @@ const Index = () => {
       subscription?.unsubscribe();
       window.removeEventListener('rxdb-initial-replication-complete', handleReplicationComplete);
     };
-  }, []); // No dependencies - subscribe once and react to all changes
+  }, [userId]); // Re-subscribe when userId changes
 
   // Subscribe to reading_plans for reactive plan updates
   useEffect(() => {
