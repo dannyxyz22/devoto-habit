@@ -301,12 +301,15 @@ export default function PhysicalBookTracker() {
         }
     };
 
+    const persistenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
     // Updated quick add: automatically persists progress and updates UI
     const handleQuickAdd = async (pages: number) => {
         if (!book || !bookId) return;
         const newPage = Math.min(book.currentPage + pages, book.totalPages);
+
+        // 1. Optimistic UI update immediately
         setCurrentPage(newPage.toString());
-        // Persist the new page count
 
         const nextVersion = lastAppliedProgressVersionRef.current + 1;
         lastAppliedProgressVersionRef.current = nextVersion;
@@ -317,43 +320,42 @@ export default function PhysicalBookTracker() {
                 : prev
         );
 
-        try {
-            // Update via DataLayer
-            console.log(`Quick adding ${pages} pages to book ID ${bookId}`);
-            const rxBook = await dataLayer.getBook(bookId);
-            if (rxBook) {
-                console.log('[DataLayer before] Save book with new current_page:', newPage);
+        // 2. Update local storage immediately (cheap synchronous op)
+        const percent = Math.round((newPage / book.totalPages) * 100);
+        setProgress(bookId, {
+            partIndex: 0,
+            chapterIndex: 0,
+            percent,
+            currentPage: newPage,
+            totalPages: book.totalPages,
+        });
 
-                dataLayer.saveBookProgress(bookId, newPage)
-                console.log('[DataLayer finished] Save book with new current_page:', newPage);
-            }
+        // Feedback
+        toast({
+            title: "Progresso atualizado!",
+            description: `Você está na página ${newPage} de ${book.totalPages}`,
+        });
 
-            const percent = Math.round((newPage / book.totalPages) * 100);
-            console.log('[Set progress before] Save book with new current_page:', newPage);
-            setProgress(bookId, {
+        // Update last book immediately
+        setLastBookId(bookId).catch(console.error);
 
-                partIndex: 0,
-                chapterIndex: 0,
-                percent,
-                currentPage: newPage,
-                totalPages: book.totalPages,
-            });
-            console.log('[Set progress after] Save book with new current_page:', newPage);
-
-            toast({
-                title: "Progresso atualizado!",
-                description: `Você está na página ${newPage} de ${book.totalPages}`,
-            });
-            await setLastBookId(bookId);
-        } catch (error) {
-            console.error("Error quick adding pages:", error);
-            toast({
-                title: "Erro ao atualizar progresso",
-                description: "Tente novamente",
-                variant: "destructive",
-            });
+        // 3. Debounced Database Persistence
+        // Clear pending save to avoid overwriting with intermediate state
+        if (persistenceTimeoutRef.current) {
+            clearTimeout(persistenceTimeoutRef.current);
         }
-        console.log('[Quick add finished] Save book with new current_page:', newPage);
+
+        persistenceTimeoutRef.current = setTimeout(async () => {
+            try {
+                console.log(`[Debounced Save] Saving final page: ${newPage} for book ${bookId}`);
+                await dataLayer.saveBookProgress(bookId, newPage);
+                console.log('[Debounced Save] Success');
+            } catch (error) {
+                console.error("[Debounced Save] Error:", error);
+                // Since this is delayed, showing a toast here might be confusing if the user has moved on,
+                // but we should log it.
+            }
+        }, 1000); // Wait 1 second after last click
     };
 
     if (loading) {
