@@ -87,7 +87,7 @@ const Index = () => {
           setActiveBookProgress(prev => ({
             partIndex: 0,
             chapterIndex: 0,
-            percent: Math.max(prev.percent, dbPercent)
+            percent: dbPercent // Trust DB
           }));
           return true;
         }
@@ -111,7 +111,7 @@ const Index = () => {
           setActiveBookProgress(prev => ({
             partIndex: data.part_index || prev.partIndex,
             chapterIndex: data.chapter_index || prev.chapterIndex,
-            percent: Math.max(prev.percent, dbPercent)
+            percent: dbPercent // Trust DB
           }));
           return true;
         }
@@ -139,7 +139,7 @@ const Index = () => {
             setActiveBookProgress(prev => ({
               partIndex: 0,
               chapterIndex: 0,
-              percent: Math.max(prev.percent, dbPercent)
+              percent: dbPercent // Trust DB
             }));
           }
         });
@@ -161,7 +161,7 @@ const Index = () => {
             setActiveBookProgress(prev => ({
               partIndex: data.part_index || prev.partIndex,
               chapterIndex: data.chapter_index || prev.chapterIndex,
-              percent: Math.max(prev.percent, dbPercent)
+              percent: dbPercent // Trust DB
             }));
           }
         });
