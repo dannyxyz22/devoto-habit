@@ -237,6 +237,18 @@ const EpubReaderV3 = () => {
                   if (typeof p === "number" && !isNaN(p)) {
                     const percent = Math.round(p * 100);
                     console.log("[EpubReaderV3] Recalculated percent after locations ready:", percent);
+
+                    // FIX: Update local progress storage with accurate percent
+                    try {
+                      const currentProgress = getProgress(epubId);
+                      setProgress(epubId, {
+                        ...currentProgress,
+                        percent: percent
+                      });
+                    } catch (e) {
+                      console.warn("[EpubReaderV3] Failed to update local progress after recalc:", e);
+                    }
+
                     // Only save if we have a meaningful percent or user has navigated
                     if (percent > 0 || latestCfiRef.current !== lastSavedCfiRef.current) {
                       saveToRxDB(latestCfiRef.current, percent);
