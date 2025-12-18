@@ -12,6 +12,7 @@ import { WidgetUpdater, canUseNative } from "@/lib/widgetUpdater";
 import { format } from "date-fns";
 import { computeDaysRemaining, computeDailyProgressPercent } from "@/lib/reading";
 import { dataLayer } from "@/services/data/RxDBDataLayer";
+import { ChevronLeft } from "lucide-react";
 
 /**
  * EpubReaderV3 - Versão minimalista baseada na documentação oficial do react-reader
@@ -397,7 +398,7 @@ const EpubReaderV3 = () => {
   }
 
   return (
-    <div className="h-screen w-full">
+    <div className="h-screen w-full relative">
       <SEO
         title={`EPUB — ${epubId}`}
         description="Leitor EPUB"
@@ -411,6 +412,15 @@ const EpubReaderV3 = () => {
         title=""
         showToc={true}
       />
+      {/* Botão de voltar posicionado abaixo do botão de TOC */}
+      <button
+        onClick={() => navigate("/biblioteca")}
+        className="absolute left-2.5 top-12 z-10 flex items-center justify-center w-8 h-8 rounded-full bg-white/90 hover:bg-white shadow-md transition-colors"
+        aria-label="Voltar para Biblioteca"
+        title="Voltar para Biblioteca"
+      >
+        <ChevronLeft className="w-5 h-5 text-gray-700" />
+      </button>
     </div>
   );
 };
