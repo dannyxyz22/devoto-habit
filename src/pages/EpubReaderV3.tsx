@@ -12,8 +12,6 @@ import { WidgetUpdater, canUseNative } from "@/lib/widgetUpdater";
 import { format } from "date-fns";
 import { computeDaysRemaining, computeDailyProgressPercent } from "@/lib/reading";
 import { dataLayer } from "@/services/data/RxDBDataLayer";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
 
 /**
  * EpubReaderV3 - Versão minimalista baseada na documentação oficial do react-reader
@@ -399,22 +397,12 @@ const EpubReaderV3 = () => {
   }
 
   return (
-    <div className="h-screen w-full relative">
+    <div className="h-screen w-full">
       <SEO
         title={`EPUB — ${epubId}`}
         description="Leitor EPUB"
         canonical={`/epub/${epubId}`}
       />
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => navigate("/biblioteca")}
-        className="absolute top-4 left-4 z-50 bg-background/80 backdrop-blur-sm hover:bg-background/90 shadow-sm"
-        aria-label="Voltar para Biblioteca"
-      >
-        <ArrowLeft className="h-4 w-4 mr-2" />
-        Biblioteca
-      </Button>
       <ReactReader
         url={epubUrl}
         location={location}
