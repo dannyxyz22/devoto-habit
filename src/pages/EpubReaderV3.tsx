@@ -13,6 +13,7 @@ import { format } from "date-fns";
 import { computeDaysRemaining, computeDailyProgressPercent } from "@/lib/reading";
 import { dataLayer } from "@/services/data/RxDBDataLayer";
 import { ChevronLeft } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 /**
  * EpubReaderV3 - Versão minimalista baseada na documentação oficial do react-reader
@@ -24,6 +25,7 @@ import { ChevronLeft } from "lucide-react";
 const EpubReaderV3 = () => {
   const { epubId = "" } = useParams();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
 
   // URL do EPUB (pode ser string URL ou ArrayBuffer)
   const [epubUrl, setEpubUrl] = useState<string | ArrayBuffer | null>(null);
@@ -411,6 +413,7 @@ const EpubReaderV3 = () => {
         getRendition={handleGetRendition}
         title=""
         showToc={true}
+        swipeable={isMobile}
       />
       {/* Botão de voltar posicionado abaixo do botão de TOC */}
       <button
