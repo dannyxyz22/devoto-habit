@@ -8,8 +8,10 @@ export default defineConfig(({ mode }) => ({
   // Use root base for native builds (CAP_NATIVE=1), otherwise GitHub Pages base
   base: process.env.CAP_NATIVE ? "/" : "/",//"/devoto-habit/",
   server: {
-    host: "::",
+    host: "localhost",
     port: 8080,
+    strictPort: false, // Se 8080 estiver ocupado, tenta outra porta
+    open: false, // Não abre automaticamente no navegador
   },
   plugins: [
     react(),

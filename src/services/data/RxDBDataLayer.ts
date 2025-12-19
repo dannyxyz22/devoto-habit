@@ -188,9 +188,39 @@ class RxDBDataLayerImpl implements DataLayer {
         if (!book) return;
 
         const currentVersion = book.get('progress_version') ?? 0;
+        const totalPages = book.get('total_pages') || 0;
+        
+        // Get OLD percentage BEFORE updating (needed for baseline creation)
+        const oldPercentage = book.get('percentage') || 0;
+        
+        // Calculate NEW percentage for physical books
+        const newPercentage = totalPages > 0 
+            ? Math.round((newPage / totalPages) * 100)
+            : oldPercentage;
 
+        // Ensure baseline exists for today BEFORE updating progress
+        // (only create if missing, don't update existing)
+        const todayISO = new Date().toISOString().split('T')[0];
+        const userId = await this.getUserId();
+        const baselineId = `${userId}:${bookId}:${todayISO}`;
+        const existingBaseline = await db.daily_baselines.findOne(baselineId).exec();
+        
+        if (!existingBaseline) {
+            // Create baseline with the OLD progress (before this update) as starting point
+            // This ensures that today's progress is calculated correctly
+            await this.saveDailyBaseline({
+                book_id: bookId,
+                date_iso: todayISO,
+                words: 0, // Physical books use percent, not words
+                percent: oldPercentage // Use old progress, not new
+            });
+            console.log('[DataLayer] 📏 Baseline created for today:', { bookId, todayISO, percent: oldPercentage });
+        }
+
+        // Now update the book progress
         await book.incrementalPatch({
             current_page: newPage,
+            percentage: newPercentage,
             progress_version: currentVersion + 1,
             _modified: Math.max(Date.now(), (book.get('_modified') || 0) + 1)
         });
@@ -198,6 +228,8 @@ class RxDBDataLayerImpl implements DataLayer {
         console.log('[DataLayer] 📖 Progress updated', {
             bookId,
             newPage,
+            oldPercentage,
+            newPercentage,
             progress_version: currentVersion + 1
         });
     }
