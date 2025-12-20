@@ -18,6 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Label } from "@/components/ui/label";
 import { Pencil, Upload } from "lucide-react";
 import { saveCoverBlob } from "@/lib/coverCache";
+import { calculatePagePercent } from "@/lib/percentageUtils";
 
 
 
@@ -118,7 +119,7 @@ export default function PhysicalBookTracker() {
                     const existingProgress = getProgress(bookId);
 
                     if (!existingProgress) {
-                        const percent = Math.round((physicalBook.currentPage / physicalBook.totalPages) * 100);
+                        const percent = calculatePagePercent(physicalBook.currentPage, physicalBook.totalPages);
                         setProgress(bookId, {
                             partIndex: 0,
                             chapterIndex: 0,
@@ -131,7 +132,7 @@ export default function PhysicalBookTracker() {
                     // Initialize baseline if needed
                     const baseline = getDailyBaseline(bookId, todayISO);
                     if (!baseline) {
-                        const percent = Math.round((physicalBook.currentPage / physicalBook.totalPages) * 100);
+                        const percent = calculatePagePercent(physicalBook.currentPage, physicalBook.totalPages);
                         setDailyBaseline(bookId, todayISO, {
                             words: 0,
                             percent,
@@ -190,7 +191,7 @@ export default function PhysicalBookTracker() {
             await dataLayer.saveBookProgress(bookId, newPage);
 
             // 4. Atualização de métricas locais
-            const percent = Math.round((newPage / book.totalPages) * 100);
+            const percent = calculatePagePercent(newPage, book.totalPages);
             setProgress(bookId, {
                 partIndex: 0,
                 chapterIndex: 0,
@@ -321,7 +322,7 @@ export default function PhysicalBookTracker() {
         );
 
         // 2. Update local storage immediately (cheap synchronous op)
-        const percent = Math.round((newPage / book.totalPages) * 100);
+        const percent = calculatePagePercent(newPage, book.totalPages);
         setProgress(bookId, {
             partIndex: 0,
             chapterIndex: 0,
@@ -372,7 +373,7 @@ export default function PhysicalBookTracker() {
         return null;
     }
 
-    const progressPercent = Math.round((book.currentPage / book.totalPages) * 100);
+    const progressPercent = calculatePagePercent(book.currentPage, book.totalPages);
 
     return (
         <main className="min-h-screen bg-background py-10">

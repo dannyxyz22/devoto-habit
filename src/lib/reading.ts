@@ -1,4 +1,5 @@
 import { differenceInCalendarDays, parseISO } from "date-fns";
+import { calculateRatioPercent, calculateProgressPercent } from "./percentageUtils";
 // Shared book structure types and utilities for word counting and plan progress
 
 export type Paragraph = { type: string; content: string };
@@ -81,7 +82,7 @@ export const computePlanProgressPercent = (
   const startWords = computePlanStartWords(parts, planStart);
   const denom = Math.max(1, targetWords - startWords);
   const num = Math.max(0, wordsUpToCurrent - startWords);
-  return Math.min(100, Math.round((num / denom) * 100));
+  return calculateRatioPercent(num, denom);
 };
 
 // Daily goal helpers
@@ -112,7 +113,7 @@ export const computeAchievedWordsToday = (wordsUpToCurrent: number, baselineWord
 export const computeDailyProgressPercent = (
   achievedWordsToday: number,
   dailyTargetWords: number | null
-): number | null => (dailyTargetWords ? Math.min(100, Math.round((achievedWordsToday / dailyTargetWords) * 100)) : null);
+): number | null => calculateProgressPercent(achievedWordsToday, dailyTargetWords);
 
 // Helpers to derive today's baseline synchronously (useful for rollover tests)
 export const deriveBaselineWords = (baseline: { words: number } | null, wordsUpToCurrent: number): number =>

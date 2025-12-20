@@ -12,6 +12,7 @@ import { WidgetUpdater, canUseNative } from "@/lib/widgetUpdater";
 import { format } from "date-fns";
 import { computeDaysRemaining, computeDailyProgressPercent } from "@/lib/reading";
 import { dataLayer } from "@/services/data/RxDBDataLayer";
+import { calculatePercent } from "@/lib/percentageUtils";
 import { ChevronLeft } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -182,7 +183,7 @@ const EpubReaderV3 = () => {
 
         // Usar displayed.percentage como fallback
         if (currentLoc?.start?.displayed?.percentage) {
-          percent = Math.round(currentLoc.start.displayed.percentage * 100);
+          percent = calculatePercent(currentLoc.start.displayed.percentage, 1);
         }
 
         // Tentar usar locations se disponível
@@ -190,7 +191,7 @@ const EpubReaderV3 = () => {
         if (book?.locations?.length?.()) {
           const p = book.locations.percentageFromCfi(newLocation);
           if (typeof p === "number" && !isNaN(p)) {
-            percent = Math.round(p * 100);
+            percent = calculatePercent(p, 1);
           }
         }
 
@@ -238,7 +239,7 @@ const EpubReaderV3 = () => {
                 try {
                   const p = book.locations.percentageFromCfi(latestCfiRef.current);
                   if (typeof p === "number" && !isNaN(p)) {
-                    const percent = Math.round(p * 100);
+                    const percent = calculatePercent(p, 1);
                     console.log("[EpubReaderV3] Recalculated percent after locations ready:", percent);
 
                     // FIX: Update local progress storage with accurate percent

@@ -2,6 +2,7 @@ import { BOOKS } from './books';
 import { getReadingPlan, getProgress, getDailyBaseline, setDailyBaseline, getLastBookIdAsync } from './storage';
 import { computeTotalWords, computeWordsUpToPosition, computeWordsUpToInclusiveTarget, computeDaysRemaining, computeDailyTargetWords, computeAchievedWordsToday, computeDailyProgressPercent } from './reading';
 import { updateDailyProgressWidget } from '@/main';
+import { calculateWordPercent } from './percentageUtils';
 
 // Central DRY function to recompute daily percent & push widget without needing UI pages.
 export async function performDailyWidgetRefresh() {
@@ -58,7 +59,7 @@ export async function performDailyWidgetRefresh() {
       const base = getDailyBaseline(activeBookId, todayISO);
       if (!base && wordsUpToCurrent > 0) {
         // Use words-based total book percent for baseline percent
-        const totalBookPercent = Math.min(100, Math.round((wordsUpToCurrent / Math.max(1, totalWords)) * 100));
+        const totalBookPercent = calculateWordPercent(wordsUpToCurrent, totalWords);
         setDailyBaseline(activeBookId, todayISO, { words: wordsUpToCurrent, percent: totalBookPercent });
       }
       const baselineWords = base ? base.words : wordsUpToCurrent;

@@ -45,6 +45,7 @@ import {
 
 // Types now shared via lib/reading
 import { dataLayer } from "@/services/data/RxDBDataLayer";
+import { calculateWordPercent, calculateRatioPercent } from "@/lib/percentageUtils";
 
 const Reader = () => {
   const { bookId = "" } = useParams();
@@ -183,8 +184,7 @@ const Reader = () => {
   // Words-based overall book percent (more precise than chapter-count percent)
   const totalBookProgressPercent = useMemo(() => {
     if (!parts) return 0;
-    const denom = Math.max(1, totalWords);
-    return Math.min(100, Math.round((wordsUpToCurrent / denom) * 100));
+    return calculateWordPercent(wordsUpToCurrent, totalWords);
   }, [parts, wordsUpToCurrent, totalWords]);
 
   const plan = useMemo(() => getReadingPlan(bookId), [bookId]);
@@ -331,7 +331,7 @@ const Reader = () => {
     const idx = flatChapters.findIndex(
       (i) => i.partIndex === np.partIndex && i.chapterIndex === np.chapterIndex
     );
-    const percent = Math.round(((idx + 1) / flatChapters.length) * 100);
+    const percent = calculateRatioPercent(idx + 1, flatChapters.length);
     np.percent = Math.min(100, percent);
     updateProgress(np);
     onReadToday();
@@ -339,7 +339,7 @@ const Reader = () => {
     requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
   };
 
-  const onReadToday = () => {
+  const onReadToday = async () => {
     if (hasReadTodaySync()) {
       toast({
         title: "Já marcado",
@@ -350,7 +350,7 @@ const Reader = () => {
     }
 
     const before = getStreak();
-    const after = markReadToday();
+    const after = await markReadToday();
     setStreak(after);
 
     if (after.current > before.current) {
@@ -529,7 +529,7 @@ const Reader = () => {
                   className={`text-left w-full rounded px-2 py-1 hover:bg-accent/30 ${c.partIndex === p.partIndex && c.chapterIndex === p.chapterIndex ? "bg-accent/40" : ""
                     }`}
                   onClick={() => {
-                    updateProgress({ partIndex: c.partIndex, chapterIndex: c.chapterIndex, percent: Math.round(((idx + 1) / flatChapters.length) * 100) });
+                    updateProgress({ partIndex: c.partIndex, chapterIndex: c.chapterIndex, percent: calculateRatioPercent(idx + 1, flatChapters.length) });
                   }}
                 >
                   {idx + 1}. {c.title}

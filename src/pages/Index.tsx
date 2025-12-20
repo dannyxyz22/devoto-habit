@@ -27,6 +27,14 @@ import {
   computeAchievedWordsToday,
   computeDailyProgressPercent,
 } from "@/lib/reading";
+import {
+  calculatePagePercent,
+  calculateWordPercent,
+  percentToPages,
+  percentToPagesCeil,
+  calculateProgressPercent,
+  calculateRatioPercent,
+} from "@/lib/percentageUtils";
 
 // Types now shared via lib/reading
 
@@ -107,7 +115,7 @@ const Index = () => {
             // FIX: For physical books, calculate percent from pages dynamically
             // This ensures consistency with Library.tsx and updates reactively when current_page changes
             if (data.type === 'physical' && data.total_pages && data.total_pages > 0) {
-              dbPercent = Math.round((data.current_page || 0) / data.total_pages * 100);
+              dbPercent = calculatePagePercent(data.current_page || 0, data.total_pages);
               // Store physical book info
               setActiveBookPhysicalInfo({
                 totalPages: data.total_pages,
@@ -165,7 +173,7 @@ const Index = () => {
             // FIX: For physical books, calculate percent from pages dynamically
             // But prefer the stored percentage if it exists (it's more accurate)
             if (data.type === 'physical' && data.total_pages && data.total_pages > 0) {
-              const calculatedPercent = Math.round((data.current_page || 0) / data.total_pages * 100);
+              const calculatedPercent = calculatePagePercent(data.current_page || 0, data.total_pages);
               // Use stored percentage if available, otherwise calculate
               dbPercent = data.percentage != null ? data.percentage : calculatedPercent;
             }
@@ -176,7 +184,7 @@ const Index = () => {
               current_page: data.current_page,
               total_pages: data.total_pages,
               stored_percentage: data.percentage,
-              calculated_percent: data.type === 'physical' && data.total_pages ? Math.round((data.current_page || 0) / data.total_pages * 100) : null,
+              calculated_percent: data.type === 'physical' && data.total_pages ? calculatePagePercent(data.current_page || 0, data.total_pages) : null,
               final_percent: dbPercent
             });
 
@@ -849,7 +857,7 @@ const Index = () => {
       return;
     }
     // Use consistent percent: EPUB/Physical uses p.percent; non-EPUB uses words-based totalBookProgressPercent
-    const baselinePercent = isPercentBased ? (p.percent || 0) : (parts ? Math.min(100, Math.round((wordsUpToCurrent / Math.max(1, totalWords)) * 100)) : 0);
+    const baselinePercent = isPercentBased ? (p.percent || 0) : (parts ? calculateWordPercent(wordsUpToCurrent, totalWords) : 0);
     setDailyBaseline(activeBookId, todayISO, { words: wordsUpToCurrent, percent: baselinePercent });
     try { console.log('[Baseline] persistida', { scope: 'Index', bookId: activeBookId, todayISO, words: wordsUpToCurrent, percent: baselinePercent, isPercentBased }); } catch { }
   }, [activeBookId, todayISO, parts, isPercentBased, wordsUpToCurrent, p.percent, totalWords]);
@@ -885,27 +893,23 @@ const Index = () => {
   const pagesExpectedToday = useMemo(() => {
     if (!activeIsPhysical || !activeBookPhysicalInfo || !dailyTargetWords) return null;
     // dailyTargetWords is in percent for physical books
-    // Convert percent to pages with better precision (use exact calculation, then round up)
-    const exactPages = (dailyTargetWords / 100) * activeBookPhysicalInfo.totalPages;
-    return Math.ceil(exactPages);
+    // Convert percent to pages (always round up)
+    return percentToPagesCeil(dailyTargetWords, activeBookPhysicalInfo.totalPages);
   }, [activeIsPhysical, activeBookPhysicalInfo, dailyTargetWords]);
 
   const dailyProgressPercent = useMemo(
     () => {
       // For physical books, calculate using pages directly for better precision
       if (activeIsPhysical && pagesReadToday != null && pagesExpectedToday != null && pagesExpectedToday > 0) {
-        // Calculate percent with better precision: avoid rounding intermediate values
-        const exactPercent = (pagesReadToday / pagesExpectedToday) * 100;
-        const result = Math.min(100, Math.round(exactPercent));
+        const result = calculateProgressPercent(pagesReadToday, pagesExpectedToday) ?? 0;
         console.log('[Index] 📊 Daily progress calculation (physical, pages-based):', {
           pagesReadToday,
           pagesExpectedToday,
-          exactPercent,
           dailyProgressPercent: result,
           baselineForToday,
           currentPage: activeBookPhysicalInfo?.currentPage,
           totalPages: activeBookPhysicalInfo?.totalPages,
-          baselinePage: activeBookPhysicalInfo ? Math.round((baselineForToday / 100) * activeBookPhysicalInfo.totalPages) : null
+          baselinePage: activeBookPhysicalInfo ? percentToPages(baselineForToday, activeBookPhysicalInfo.totalPages) : null
         });
         return result;
       }
@@ -931,12 +935,17 @@ const Index = () => {
       const startPercent = (() => { try { const raw = localStorage.getItem(`planStart:${activeBookId}`); const j = raw ? JSON.parse(raw) : null; return j?.startPercent ?? 0; } catch { return 0; } })();
       const denom = Math.max(1, 100 - startPercent);
       const num = Math.max(0, (p.percent || 0) - startPercent);
-      return Math.min(100, Math.round((num / denom) * 100));
+      return calculateRatioPercent(num, denom);
     }
     return computePlanProgressPercent(parts, wordsUpToCurrent, targetWords, planStart);
   }, [isPercentBased, parts, wordsUpToCurrent, targetWords, planStart, p.percent, activeBookId]);
 
-  const totalBookProgressPercent = useMemo(() => isPercentBased ? (p.percent || 0) : (parts ? Math.min(100, Math.round((wordsUpToCurrent / Math.max(1, totalWords)) * 100)) : null), [isPercentBased, parts, wordsUpToCurrent, totalWords, p.percent]);
+  const totalBookProgressPercent = useMemo(() => 
+    isPercentBased 
+      ? (p.percent || 0) 
+      : (parts ? calculateWordPercent(wordsUpToCurrent, totalWords) : null), 
+    [isPercentBased, parts, wordsUpToCurrent, totalWords, p.percent]
+  );
 
   // Current reading position labels
   const currentPartTitle = useMemo(() => {
@@ -970,7 +979,7 @@ const Index = () => {
   useEffect(() => {
     const isNative = canUseNative();
     if (!isNative) return;
-    const percent = Math.max(0, Math.min(100, Math.round(dailyProgressPercent || 0)));
+    const percent = Math.max(0, Math.min(100, dailyProgressPercent || 0));
     const hasGoal = dailyTargetWords != null && dailyTargetWords > 0;
     (async () => {
       try {

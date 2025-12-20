@@ -4,6 +4,7 @@ import { RxBookDocumentType, RxSettingsDocumentType, RxReadingPlanDocumentType, 
 import { authService } from '@/services/auth/SupabaseAuthService';
 import { replicationManager } from '@/lib/database/replication';
 import { ensureStaticBooks } from '@/lib/database/staticBooksInit';
+import { calculatePagePercent } from '@/lib/percentageUtils';
 
 class RxDBDataLayerImpl implements DataLayer {
     private static instance: RxDBDataLayerImpl;
@@ -195,7 +196,7 @@ class RxDBDataLayerImpl implements DataLayer {
         
         // Calculate NEW percentage for physical books
         const newPercentage = totalPages > 0 
-            ? Math.round((newPage / totalPages) * 100)
+            ? calculatePagePercent(newPage, totalPages)
             : oldPercentage;
 
         // Ensure baseline exists for today BEFORE updating progress

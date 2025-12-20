@@ -21,6 +21,7 @@ import { getDatabase } from "@/lib/database/db";
 import { BookSearchDialog } from "@/components/app/BookSearchDialog";
 import { Upload, Trash2, BookPlus, AlertCircle, X, Bookmark } from "lucide-react";
 import { BookCover } from "@/components/book/BookCover";
+import { calculateRatioPercent, calculatePagePercent } from "@/lib/percentageUtils";
 
 type Paragraph = { type: string; content: string };
 type Chapter = { chapter_title: string; content: Paragraph[] };
@@ -568,7 +569,7 @@ const Library = () => {
         const flat: Array<{ pi: number; ci: number }> = [];
         bookParts.forEach((part, pi) => part.chapters.forEach((_, ci) => flat.push({ pi, ci })));
         const idx = flat.findIndex((x) => x.pi === curPartIndex && x.ci === curChapterIndex);
-        const percent = idx >= 0 ? Math.round(((idx + 1) / flat.length) * 100) : 0;
+        const percent = idx >= 0 ? calculateRatioPercent(idx + 1, flat.length) : 0;
         setProgress(selectedBook, { partIndex: curPartIndex, chapterIndex: curChapterIndex, percent });
         // Compute baseline words up to current position
         let wordsUpToCurrent = 0;
@@ -599,7 +600,7 @@ const Library = () => {
         const flat: Array<{ pi: number; ci: number }> = [];
         bookParts.forEach((part, pi) => part.chapters.forEach((_, ci) => flat.push({ pi, ci })));
         const idx = flat.findIndex((x) => x.pi === curPartIndex && x.ci === curChapterIndex);
-        const percent = idx >= 0 ? Math.round(((idx + 1) / flat.length) * 100) : 0;
+        const percent = idx >= 0 ? calculateRatioPercent(idx + 1, flat.length) : 0;
         setProgress(selectedBook, { partIndex: curPartIndex, chapterIndex: curChapterIndex, percent });
         let wordsUpToCurrent = 0;
         bookParts.forEach((part, pi) => {
@@ -837,7 +838,7 @@ const Library = () => {
                     <span>Progresso</span>
                     <span className="flex gap-1">
                       <span className="font-medium text-foreground">
-                        {Math.round(((book.currentPage || 0) / book.totalPages) * 100)}%
+                        {calculatePagePercent(book.currentPage || 0, book.totalPages)}%
                       </span>
                       <span>
                         ({book.currentPage || 0} / {book.totalPages})
@@ -847,7 +848,7 @@ const Library = () => {
                   <div className="w-full bg-secondary rounded-full h-2">
                     <div
                       className="bg-primary h-2 rounded-full transition-all"
-                      style={{ width: `${Math.round(((book.currentPage || 0) / book.totalPages) * 100)}%` }}
+                      style={{ width: `${calculatePagePercent(book.currentPage || 0, book.totalPages)}%` }}
                     />
                   </div>
                 </div>
