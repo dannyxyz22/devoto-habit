@@ -63,6 +63,32 @@ const EpubReaderV3 = () => {
     console.log("[EpubReaderV3] Persisting to DB:", { cfi, percent });
     const todayISO = format(new Date(), 'yyyy-MM-dd');
 
+    // Get OLD percentage BEFORE updating (needed for baseline creation)
+    let oldPercentage = 0;
+    try {
+      const userEpub = await dataLayer.getUserEpub(epubId);
+      if (userEpub) {
+        oldPercentage = userEpub.percentage || 0;
+      } else {
+        const book = await dataLayer.getBook(epubId);
+        if (book) {
+          oldPercentage = book.percentage || 0;
+        }
+      }
+    } catch (error) {
+      console.warn("[EpubReaderV3] Failed to get old percentage:", error);
+    }
+
+    // Ensure baseline exists for today BEFORE updating progress
+    // (only create if missing, don't update existing)
+    const base = getDailyBaseline(epubId, todayISO);
+    if (!base && oldPercentage > 0) {
+      // Create baseline with the OLD progress (before this update) as starting point
+      // This ensures that today's progress is calculated correctly
+      await setDailyBaseline(epubId, todayISO, { words: 0, percent: oldPercentage });
+      console.log('[EpubReaderV3] 📏 Baseline created for today:', { epubId, todayISO, percent: oldPercentage });
+    }
+
     // Sincronizar com DataLayer (RxDB/Supabase)
     try {
       const userEpub = await dataLayer.getUserEpub(epubId);
@@ -107,11 +133,8 @@ const EpubReaderV3 = () => {
     }
 
     // Atualizar baseline e widgets (operações "leves")
-    const base = getDailyBaseline(epubId, todayISO);
-    const baselinePercent = base ? base.percent : percent;
-    if (!base && percent > 0) {
-      setDailyBaseline(epubId, todayISO, { words: 0, percent });
-    }
+    const updatedBase = getDailyBaseline(epubId, todayISO);
+    const baselinePercent = updatedBase ? updatedBase.percent : oldPercentage;
 
     const plan = getReadingPlan(epubId);
     if (plan) { // Calc apenas se tiver plano
