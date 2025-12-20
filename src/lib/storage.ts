@@ -210,17 +210,30 @@ export const getReadingPlan = (bookId: string): ReadingPlan =>
 
 export const setReadingPlan = async (bookId: string, targetDateISO: string | null, targetPartIndex?: number, targetChapterIndex?: number) => {
   try {
-    await dataLayer.saveReadingPlan({
-      book_id: bookId,
-      target_date_iso: targetDateISO ?? undefined,
-      target_part_index: targetPartIndex,
-      target_chapter_index: targetChapterIndex,
-    });
-    console.log('[storage] 📅 Reading plan saved:', { bookId, targetDateISO });
+    // If targetDateISO is null or empty string, delete the plan instead of saving
+    if (targetDateISO === null || targetDateISO === '' || (typeof targetDateISO === 'string' && targetDateISO.trim() === '')) {
+      await dataLayer.deleteReadingPlan(bookId);
+      console.log('[storage] 📅 Reading plan deleted:', { bookId });
+      storage.set<ReadingPlan>(`plan:${bookId}`, { targetDateISO: null, targetPartIndex, targetChapterIndex });
+    } else {
+      // Validate date format (should be YYYY-MM-DD)
+      if (typeof targetDateISO === 'string' && !/^\d{4}-\d{2}-\d{2}$/.test(targetDateISO)) {
+        console.warn('[storage] Invalid date format:', targetDateISO);
+        throw new Error('Formato de data inválido. Use YYYY-MM-DD');
+      }
+      await dataLayer.saveReadingPlan({
+        book_id: bookId,
+        target_date_iso: targetDateISO,
+        target_part_index: targetPartIndex,
+        target_chapter_index: targetChapterIndex,
+      });
+      console.log('[storage] 📅 Reading plan saved:', { bookId, targetDateISO });
+      storage.set<ReadingPlan>(`plan:${bookId}`, { targetDateISO, targetPartIndex, targetChapterIndex });
+    }
   } catch (e) {
-    console.warn('[storage] Failed to save reading plan to RxDB:', e);
+    console.warn('[storage] Failed to save/delete reading plan to RxDB:', e);
+    throw e; // Re-throw to let UI handle the error
   }
-  storage.set<ReadingPlan>(`plan:${bookId}`, { targetDateISO, targetPartIndex, targetChapterIndex });
 };
 
 // Daily baseline per book - now uses RxDB

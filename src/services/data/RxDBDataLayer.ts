@@ -498,7 +498,15 @@ class RxDBDataLayerImpl implements DataLayer {
                 _modified: Math.max(Date.now(), (existingPlan.get('_modified') || 0) + 1)
             };
 
-            if (planData.target_date_iso !== undefined) updates.target_date_iso = planData.target_date_iso;
+            // Only update target_date_iso if it's a valid non-empty string
+            if (planData.target_date_iso !== undefined) {
+                if (planData.target_date_iso === null || planData.target_date_iso === '') {
+                    // If null or empty, don't update (or could set to null explicitly)
+                    // For now, we'll skip updating to preserve existing value
+                } else if (typeof planData.target_date_iso === 'string' && planData.target_date_iso.trim() !== '') {
+                    updates.target_date_iso = planData.target_date_iso;
+                }
+            }
             if (planData.target_part_index !== undefined) updates.target_part_index = planData.target_part_index;
             if (planData.target_chapter_index !== undefined) updates.target_chapter_index = planData.target_chapter_index;
             if (planData.start_part_index !== undefined) updates.start_part_index = planData.start_part_index;
@@ -535,14 +543,30 @@ class RxDBDataLayerImpl implements DataLayer {
         const db = await getDatabase();
         const userId = await this.getUserId();
 
+        // Try to find by composite ID first (user_id:book_id), then by book_id alone
         const compositeId = `${userId}:${bookId}`;
-        const plan = await db.reading_plans.findOne(compositeId).exec();
+        let plan = await db.reading_plans.findOne(compositeId).exec();
 
-        if (plan) {
+        if (!plan) {
+            // Fallback: search by book_id for local-user plans or plans from different users
+            const plans = await db.reading_plans.find({
+                selector: {
+                    book_id: bookId,
+                    _deleted: { $eq: false }
+                }
+            }).exec();
+            plan = plans[0] || null;
+        }
+
+        if (plan && !plan._deleted) {
             await plan.incrementalPatch({
                 _deleted: true,
                 _modified: Date.now()
             });
+            replicationManager.quickSync().catch(e => console.warn('[DataLayer] ⚠️ Quick sync failed:', e));
+            console.log('[DataLayer] 📅 Reading plan deleted:', { bookId, planId: plan.id });
+        } else {
+            console.log('[DataLayer] 📅 No plan found to delete:', { bookId, compositeId });
         }
     }
 

@@ -12,14 +12,14 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { setReadingPlan, getProgress, getReadingPlan, setDailyBaseline, setProgress, getDailyBaseline, setLastBookId, getLastBookIdAsync } from "@/lib/storage";
 import { toast } from "@/hooks/use-toast";
-import { formatISO } from "date-fns";
+import { formatISO, format, parseISO } from "date-fns";
 import { resolveEpubSource } from "@/lib/utils";
 import ePub from "epubjs";
 import { getCoverObjectUrl, saveCoverBlob } from "@/lib/coverCache";
 import { saveUserEpub, getUserEpubs, deleteUserEpub, reUploadEpub } from "@/lib/userEpubs";
 import { getDatabase } from "@/lib/database/db";
 import { BookSearchDialog } from "@/components/app/BookSearchDialog";
-import { Upload, Trash2, BookPlus, AlertCircle, X, Bookmark } from "lucide-react";
+import { Upload, Trash2, BookPlus, AlertCircle, X, Bookmark, Calendar } from "lucide-react";
 import { BookCover } from "@/components/book/BookCover";
 import { calculateRatioPercent, calculatePagePercent } from "@/lib/percentageUtils";
 
@@ -216,13 +216,34 @@ const Library = () => {
           selector: { _deleted: false }
         }).$;
 
-        subscription = combineLatest([books$, userEpubs$]).subscribe(async ([rxBooks, rxEpubs]) => {
+        const readingPlans$ = db.reading_plans.find({
+          selector: { _deleted: false }
+        }).$;
+
+        subscription = combineLatest([books$, userEpubs$, readingPlans$]).subscribe(async ([rxBooks, rxEpubs, rxPlans]) => {
           try {
+            // Build map of book_id -> target_date_iso from reading plans
+            // Only include plans that are not deleted and have a valid target_date_iso
+            const plansMap = new Map<string, string>();
+            rxPlans.forEach(plan => {
+              const planData = plan.toJSON();
+              const targetDateISO = planData.target_date_iso;
+              // Only include if not deleted, has a target_date_iso, and it's a valid non-empty string
+              if (!planData._deleted && targetDateISO && typeof targetDateISO === 'string' && targetDateISO.trim() !== '') {
+                // Validate the date format (should be YYYY-MM-DD)
+                if (/^\d{4}-\d{2}-\d{2}$/.test(targetDateISO)) {
+                  plansMap.set(planData.book_id, targetDateISO);
+                } else {
+                  console.warn('[Library] Invalid date format in plan:', { book_id: planData.book_id, target_date_iso: targetDateISO });
+                }
+              }
+            });
+
             // 1. Process User EPUBs
             const userEpubsLocal = await getUserEpubs();
             const localEpubHashes = new Set(userEpubsLocal.map(e => e.fileHash));
 
-            const userEpubBooks: BookMeta[] = rxEpubs.map(epub => {
+            const userEpubBooks: (BookMeta & { targetDateISO?: string | null })[] = rxEpubs.map(epub => {
               const epubData = epub.toJSON();
               const hasLocalFile = localEpubHashes.has(epubData.file_hash);
               const localEpub = userEpubsLocal.find(e => e.fileHash === epubData.file_hash);
@@ -239,12 +260,13 @@ const Library = () => {
                 addedDate: epubData.added_date,
                 fileHash: epubData.file_hash,
                 hasLocalFile,
-                percentage: epubData.percentage || 0
+                percentage: epubData.percentage || 0,
+                targetDateISO: plansMap.get(epubData.id) ?? null
               };
             });
 
             // 2. Process Physical Books from RxDB
-            const physicalBooksMeta: BookMeta[] = rxBooks
+            const physicalBooksMeta: (BookMeta & { targetDateISO?: string | null })[] = rxBooks
               .filter(b => b.type === 'physical')
               .map(b => {
                 const book = b.toJSON();
@@ -260,12 +282,13 @@ const Library = () => {
                   totalPages: book.total_pages || 0,
                   currentPage: book.current_page || 0,
                   addedDate: book.added_date || new Date(book._modified).getTime(),
-                  percentage: book.percentage || 0
+                  percentage: book.percentage || 0,
+                  targetDateISO: plansMap.get(book.id) ?? null
                 };
               });
 
             // 3. Process Static Books (merge with RxDB data)
-            const staticBooksMeta: BookMeta[] = BOOKS.map(staticBook => {
+            const staticBooksMeta: (BookMeta & { targetDateISO?: string | null })[] = BOOKS.map(staticBook => {
               // Check if we have synced data for this static book
               const syncedBook = rxBooks.find(b => b.id === staticBook.id);
               if (syncedBook) {
@@ -274,11 +297,15 @@ const Library = () => {
                   ...staticBook,
                   // Override with synced progress data
                   percentage: syncedData.percentage || 0,
+                  targetDateISO: plansMap.get(staticBook.id) ?? null
                   // Keep static metadata (cover, description, sourceUrl) from BOOKS
                   // unless we want to allow overrides from DB in future
                 };
               }
-              return staticBook;
+              return {
+                ...staticBook,
+                targetDateISO: plansMap.get(staticBook.id) ?? null
+              };
             });
 
             // 4. Merge
@@ -820,6 +847,61 @@ const Library = () => {
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground mb-4">{book.description}</p>
+
+              {/* Reading plan target date */}
+              {(() => {
+                const targetDateISO = (book as any).targetDateISO;
+                // Only show if targetDateISO is a valid non-empty string
+                if (targetDateISO && typeof targetDateISO === 'string' && targetDateISO.trim() !== '') {
+                  try {
+                    const targetDate = parseISO(targetDateISO);
+                    // Validate that the date is valid
+                    if (isNaN(targetDate.getTime())) {
+                      console.warn('[Library] Invalid date:', targetDateISO);
+                      return null;
+                    }
+                    return (
+                      <div className="mb-4 p-2 bg-muted/50 rounded-md flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                          <p className="text-sm font-medium text-muted-foreground">
+                            Meta de leitura: {format(targetDate, "dd/MM/yyyy")}
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            try {
+                              await setReadingPlan(book.id, null);
+                              toast({
+                                title: "Meta removida",
+                                description: "A meta de leitura foi removida com sucesso.",
+                              });
+                            } catch (error) {
+                              console.error('[Library] Error removing plan:', error);
+                              toast({
+                                title: "Erro ao remover meta",
+                                description: "Não foi possível remover a meta de leitura.",
+                                variant: "destructive",
+                              });
+                            }
+                          }}
+                          title="Remover meta de leitura"
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    );
+                  } catch (error) {
+                    console.warn('[Library] Error parsing date:', targetDateISO, error);
+                    return null;
+                  }
+                }
+                return null;
+              })()}
 
               {/* EPUB not available locally message */}
               {book.type === 'epub' && book.isUserUpload && !book.hasLocalFile && (
