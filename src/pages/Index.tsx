@@ -394,12 +394,17 @@ const Index = () => {
     const loadFromRxDB = async () => {
       try {
         const db = await getDatabase();
-        const doc = await db.reading_plans.findOne({
+        // Use find() with selector (same as subscription) to ensure consistency
+        const docs = await db.reading_plans.find({
           selector: { book_id: activeBookId, _deleted: false }
         }).exec();
-        if (doc) {
-          const plan = doc.toJSON();
-          console.log('[Index] 📅 loadFromRxDB - reading_plan found:', { book_id: activeBookId });
+        if (docs && docs.length > 0) {
+          const plan = docs[0].toJSON();
+          console.log('[Index] 📅 loadFromRxDB - reading_plan found:', { 
+            book_id: activeBookId,
+            targetDateISO: plan.target_date_iso,
+            plan
+          });
           setActivePlan({
             targetDateISO: plan.target_date_iso ?? null,
             targetPartIndex: plan.target_part_index,
@@ -407,6 +412,7 @@ const Index = () => {
           });
           return true;
         }
+        console.log('[Index] 📅 loadFromRxDB - reading_plan not found for:', { book_id: activeBookId });
         return false;
       } catch (err) {
         console.error('[Index] loadFromRxDB reading_plans failed:', err);
@@ -417,16 +423,27 @@ const Index = () => {
     const setupSubscription = async () => {
       try {
         const db = await getDatabase();
-        const sub = db.reading_plans.findOne({
+        // Use find() with selector to better detect new documents being created
+        // This works better than findOne() when a document doesn't exist yet
+        const sub = db.reading_plans.find({
           selector: { book_id: activeBookId, _deleted: false }
-        }).$.subscribe(doc => {
-          if (doc) {
-            const plan = doc.toJSON();
+        }).$.subscribe(docs => {
+          if (docs && docs.length > 0) {
+            const plan = docs[0].toJSON();
+            console.log('[Index] 📅 Reading plan subscription fired:', {
+              book_id: activeBookId,
+              plan,
+              targetDateISO: plan.target_date_iso
+            });
             setActivePlan({
               targetDateISO: plan.target_date_iso ?? null,
               targetPartIndex: plan.target_part_index,
               targetChapterIndex: plan.target_chapter_index
             });
+          } else {
+            // Document was deleted or doesn't exist - reset plan
+            console.log('[Index] 📅 Reading plan subscription: no doc found, resetting plan', { book_id: activeBookId });
+            setActivePlan({ targetDateISO: null });
           }
         });
         subscription = { unsubscribe: () => sub.unsubscribe() };
@@ -452,7 +469,7 @@ const Index = () => {
       subscription?.unsubscribe();
       window.removeEventListener('rxdb-initial-replication-complete', handleReplicationComplete);
     };
-  }, [activeBookId]);
+  }, [activeBookId, userId]);
 
   // Subscribe to daily_baselines for reactive baseline updates
   useEffect(() => {

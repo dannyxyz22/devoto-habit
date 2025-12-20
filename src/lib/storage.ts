@@ -216,6 +216,7 @@ export const setReadingPlan = async (bookId: string, targetDateISO: string | nul
       target_part_index: targetPartIndex,
       target_chapter_index: targetChapterIndex,
     });
+    console.log('[storage] 📅 Reading plan saved:', { bookId, targetDateISO });
   } catch (e) {
     console.warn('[storage] Failed to save reading plan to RxDB:', e);
   }
