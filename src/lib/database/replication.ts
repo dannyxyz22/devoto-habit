@@ -213,31 +213,29 @@ export class ReplicationManager {
 
             // Replicate Daily Baselines
 
-            //Comentei para facilitar o debug
-            //TODO: descomentar depois de testar
-            // const dailyBaselinesReplication = await replicateSupabase<RxDailyBaselineDocumentType>({
-            //     tableName: 'daily_baselines',
-            //     client: supabase,
-            //     collection: db.daily_baselines,
-            //     replicationIdentifier: 'daily-baselines-replication',
-            //     live: true,
-            //     pull: {
-            //         batchSize: 100,
-            //         modifier: (doc) => {
-            //             console.log('[Cloud Debug] ⬇️ Pulled Annual Baseline:', doc);
-            //             return doc;
-            //         }
-            //     },
-            //     push: {
-            //         batchSize: 100,
-            //         modifier: (doc) => {
-            //             const { created_at, updated_at, ...rest } = doc as any;
-            //             // Skip documents with local-user (pre-login data)
-            //             if (rest.user_id === 'local-user') return null;
-            //             return rest;
-            //         }
-            //     }
-            // });
+            const dailyBaselinesReplication = await replicateSupabase<RxDailyBaselineDocumentType>({
+                tableName: 'daily_baselines',
+                client: supabase,
+                collection: db.daily_baselines,
+                replicationIdentifier: 'daily-baselines-replication',
+                live: true,
+                pull: {
+                    batchSize: 100,
+                    modifier: (doc) => {
+                        console.log('[Cloud Debug] ⬇️ Pulled Annual Baseline:', doc);
+                        return doc;
+                    }
+                },
+                push: {
+                    batchSize: 100,
+                    modifier: (doc) => {
+                        const { created_at, updated_at, ...rest } = doc as any;
+                        // Skip documents with local-user (pre-login data)
+                        if (rest.user_id === 'local-user') return null;
+                        return rest;
+                    }
+                }
+            });
 
 
 
@@ -314,8 +312,8 @@ export class ReplicationManager {
                 } as any
             });
 
-            //this.replicationStates = [booksReplication, userEpubsReplication, settingsReplication, readingPlansReplication, dailyBaselinesReplication, userStatsReplication];
-            this.replicationStates = [userStatsReplication];
+            this.replicationStates = [booksReplication, userEpubsReplication, settingsReplication, readingPlansReplication, dailyBaselinesReplication, userStatsReplication];
+            //this.replicationStates = [userStatsReplication];
 
             // Validate all replication states were created successfully
             const invalidStates = this.replicationStates.filter(s => !s);

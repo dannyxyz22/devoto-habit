@@ -186,6 +186,10 @@ export type ReadingPlan = {
   targetDateISO: string | null;
   targetPartIndex?: number;
   targetChapterIndex?: number;
+  startPercent?: number;
+  startPartIndex?: number;
+  startChapterIndex?: number;
+  startWords?: number;
 };
 
 export const getReadingPlanAsync = async (bookId: string): Promise<ReadingPlan> => {
@@ -196,6 +200,10 @@ export const getReadingPlanAsync = async (bookId: string): Promise<ReadingPlan> 
         targetDateISO: plan.target_date_iso ?? null,
         targetPartIndex: plan.target_part_index,
         targetChapterIndex: plan.target_chapter_index,
+        startPercent: plan.start_percent,
+        startPartIndex: plan.start_part_index,
+        startChapterIndex: plan.start_chapter_index,
+        startWords: plan.start_words,
       };
     }
   } catch (e) {

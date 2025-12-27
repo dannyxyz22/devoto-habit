@@ -108,31 +108,31 @@ const Index = () => {
           selector: { id: activeBookId, _deleted: false }
         }).exec();
 
-          if (book) {
-            const data = book.toJSON();
-            let dbPercent = data.percentage || 0;
+        if (book) {
+          const data = book.toJSON();
+          let dbPercent = data.percentage || 0;
 
-            // FIX: For physical books, calculate percent from pages dynamically
-            // This ensures consistency with Library.tsx and updates reactively when current_page changes
-            if (data.type === 'physical' && data.total_pages && data.total_pages > 0) {
-              dbPercent = calculatePagePercent(data.current_page || 0, data.total_pages);
-              // Store physical book info
-              setActiveBookPhysicalInfo({
-                totalPages: data.total_pages,
-                currentPage: data.current_page || 0
-              });
-            } else {
-              setActiveBookPhysicalInfo(null);
-            }
-
-            console.log('[Index] 📚 loadFromRxDB - books found:', { id: activeBookId, percent: dbPercent, type: data.type });
-            setActiveBookProgress(prev => ({
-              partIndex: data.part_index || prev.partIndex,
-              chapterIndex: data.chapter_index || prev.chapterIndex,
-              percent: dbPercent // Trust DB
-            }));
-            return true;
+          // FIX: For physical books, calculate percent from pages dynamically
+          // This ensures consistency with Library.tsx and updates reactively when current_page changes
+          if (data.type === 'physical' && data.total_pages && data.total_pages > 0) {
+            dbPercent = calculatePagePercent(data.current_page || 0, data.total_pages);
+            // Store physical book info
+            setActiveBookPhysicalInfo({
+              totalPages: data.total_pages,
+              currentPage: data.current_page || 0
+            });
+          } else {
+            setActiveBookPhysicalInfo(null);
           }
+
+          console.log('[Index] 📚 loadFromRxDB - books found:', { id: activeBookId, percent: dbPercent, type: data.type });
+          setActiveBookProgress(prev => ({
+            partIndex: data.part_index || prev.partIndex,
+            chapterIndex: data.chapter_index || prev.chapterIndex,
+            percent: dbPercent // Trust DB
+          }));
+          return true;
+        }
 
         console.log('[Index] 📚 loadFromRxDB - no book found for:', activeBookId);
         return false;
@@ -400,7 +400,7 @@ const Index = () => {
         }).exec();
         if (docs && docs.length > 0) {
           const plan = docs[0].toJSON();
-          console.log('[Index] 📅 loadFromRxDB - reading_plan found:', { 
+          console.log('[Index] 📅 loadFromRxDB - reading_plan found:', {
             book_id: activeBookId,
             targetDateISO: plan.target_date_iso,
             plan
@@ -408,7 +408,11 @@ const Index = () => {
           setActivePlan({
             targetDateISO: plan.target_date_iso ?? null,
             targetPartIndex: plan.target_part_index,
-            targetChapterIndex: plan.target_chapter_index
+            targetChapterIndex: plan.target_chapter_index,
+            startPercent: plan.start_percent,
+            startPartIndex: plan.start_part_index,
+            startChapterIndex: plan.start_chapter_index,
+            startWords: plan.start_words,
           });
           return true;
         }
@@ -438,7 +442,11 @@ const Index = () => {
             setActivePlan({
               targetDateISO: plan.target_date_iso ?? null,
               targetPartIndex: plan.target_part_index,
-              targetChapterIndex: plan.target_chapter_index
+              targetChapterIndex: plan.target_chapter_index,
+              startPercent: plan.start_percent,
+              startPartIndex: plan.start_part_index,
+              startChapterIndex: plan.start_chapter_index,
+              startWords: plan.start_words,
             });
           } else {
             // Document was deleted or doesn't exist - reset plan
@@ -895,14 +903,14 @@ const Index = () => {
   // Calculate pages for physical books (must be before dailyProgressPercent)
   const pagesReadToday = useMemo(() => {
     if (!activeIsPhysical || !activeBookPhysicalInfo) return null;
-    
+
     // Get baseline percent (from subscription, localStorage, or current progress)
     const baselinePercent = baselineForToday;
-    
+
     // Calculate baseline page from baseline percent with better precision
     // Use round for more accurate conversion (baseline percent was likely calculated from a page)
     const baselinePage = Math.round((baselinePercent / 100) * activeBookPhysicalInfo.totalPages);
-    
+
     // Pages read today = current page - baseline page
     return Math.max(0, activeBookPhysicalInfo.currentPage - baselinePage);
   }, [activeIsPhysical, activeBookPhysicalInfo, baselineForToday]);
@@ -930,7 +938,7 @@ const Index = () => {
         });
         return result;
       }
-      
+
       // For EPUBs and other books, use the standard calculation
       const result = computeDailyProgressPercent(achievedWordsToday, dailyTargetWords);
       console.log('[Index] 📊 Daily progress calculation:', {
@@ -949,7 +957,11 @@ const Index = () => {
     if (isPercentBased) {
       // From plan start percent to 100% target
       const rawStart = planStart?.startWords != null ? planStart.startWords : null; // for type narrowing only
-      const startPercent = (() => { try { const raw = localStorage.getItem(`planStart:${activeBookId}`); const j = raw ? JSON.parse(raw) : null; return j?.startPercent ?? 0; } catch { return 0; } })();
+
+      let startPercent = plan?.startPercent;
+      if (startPercent == null) {
+        startPercent = (() => { try { const raw = localStorage.getItem(`planStart:${activeBookId}`); const j = raw ? JSON.parse(raw) : null; return j?.startPercent ?? 0; } catch { return 0; } })();
+      }
       const denom = Math.max(1, 100 - startPercent);
       const num = Math.max(0, (p.percent || 0) - startPercent);
       return calculateRatioPercent(num, denom);
@@ -957,10 +969,10 @@ const Index = () => {
     return computePlanProgressPercent(parts, wordsUpToCurrent, targetWords, planStart);
   }, [isPercentBased, parts, wordsUpToCurrent, targetWords, planStart, p.percent, activeBookId]);
 
-  const totalBookProgressPercent = useMemo(() => 
-    isPercentBased 
-      ? (p.percent || 0) 
-      : (parts ? calculateWordPercent(wordsUpToCurrent, totalWords) : null), 
+  const totalBookProgressPercent = useMemo(() =>
+    isPercentBased
+      ? (p.percent || 0)
+      : (parts ? calculateWordPercent(wordsUpToCurrent, totalWords) : null),
     [isPercentBased, parts, wordsUpToCurrent, totalWords, p.percent]
   );
 
