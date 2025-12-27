@@ -25,13 +25,23 @@ public class MainActivity extends BridgeActivity {
 
 		// Removido pedido de autorização de exact alarms (não mais necessário)
 
-		// Se iniciado por RefreshScheduler para refresh silencioso
+		// Se iniciado por RefreshScheduler ou Widget para refresh silencioso
 		if (getIntent() != null && getIntent().getBooleanExtra("devota_force_refresh", false)) {
+			Log.d("MainActivity", "Iniciado para refresh silencioso (widget/replication)");
 			// Post para garantir que o WebView já inicializou
 			getWindow().getDecorView().postDelayed(() -> {
 				try {
+					Log.d("MainActivity", "Executando devotaDailyRefresh via JavaScript");
 					this.getBridge().getWebView().evaluateJavascript("window.devotaDailyRefresh && window.devotaDailyRefresh()", null);
-				} catch (Throwable ignored) {}
+					// Fecha a Activity após um delay para dar tempo do JavaScript executar
+					getWindow().getDecorView().postDelayed(() -> {
+						Log.d("MainActivity", "Fechando Activity após refresh silencioso");
+						finish();
+					}, 2000); // 2 segundos devem ser suficientes para o refresh
+				} catch (Throwable t) {
+					Log.e("MainActivity", "Erro ao executar refresh silencioso", t);
+					finish();
+				}
 			}, 600);
 		}
 	}

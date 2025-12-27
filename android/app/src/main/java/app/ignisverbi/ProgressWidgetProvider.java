@@ -20,6 +20,9 @@ public class ProgressWidgetProvider extends AppWidgetProvider {
   // Único arquivo oficial após refactor
   private static final String PREF_FILE = "CapacitorStorage";
   private static final String KEY = "widget:dailyProgress";   // JSON string { percent, hasGoal, ts, day }
+  private static final String LAST_REFRESH_ATTEMPT_KEY = "widget:lastRefreshAttempt"; // timestamp da última tentativa de refresh
+  private static final long MIN_REFRESH_INTERVAL_MS = 5 * 60 * 1000; // 5 minutos entre tentativas de refresh
+  private static final long DATA_STALE_THRESHOLD_MS = 60 * 60 * 1000; // 1 hora - considera dados antigos
 
   @Override
   public void onUpdate(Context context, AppWidgetManager appWidgetManager, int[] appWidgetIds) {
@@ -61,16 +64,17 @@ public class ProgressWidgetProvider extends AppWidgetProvider {
         }
     }
 
-  // We'll adjust layout after knowing if there's a goal or not
-
     int percent = 0;
     boolean hasGoal = false;
+    boolean needsRefresh = false;
     try {
       SharedPreferences prefs = context.getSharedPreferences(PREF_FILE, Context.MODE_PRIVATE);
       String json = prefs.getString(KEY, null);
       String today = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(new java.util.Date());
       boolean stale = false;
       boolean prevHasGoal = false;
+      long dataTimestamp = 0;
+      
       if (json != null) {
         try {
           JSONObject obj = new JSONObject(json);
@@ -78,10 +82,52 @@ public class ProgressWidgetProvider extends AppWidgetProvider {
           hasGoal = obj.optBoolean("hasGoal", false);
           prevHasGoal = hasGoal;
           String day = obj.optString("day", null);
-          if (day == null || !today.equals(day)) stale = true;
-        } catch (Throwable ignored) { stale = true; }
+          dataTimestamp = obj.optLong("ts", 0);
+          
+          // Verifica se os dados são de hoje
+          if (day == null || !today.equals(day)) {
+            stale = true;
+            needsRefresh = true;
+            Log.d("ProgressWidgetProvider", "Dados de dia diferente detectados (dia: " + day + ", hoje: " + today + ")");
+          } else {
+            // Se são de hoje, verifica se são muito antigos
+            long now = System.currentTimeMillis();
+            long dataAge = now - dataTimestamp;
+            if (dataAge > DATA_STALE_THRESHOLD_MS) {
+              needsRefresh = true;
+              Log.d("ProgressWidgetProvider", "Dados antigos detectados (idade: " + (dataAge / 60000) + " min), solicitando refresh");
+            }
+          }
+        } catch (Throwable ignored) { 
+          stale = true;
+          needsRefresh = true;
+        }
       } else {
         stale = true; // sem payload -> considerar desatualizado
+        needsRefresh = true;
+      }
+
+      // Se precisa refresh e passou tempo suficiente desde a última tentativa
+      if (needsRefresh) {
+        long lastAttempt = prefs.getLong(LAST_REFRESH_ATTEMPT_KEY, 0);
+        long now = System.currentTimeMillis();
+        if (now - lastAttempt > MIN_REFRESH_INTERVAL_MS) {
+          // Marca que tentaremos refresh
+          prefs.edit().putLong(LAST_REFRESH_ATTEMPT_KEY, now).apply();
+          
+          // Inicia a MainActivity em modo headless para recalcular
+          try {
+            Intent refreshIntent = new Intent(context, MainActivity.class);
+            refreshIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_NO_ANIMATION);
+            refreshIntent.putExtra("devota_force_refresh", true);
+            context.startActivity(refreshIntent);
+            Log.d("ProgressWidgetProvider", "Widget iniciou MainActivity para refresh de dados (widget renderizado)");
+          } catch (Throwable t) {
+            Log.e("ProgressWidgetProvider", "Falha ao iniciar MainActivity para refresh", t);
+          }
+        } else {
+          Log.d("ProgressWidgetProvider", "Refresh recente detectado, pulando nova tentativa (última: " + ((now - lastAttempt) / 1000) + "s atrás)");
+        }
       }
 
       if (stale) {
