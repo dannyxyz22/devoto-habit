@@ -40,11 +40,11 @@ describe('EPUB daily goal (percent-based)', () => {
     setNow(today);
 
     const daysRemaining = computeDaysRemaining(formatISO(addDays(today, 1), { representation: 'date' })); // include today
-    const dailyTarget = computeEpubDailyTargetPercent(base, daysRemaining); // ceil((100-70)/2) = ceil(30/2) = 15
+    const dailyTarget = computeEpubDailyTargetPercent(base, daysRemaining); // (100-70)/2 = 30/2 = 15
     expect(dailyTarget).toBe(15);
 
     const achieved = computeEpubAchievedPercentToday(current, base); // 25
-    const p = computeDailyProgressPercent(achieved, dailyTarget); // min(100, round(25/15*100)) = 100
+    const p = computeDailyProgressPercent(achieved, dailyTarget); // min(100, round(25/15*100)) = round(166.6...) = 100
     expect(p).toBe(100);
   });
 

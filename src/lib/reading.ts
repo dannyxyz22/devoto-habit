@@ -128,7 +128,7 @@ export const computeEpubDailyTargetPercent = (
   daysRemaining: number | null
 ): number | null => {
   if (baselinePercent == null || daysRemaining == null) return null;
-  return Math.ceil(Math.max(0, 100 - baselinePercent) / daysRemaining);
+  return Math.max(0, 100 - baselinePercent) / daysRemaining;
 };
 
 export const computeEpubAchievedPercentToday = (

@@ -955,7 +955,7 @@ const Index = () => {
   // EPUB/Physical daily target uses percentage instead of words
   const dailyTargetWords = useMemo(
     () => isPercentBased
-      ? (daysRemaining ? Math.ceil(Math.max(0, 100 - (baselineForToday || 0)) / daysRemaining) : null)
+      ? (daysRemaining ? Math.max(0, 100 - (baselineForToday || 0)) / daysRemaining : null)
       : computeDailyTargetWords(targetWords, baselineForToday, daysRemaining),
     [isPercentBased, targetWords, baselineForToday, daysRemaining]
   );
