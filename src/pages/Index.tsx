@@ -1084,6 +1084,12 @@ const Index = () => {
                       : `${achievedWordsToday}/${dailyTargetWords} palavras`
                 }
               </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Marco inicial de hoje:{' '}
+                {activeIsPhysical && activeBookPhysicalInfo
+                  ? `Página ${baselineEntryForToday?.page ?? 0} de ${activeBookPhysicalInfo.totalPages} do livro`
+                  : `${(baselineEntryForToday?.percent ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} % do livro`}
+              </p>
             </>
           ) : (
             <p className="text-muted-foreground">Se tiver uma meta, mostraremos seu progresso diário aqui.</p>
