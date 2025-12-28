@@ -1066,6 +1066,18 @@ const Index = () => {
           ) : (
             <p className="text-muted-foreground">Defina uma meta e acompanhe seu avanço.</p>
           )}
+          {/* Debug Info */}
+          <details className="mt-2">
+            <summary className="text-xs text-muted-foreground cursor-pointer select-none">Debug Info</summary>
+            <div className="mt-2 p-2 bg-muted rounded text-xs grid gap-1 font-mono break-all">
+              <p>Target Date: {plan?.targetDateISO || 'null'}</p>
+              <p>Start Percent: {plan?.startPercent ?? 'undefined'}</p>
+              <p>Current Percent: {p?.percent ?? 0}</p>
+              <p>Days Remaining: {daysRemaining ?? 'null'}</p>
+              <p>Baseline Today: {baselineForToday ?? 'null'}</p>
+              <p>Local Start: {(() => { try { const raw = localStorage.getItem(`planStart:${activeBookId}`); return raw || 'null'; } catch { return 'err'; } })()}</p>
+            </div>
+          </details>
         </div>
 
         {/* Livro ativo */}

@@ -40,6 +40,7 @@ class RxDBDataLayerImpl implements DataLayer {
                     await ensureStaticBooks(db, session.user.id);
                     // Reconcile user_epubs to ensure missing rows are upserted before replication
                     await replicationManager.reconcileUserEpubs();
+                    await replicationManager.reconcileReadingPlans();
                     await replicationManager.startReplication();
 
                     this.lastMigratedUserId = session.user.id;
@@ -190,12 +191,12 @@ class RxDBDataLayerImpl implements DataLayer {
 
         const currentVersion = book.get('progress_version') ?? 0;
         const totalPages = book.get('total_pages') || 0;
-        
+
         // Get OLD percentage BEFORE updating (needed for baseline creation)
         const oldPercentage = book.get('percentage') || 0;
-        
+
         // Calculate NEW percentage for physical books
-        const newPercentage = totalPages > 0 
+        const newPercentage = totalPages > 0
             ? calculatePagePercent(newPage, totalPages)
             : oldPercentage;
 
@@ -205,7 +206,7 @@ class RxDBDataLayerImpl implements DataLayer {
         const userId = await this.getUserId();
         const baselineId = `${userId}:${bookId}:${todayISO}`;
         const existingBaseline = await db.daily_baselines.findOne(baselineId).exec();
-        
+
         if (!existingBaseline) {
             // Create baseline with the OLD progress (before this update) as starting point
             // This ensures that today's progress is calculated correctly

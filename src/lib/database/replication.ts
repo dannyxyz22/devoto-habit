@@ -857,7 +857,7 @@ export class ReplicationManager {
             // Check which ones already exist on server
             const { data: serverPlans, error: fetchErr } = await supabase
                 .from('reading_plans')
-                .select('id')
+                .select('id, start_percent, start_part_index, start_chapter_index, start_words, target_date_iso, _modified')
                 .eq('user_id', userId)
                 .in('id', localIds);
 
@@ -866,17 +866,89 @@ export class ReplicationManager {
                 return;
             }
 
-            const serverIds = new Set((serverPlans || []).map(p => p.id));
-            const newDocs = localJsons.filter(j => !serverIds.has(j.id));
+            const serverMap = new Map((serverPlans || []).map(p => [p.id, p]));
+            const newDocs: any[] = [];
+            const updateDocs: any[] = [];
 
-            if (newDocs.length === 0) {
+            for (const localJson of localJsons) {
+                const serverPlan = serverMap.get(localJson.id);
+
+                // Get legacy start data from localStorage if missing in RxDB
+                let localStartPercent = localJson.start_percent;
+                let localStartPart = localJson.start_part_index;
+                let localStartChapter = localJson.start_chapter_index;
+                let localStartWords = localJson.start_words;
+
+                if (localStartPercent === undefined) {
+                    try {
+                        const raw = localStorage.getItem(`planStart:${localJson.book_id}`);
+                        if (raw) {
+                            const parsed = JSON.parse(raw);
+                            localStartPercent = parsed.startPercent;
+                            localStartPart = parsed.startPartIndex;
+                            localStartChapter = parsed.startChapterIndex;
+                            localStartWords = parsed.startWords;
+                            console.log(`[Reading Plans Reconciliation] Found legacy local data for ${localJson.book_id}:`, parsed);
+                        }
+                    } catch (e) {
+                        // ignore parse error
+                    }
+                }
+
+                if (!serverPlan) {
+                    // New plan, add to insert list (enriching with local storage data if needed)
+                    newDocs.push({
+                        ...localJson,
+                        start_percent: localStartPercent,
+                        start_part_index: localStartPart,
+                        start_chapter_index: localStartChapter,
+                        start_words: localStartWords
+                    });
+                } else {
+                    // Check if server is missing start data that we have locally (in RxDB or localStorage)
+                    // AND check timestamp to respect latest target_date
+                    const serverMissingStart = serverPlan.start_percent === null && localStartPercent !== undefined;
+
+                    if (serverMissingStart) {
+                        console.log(`[Reading Plans Reconciliation] enhancing server plan ${localJson.id} with local start data`);
+
+                        // Timestamp check: if local is newer (or equal), use local date. If server is strictly newer, use server date.
+                        // _modified can be number or string? strict comparison usually safer if types known. 
+                        // Assuming numbers from previous code context, but handling potential nulls.
+                        const serverMod = serverPlan._modified || 0;
+                        const localMod = localJson._modified || 0;
+
+                        // If server is newer, we want to KEEP server's date but PATCH the start stats.
+                        // If local is newer, we overwrite everything (which upsert does by default for the fields we provide).
+                        const useServerDate = serverMod > localMod;
+                        const targetDate = useServerDate ? serverPlan.target_date_iso : localJson.target_date_iso;
+
+                        updateDocs.push({
+                            ...localJson,
+                            user_id: userId,
+                            // Patch start data
+                            start_percent: localStartPercent,
+                            start_part_index: localStartPart,
+                            start_chapter_index: localStartChapter,
+                            start_words: localStartWords,
+                            // Respect strict timestamp for target date
+                            target_date_iso: targetDate,
+
+                            created_at: undefined,
+                            updated_at: undefined
+                        });
+                    }
+                }
+            }
+
+            if (newDocs.length === 0 && updateDocs.length === 0) {
                 console.log('[Reading Plans Reconciliation] All plans already synced');
                 return;
             }
 
-            console.log(`[Reading Plans Reconciliation] Upserting ${newDocs.length} plans...`);
+            console.log(`[Reading Plans Reconciliation] Upserting ${newDocs.length} new plans and updating ${updateDocs.length} existing...`);
 
-            const upsertPayload = newDocs.map(j => ({
+            const upsertPayload = [...newDocs, ...updateDocs].map(j => ({
                 ...j,
                 user_id: userId,
                 created_at: undefined,
