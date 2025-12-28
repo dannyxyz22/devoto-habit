@@ -158,13 +158,14 @@ export class ReplicationManager {
                 pull: {
                     batchSize: 50,
                     modifier: (doc) => {
-                        console.log('[Cloud Debug] ⬇️ Pulled User Epub:', doc);
+                        console.log('[Pull User Epubs] ⬇️ Received from cloud:', { id: doc.id, title: doc.title, user_id: doc.user_id });
                         // Map nullable fields - cover_url is handled by Cache Storage in UI
                         if (!doc.author) delete doc.author;
                         if (!doc.file_size) delete doc.file_size;
                         if (!doc.cover_url) delete doc.cover_url;
                         if (!doc.percentage) delete doc.percentage;
                         if (!doc.last_location_cfi) delete doc.last_location_cfi;
+                        console.log('[Pull User Epubs] ✓ Processed, will insert to RxDB');
                         return doc;
                     }
                 },
@@ -350,9 +351,30 @@ export class ReplicationManager {
             this.replicationStates.forEach((state, index) => {
                 const names = ['Books', 'User EPUBs', 'Settings', 'Reading Plans', 'Daily Baselines', 'User Stats'];
                 const name = names[index];
+
+                // Error handler
                 (state as any).error$.subscribe((err: any) => {
-                    console.error(`[${name} Replication] Error:`, err);
+                    console.error(`[${name} Replication] ❌ Error:`, err);
                 });
+
+                // For User EPUBs, add more detailed logging
+                if (index === 1) {
+                    console.log(`[${name}] Setting up detailed logging...`);
+
+                    // Listen to received$ to see what comes from server
+                    if ((state as any).received$) {
+                        (state as any).received$.subscribe((doc: any) => {
+                            console.log(`[${name}] 📥 Received document:`, doc);
+                        });
+                    }
+
+                    // Listen to sent$ to see what goes to server
+                    if ((state as any).sent$) {
+                        (state as any).sent$.subscribe((doc: any) => {
+                            console.log(`[${name}] 📤 Sent document:`, doc);
+                        });
+                    }
+                }
             });
 
 
@@ -367,32 +389,24 @@ export class ReplicationManager {
             // Store handle so it can be cleared on stopReplication if needed.
             (this as any)._pollHandle = pollHandle;*/
 
-            // Wait for initial sync
-            try {
-                const names = ['Books', 'User EPUBs', 'Settings', 'Reading Plans', 'Daily Baselines', 'User Stats'];
-                await Promise.race([
-                    Promise.all(this.replicationStates.map(async (s, i) => {
-                        try {
-                            await s.awaitInitialReplication();
-                            console.log(`ReplicationManager: ${names[i]} initial sync complete ✓`);
-                        } catch (err) {
-                            console.warn(`ReplicationManager: ${names[i]} initial sync failed or partial:`, err);
-                        }
-                    })),
-                    new Promise((_, reject) => setTimeout(() => reject(new Error('Replication timeout')), 30000))
-                ]);
-                console.log('ReplicationManager: Initial replication attempt finished ✓');
-            } catch (err) {
-                if ((err as Error).message === 'Replication timeout') {
-                    console.warn('ReplicationManager: Replication timeout (continuing anyway)');
-                } else {
-                    console.error('ReplicationManager: Initial replication failed:', err);
-                }
-            } finally {
-                // Dispatch a global event to notify listeners that replication is complete (or at least attempted)
-                window.dispatchEvent(new CustomEvent('rxdb-initial-replication-complete'));
-                console.log('ReplicationManager: Dispatched rxdb-initial-replication-complete event');
-            }
+            // Give replications time to start pulling data
+            // awaitInitialReplication() hangs when collections are empty or there are RLS issues
+            console.log('ReplicationManager: Waiting 3s for replications to start...');
+            await new Promise(resolve => setTimeout(resolve, 3000));
+
+            // Log replication states for debugging
+            const names = ['Books', 'User EPUBs', 'Settings', 'Reading Plans', 'Daily Baselines', 'User Stats'];
+            this.replicationStates.forEach((state, i) => {
+                console.log(`[${names[i]}] Replication state:`, {
+                    active: (state as any).active,
+                    canceled: (state as any).canceled,
+                    isStopped: (state as any).isStopped
+                });
+            });
+
+            // Dispatch event to allow UI to proceed
+            window.dispatchEvent(new CustomEvent('rxdb-initial-replication-complete'));
+            console.log('ReplicationManager: Dispatched rxdb-initial-replication-complete event');
 
             // Log final sync count
             const totalBooks = await db.books.count().exec();
