@@ -19,6 +19,9 @@ const config: CapacitorConfig = {
       // It is NOT the Android Client ID.
       serverClientId: '1044245386938-17oqsb47cec4had8ptou6mfosmnfes92.apps.googleusercontent.com',
       forceCodeForRefreshToken: true,
+    },
+    StatusBar: {
+      overlay: true,
     }
   }
 };

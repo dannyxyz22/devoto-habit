@@ -18,6 +18,7 @@ import NotFound from "./pages/NotFound";
 import { ThemeProvider } from "next-themes";
 import { Capacitor } from "@capacitor/core";
 import { App as CapacitorApp } from "@capacitor/app";
+import { StatusBarManager } from "@/components/app/StatusBarManager";
 
 const App = () => {
   // Initialize PWA functionality
@@ -50,7 +51,7 @@ const App = () => {
     });
 
     return () => {
-      listener?.remove();
+      listener.then(h => h.remove());
     };
   }, [isNative]);
 
@@ -59,6 +60,7 @@ const App = () => {
       <Toaster />
       <Sonner />
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <StatusBarManager />
         <BrowserRouter basename={baseName}>
           <AuthCallbackHandler />
           <Routes>
