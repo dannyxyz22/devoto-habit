@@ -2,15 +2,15 @@ import { createRxDatabase, RxDatabase, RxCollection, addRxPlugin } from 'rxdb';
 import { getRxStorageDexie } from 'rxdb/plugins/storage-dexie';
 import { RxDBMigrationSchemaPlugin } from 'rxdb/plugins/migration-schema';
 import { RxDBUpdatePlugin } from 'rxdb/plugins/update';
-import { 
-    bookSchema, 
-    settingsSchema, 
-    userEpubSchema, 
+import {
+    bookSchema,
+    settingsSchema,
+    userEpubSchema,
     readingPlanSchema,
     dailyBaselineSchema,
     userStatsSchema,
-    RxBookDocumentType, 
-    RxSettingsDocumentType, 
+    RxBookDocumentType,
+    RxSettingsDocumentType,
     RxUserEpubDocumentType,
     RxReadingPlanDocumentType,
     RxDailyBaselineDocumentType,
@@ -86,7 +86,12 @@ const _createDatabase = async (): Promise<DevotoDatabase> => {
             schema: readingPlanSchema
         },
         daily_baselines: {
-            schema: dailyBaselineSchema
+            schema: dailyBaselineSchema,
+            migrationStrategies: {
+                1: function (oldDoc: any) {
+                    return oldDoc;
+                }
+            }
         },
         user_stats: {
             schema: userStatsSchema
@@ -94,15 +99,15 @@ const _createDatabase = async (): Promise<DevotoDatabase> => {
     });
 
     db.user_stats.preInsert((data, instance) => {
-  console.log('[HOOK] preInsert user_stats', data);
-  console.trace('[HOOK] preInsert user_stats trace');
-  return data;
-}, false);
-db.user_stats.preSave((data, instance) => {
-  console.log('[HOOK] preSave user_stats', data);
-console.trace('[HOOK] preSave user_stats trace');
-  return data;
-}, false);
+        console.log('[HOOK] preInsert user_stats', data);
+        console.trace('[HOOK] preInsert user_stats trace');
+        return data;
+    }, false);
+    db.user_stats.preSave((data, instance) => {
+        console.log('[HOOK] preSave user_stats', data);
+        console.trace('[HOOK] preSave user_stats trace');
+        return data;
+    }, false);
 
     console.log('DatabaseService: Database created');
 

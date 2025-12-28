@@ -930,7 +930,7 @@ const Library = () => {
                   <div className="w-full bg-secondary rounded-full h-2">
                     <div
                       className="bg-primary h-2 rounded-full transition-all"
-                      style={{ width: `${calculatePagePercent(book.currentPage || 0, book.totalPages)}%` }}
+                      style={{ width: `${calculatePagePercent(book.currentPage || 0, book.totalPages, { round: false })}%` }}
                     />
                   </div>
                 </div>

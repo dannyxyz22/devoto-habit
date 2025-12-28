@@ -600,6 +600,7 @@ class RxDBDataLayerImpl implements DataLayer {
 
             if (baselineData.words !== undefined) updates.words = baselineData.words;
             if (baselineData.percent !== undefined) updates.percent = baselineData.percent;
+            if (baselineData.page !== undefined) updates.page = baselineData.page;
 
             await existingBaseline.incrementalPatch(updates);
             replicationManager.quickSync().catch(e => console.warn('[DataLayer] ⚠️ Quick sync failed:', e));
@@ -612,6 +613,7 @@ class RxDBDataLayerImpl implements DataLayer {
                 date_iso: dateISO,
                 words: baselineData.words ?? 0,
                 percent: baselineData.percent ?? 0,
+                page: baselineData.page,
                 _modified: Date.now(),
                 _deleted: false
             } as RxDailyBaselineDocumentType;

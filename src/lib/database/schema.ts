@@ -228,7 +228,7 @@ export const readingPlanSchema: RxJsonSchema<RxReadingPlanDocumentType> = readin
 
 // Daily Baselines Schema
 export const dailyBaselineSchemaLiteral = {
-    version: 0,
+    version: 1,
     primaryKey: 'id',
     type: 'object',
     properties: {
@@ -251,6 +251,9 @@ export const dailyBaselineSchemaLiteral = {
             type: 'number'
         },
         percent: {
+            type: 'number'
+        },
+        page: {
             type: 'number'
         },
         _modified: {

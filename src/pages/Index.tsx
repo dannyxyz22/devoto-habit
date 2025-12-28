@@ -15,7 +15,7 @@ import { dataLayer } from "@/services/data/RxDBDataLayer";
 import { getDatabase } from "@/lib/database/db";
 import { differenceInCalendarDays, formatISO, parseISO, format } from "date-fns";
 import { useTodayISO } from "@/hooks/use-today";
-import { getStreak, getReadingPlan, getProgress, getDailyBaseline, setDailyBaseline, getStats, getLastBookIdAsync, setLastBookId, type Streak, type ReadingPlan } from "@/lib/storage";
+import { getStreak, getReadingPlan, getProgress, getDailyBaseline, setDailyBaseline, getStats, getLastBookIdAsync, setLastBookId, type Streak, type ReadingPlan, type BaselineEntry } from "@/lib/storage";
 import {
   type Part,
   computeTotalWords,
@@ -60,7 +60,7 @@ const Index = () => {
 
   // Reactive baseline from RxDB subscription
   const todayISO = useTodayISO();
-  const [activeBaseline, setActiveBaseline] = useState<{ words: number; percent: number } | null>(null);
+  const [activeBaseline, setActiveBaseline] = useState<BaselineEntry | null>(null);
 
   // Physical book info for page calculations
   const [activeBookPhysicalInfo, setActiveBookPhysicalInfo] = useState<{ totalPages: number; currentPage: number } | null>(null);
@@ -115,8 +115,9 @@ const Index = () => {
 
           // FIX: For physical books, calculate percent from pages dynamically
           // This ensures consistency with Library.tsx and updates reactively when current_page changes
+          // Use round: false to keep precision and prevent prematurely rounding 1 page to 0% difference
           if (data.type === 'physical' && data.total_pages && data.total_pages > 0) {
-            dbPercent = calculatePagePercent(data.current_page || 0, data.total_pages);
+            dbPercent = calculatePagePercent(data.current_page || 0, data.total_pages, { round: false });
             // Store physical book info
             setActiveBookPhysicalInfo({
               totalPages: data.total_pages,
@@ -174,7 +175,7 @@ const Index = () => {
             // FIX: For physical books, calculate percent from pages dynamically
             // But prefer the stored percentage if it exists (it's more accurate)
             if (data.type === 'physical' && data.total_pages && data.total_pages > 0) {
-              const calculatedPercent = calculatePagePercent(data.current_page || 0, data.total_pages);
+              const calculatedPercent = calculatePagePercent(data.current_page || 0, data.total_pages, { round: false });
               // Use stored percentage if available, otherwise calculate
               dbPercent = data.percentage != null ? data.percentage : calculatedPercent;
             }
@@ -844,26 +845,30 @@ const Index = () => {
 
   const remainingWords = Math.max(0, targetWords - wordsUpToCurrent);
   // Note: todayISO is defined at the top of the component
+
+  // Get full baseline entry (words + percent) to access exact page count for physical books
+  const baselineEntryForToday = useMemo(() => {
+    if (!activeBookId) return null;
+    // 1. Reactive from RxDB
+    if (activeBaseline) return activeBaseline;
+    // 2. LocalStorage fallback
+    return getDailyBaseline(activeBookId, todayISO);
+  }, [activeBookId, activeBaseline, todayISO]);
+
   // Use reactive baseline from RxDB subscription, with fallback
   const baselineForToday = useMemo(() => {
     if (!activeBookId) return isPercentBased ? (p.percent || 0) : wordsUpToCurrent;
-    // Use reactive baseline from subscription
-    if (activeBaseline) {
-      const result = isPercentBased ? activeBaseline.percent : activeBaseline.words;
-      console.log('[Index] 📏 baselineForToday: using activeBaseline', { activeBaseline, result, isPercentBased });
+
+    if (baselineEntryForToday) {
+      const result = isPercentBased ? baselineEntryForToday.percent : baselineEntryForToday.words;
+      console.log('[Index] 📏 baselineForToday: using entry', { baselineEntryForToday, result, isPercentBased });
       return result;
     }
-    // Fallback to localStorage
-    const base = getDailyBaseline(activeBookId, todayISO);
-    if (base) {
-      const result = isPercentBased ? base.percent : base.words;
-      console.log('[Index] 📏 baselineForToday: using localStorage', { base, result, isPercentBased });
-      return result;
-    }
+
     const fallback = isPercentBased ? (p.percent || 0) : wordsUpToCurrent;
     console.log('[Index] 📏 baselineForToday: using fallback (current progress)', { fallback, p: p.percent, isPercentBased });
     return fallback;
-  }, [activeBookId, isPercentBased, todayISO, wordsUpToCurrent, p.percent, activeBaseline]);
+  }, [activeBookId, isPercentBased, wordsUpToCurrent, p.percent, baselineEntryForToday]);
 
   // Persist baseline if missing, with guards and logs
   useEffect(() => {
@@ -873,6 +878,13 @@ const Index = () => {
       try { console.log('[Baseline] existente', { scope: 'Index', bookId: activeBookId, todayISO, base }); } catch { }
       return;
     }
+
+    // GUARD: For physical books, wait for page info to ensure precision
+    if (activeIsPhysical && !activeBookPhysicalInfo) {
+      try { console.log('[Baseline] waiting for physical info', { scope: 'Index', bookId: activeBookId }); } catch { }
+      return;
+    }
+
     const hasProgress = isPercentBased ? ((p?.percent ?? 0) > 0) : (wordsUpToCurrent > 0);
     if (!parts && !isPercentBased) {
       try { console.log('[Baseline] skip persist: parts não carregadas', { scope: 'Index', bookId: activeBookId, todayISO, wordsUpToCurrent, p, isPercentBased }); } catch { }
@@ -884,9 +896,18 @@ const Index = () => {
     }
     // Use consistent percent: EPUB/Physical uses p.percent; non-EPUB uses words-based totalBookProgressPercent
     const baselinePercent = isPercentBased ? (p.percent || 0) : (parts ? calculateWordPercent(wordsUpToCurrent, totalWords, { round: false }) : 0);
-    setDailyBaseline(activeBookId, todayISO, { words: wordsUpToCurrent, percent: baselinePercent });
-    try { console.log('[Baseline] persistida', { scope: 'Index', bookId: activeBookId, todayISO, words: wordsUpToCurrent, percent: baselinePercent, isPercentBased }); } catch { }
-  }, [activeBookId, todayISO, parts, isPercentBased, wordsUpToCurrent, p.percent, totalWords]);
+
+    // For physical books, use specific 'page' field.
+    // For others, store wordsUpToCurrent in 'words'.
+    // Avoid overloading 'words' with page numbers.
+    const baselineWords = isPercentBased ? 0 : wordsUpToCurrent;
+    const baselinePage = (activeIsPhysical && activeBookPhysicalInfo)
+      ? activeBookPhysicalInfo.currentPage
+      : undefined;
+
+    setDailyBaseline(activeBookId, todayISO, { words: baselineWords, percent: baselinePercent, page: baselinePage });
+    try { console.log('[Baseline] persistida', { scope: 'Index', bookId: activeBookId, todayISO, words: baselineWords, percent: baselinePercent, page: baselinePage }); } catch { }
+  }, [activeBookId, todayISO, parts, isPercentBased, wordsUpToCurrent, p.percent, totalWords, activeIsPhysical, activeBookPhysicalInfo]);
 
   const daysRemaining = useMemo(() => computeDaysRemaining(plan?.targetDateISO), [plan]);
   // EPUB/Physical daily target uses percentage instead of words
@@ -910,11 +931,28 @@ const Index = () => {
 
     // Calculate baseline page from baseline percent with better precision
     // Use round for more accurate conversion (baseline percent was likely calculated from a page)
-    const baselinePage = Math.round((baselinePercent / 100) * activeBookPhysicalInfo.totalPages);
+    let baselinePage = 0;
+
+    // NEW: Use exact page from baseline entry if available (more precise for physical books)
+    if (baselineEntryForToday && activeIsPhysical) {
+      if (baselineEntryForToday.page !== undefined) {
+        baselinePage = baselineEntryForToday.page;
+      } else if (baselineEntryForToday.words > 0) {
+        // Legacy fallback: reuse words if it looks like a page (from previous version)
+        baselinePage = baselineEntryForToday.words;
+      }
+      // Sanity check: if baseline page > total pages (impossible), fallback to calculation
+      if (baselinePage > activeBookPhysicalInfo.totalPages) {
+        baselinePage = Math.round((baselinePercent / 100) * activeBookPhysicalInfo.totalPages);
+      }
+    } else {
+      // Fallback: calculate from percent
+      baselinePage = Math.round((baselinePercent / 100) * activeBookPhysicalInfo.totalPages);
+    }
 
     // Pages read today = current page - baseline page
     return Math.max(0, activeBookPhysicalInfo.currentPage - baselinePage);
-  }, [activeIsPhysical, activeBookPhysicalInfo, baselineForToday]);
+  }, [activeIsPhysical, activeBookPhysicalInfo, baselineForToday, baselineEntryForToday]);
 
   const pagesExpectedToday = useMemo(() => {
     if (!activeIsPhysical || !activeBookPhysicalInfo || !dailyTargetWords) return null;
