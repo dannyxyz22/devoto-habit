@@ -253,7 +253,7 @@ const Library = () => {
                 title: epubData.title,
                 author: epubData.author || '',
                 sourceUrl: hasLocalFile && localEpub ? URL.createObjectURL(localEpub.blob) : undefined,
-                description: 'Uploaded by user',
+                description: 'Adicionado pelo usuário',
                 coverImage: hasLocalFile && localEpub ? localEpub.coverUrl : undefined,
                 type: 'epub' as const,
                 isUserUpload: true,

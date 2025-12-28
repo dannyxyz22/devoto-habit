@@ -678,7 +678,7 @@ const Index = () => {
         title: epub.title,
         author: epub.author,
         sourceUrl: URL.createObjectURL(epub.blob),
-        description: 'Uploaded by user',
+        description: 'Adicionado pelo usuário',
         coverImage: epub.coverUrl,
         type: 'epub' as const,
         isUserUpload: true,
