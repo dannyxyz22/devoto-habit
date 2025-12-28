@@ -920,7 +920,7 @@ const Library = () => {
                     <span>Progresso</span>
                     <span className="flex gap-1">
                       <span className="font-medium text-foreground">
-                        {calculatePagePercent(book.currentPage || 0, book.totalPages, { round: false }).toFixed(1)}%
+                        {calculatePagePercent(book.currentPage || 0, book.totalPages, { round: false }).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%
                       </span>
                       <span>
                         ({book.currentPage || 0} / {book.totalPages})
@@ -946,7 +946,7 @@ const Library = () => {
                   <div className="mb-4">
                     <div className="flex justify-between text-sm text-muted-foreground mb-1">
                       <span>Progresso</span>
-                      <span>{percent.toFixed(1)}%</span>
+                      <span>{percent.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%</span>
                     </div>
                     <div className="w-full bg-secondary rounded-full h-2">
                       <div

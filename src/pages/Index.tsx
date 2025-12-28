@@ -13,7 +13,7 @@ import { BOOKS, type BookMeta } from "@/lib/books";
 import { getUserEpubs } from "@/lib/userEpubs";
 import { dataLayer } from "@/services/data/RxDBDataLayer";
 import { getDatabase } from "@/lib/database/db";
-import { differenceInCalendarDays, formatISO, parseISO } from "date-fns";
+import { differenceInCalendarDays, formatISO, parseISO, format } from "date-fns";
 import { useTodayISO } from "@/hooks/use-today";
 import { getStreak, getReadingPlan, getProgress, getDailyBaseline, setDailyBaseline, getStats, getLastBookIdAsync, setLastBookId, type Streak, type ReadingPlan } from "@/lib/storage";
 import {
@@ -35,6 +35,7 @@ import {
   calculateProgressPercent,
   calculateRatioPercent,
 } from "@/lib/percentageUtils";
+import { Calendar } from "lucide-react";
 
 // Types now shared via lib/reading
 
@@ -1034,7 +1035,7 @@ const Index = () => {
             <>
               <Progress value={dailyProgressPercent} />
               <p className="text-sm text-muted-foreground mt-2">
-                {dailyProgressPercent}% — {
+                {dailyProgressPercent.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}% — {
                   activeIsPhysical && pagesReadToday != null && pagesExpectedToday != null
                     ? `${pagesReadToday}/${pagesExpectedToday} páginas`
                     : `${achievedWordsToday}/${dailyTargetWords} ${isPercentBased ? "%" : "palavras"}`
@@ -1048,11 +1049,19 @@ const Index = () => {
 
         {/* Meta de leitura: mostra progresso da meta (se houver) */}
         <div className="rounded-lg border p-4">
-          <h3 className="text-lg font-semibold">Meta de leitura</h3>
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <span>Meta de leitura</span>
+            {plan?.targetDateISO && (
+              <span className="text-base font-normal text-muted-foreground flex items-center gap-1">
+                <Calendar className="h-4 w-4" />
+                {format(parseISO(plan.targetDateISO), "dd/MM/yyyy")}
+              </span>
+            )}
+          </h3>
           {used && activeBookId && plan?.targetDateISO && planProgressPercent != null ? (
             <>
               <Progress value={planProgressPercent} />
-              <p className="text-sm text-muted-foreground mt-2">Meta: {planProgressPercent?.toFixed(1)}%
+              <p className="text-sm text-muted-foreground mt-2">Meta: {planProgressPercent?.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%
                 {daysRemaining ? ` • ${daysRemaining} dia(s) restantes` : ""}
               </p>
               {!isPercentBased && parts && plan?.targetPartIndex != null && (
@@ -1066,18 +1075,6 @@ const Index = () => {
           ) : (
             <p className="text-muted-foreground">Defina uma meta e acompanhe seu avanço.</p>
           )}
-          {/* Debug Info */}
-          <details className="mt-2">
-            <summary className="text-xs text-muted-foreground cursor-pointer select-none">Debug Info</summary>
-            <div className="mt-2 p-2 bg-muted rounded text-xs grid gap-1 font-mono break-all">
-              <p>Target Date: {plan?.targetDateISO || 'null'}</p>
-              <p>Start Percent: {plan?.startPercent ?? 'undefined'}</p>
-              <p>Current Percent: {p?.percent ?? 0}</p>
-              <p>Days Remaining: {daysRemaining ?? 'null'}</p>
-              <p>Baseline Today: {baselineForToday ?? 'null'}</p>
-              <p>Local Start: {(() => { try { const raw = localStorage.getItem(`planStart:${activeBookId}`); return raw || 'null'; } catch { return 'err'; } })()}</p>
-            </div>
-          </details>
         </div>
 
         {/* Livro ativo */}
@@ -1089,7 +1086,7 @@ const Index = () => {
               {activeBookId && totalBookProgressPercent != null && (
                 <div className="mt-2">
                   <Progress value={totalBookProgressPercent} />
-                  <p className="text-sm text-muted-foreground mt-2">Livro: {totalBookProgressPercent}%</p>
+                  <p className="text-sm text-muted-foreground mt-2">Livro: {totalBookProgressPercent.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%</p>
                 </div>
               )}
             </>
@@ -1107,7 +1104,7 @@ const Index = () => {
           {used && activeBookId ? (
             isPercentBased ? (
               <>
-                <p className="text-sm text-muted-foreground mt-1">{p.percent || 0}% lido</p>
+                <p className="text-sm text-muted-foreground mt-1">{(p.percent || 0).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}% lido</p>
                 <div className="mt-2">
                   <Button asChild variant="link">
                     <Link to={activeIsPhysical ? `/physical/${activeBookId}` : `/epub/${activeBookId}`} onClick={() => setLastBookId(activeBookId)}>Continuar leitura</Link>
