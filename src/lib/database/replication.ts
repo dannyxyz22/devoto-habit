@@ -879,7 +879,7 @@ export class ReplicationManager {
                 let localStartChapter = localJson.start_chapter_index;
                 let localStartWords = localJson.start_words;
 
-                if (localStartPercent === undefined) {
+                if (localStartPercent == null) { // Loose check for null/undefined
                     try {
                         const raw = localStorage.getItem(`planStart:${localJson.book_id}`);
                         if (raw) {
@@ -907,10 +907,13 @@ export class ReplicationManager {
                 } else {
                     // Check if server is missing start data that we have locally (in RxDB or localStorage)
                     // AND check timestamp to respect latest target_date
-                    const serverMissingStart = serverPlan.start_percent === null && localStartPercent !== undefined;
+                    // Relaxed condition: if server is null OR 0, and we have a valid local start > 0
+                    const serverValue = serverPlan.start_percent;
+                    const localHasValue = localStartPercent !== undefined && localStartPercent > 0;
+                    const serverMissingStart = (serverValue === null || serverValue === 0) && localHasValue;
 
                     if (serverMissingStart) {
-                        console.log(`[Reading Plans Reconciliation] enhancing server plan ${localJson.id} with local start data`);
+                        console.log(`[Reading Plans Reconciliation] enhancing server plan ${localJson.id} with local start data (Server: ${serverValue}, Local: ${localStartPercent})`);
 
                         // Timestamp check: if local is newer (or equal), use local date. If server is strictly newer, use server date.
                         // _modified can be number or string? strict comparison usually safer if types known. 
@@ -932,10 +935,7 @@ export class ReplicationManager {
                             start_chapter_index: localStartChapter,
                             start_words: localStartWords,
                             // Respect strict timestamp for target date
-                            target_date_iso: targetDate,
-
-                            created_at: undefined,
-                            updated_at: undefined
+                            target_date_iso: targetDate
                         });
                     }
                 }
@@ -950,14 +950,12 @@ export class ReplicationManager {
 
             const upsertPayload = [...newDocs, ...updateDocs].map(j => ({
                 ...j,
-                user_id: userId,
-                created_at: undefined,
-                updated_at: undefined
+                user_id: userId
             }));
 
             const { error: upsertErr } = await supabase
                 .from('reading_plans')
-                .upsert(upsertPayload, { onConflict: 'id,user_id' });
+                .upsert(upsertPayload, { onConflict: 'id' });
 
             if (upsertErr) {
                 console.warn('[Reading Plans Reconciliation] Upsert error:', upsertErr);
