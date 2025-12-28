@@ -1038,7 +1038,9 @@ const Index = () => {
                 {dailyProgressPercent.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}% — {
                   activeIsPhysical && pagesReadToday != null && pagesExpectedToday != null
                     ? `${pagesReadToday}/${pagesExpectedToday} páginas`
-                    : `${achievedWordsToday}/${dailyTargetWords} ${isPercentBased ? "%" : "palavras"}`
+                    : isPercentBased
+                      ? `${(achievedWordsToday || 0).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}/${(dailyTargetWords || 0).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} %`
+                      : `${achievedWordsToday}/${dailyTargetWords} palavras`
                 }
               </p>
             </>
