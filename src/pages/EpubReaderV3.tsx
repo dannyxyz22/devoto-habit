@@ -6,7 +6,7 @@ import { BOOKS } from "@/lib/books";
 import { resolveEpubSource } from "@/lib/utils";
 import { getUserEpubBlob } from "@/lib/userEpubs";
 import { SEO } from "@/components/app/SEO";
-import { getDailyBaseline, setDailyBaseline, setProgress, getReadingPlan, getProgress } from "@/lib/storage";
+import { getDailyBaselineAsync, setDailyBaseline, setProgress, getReadingPlanAsync, getProgress } from "@/lib/storage";
 import { updateDailyProgressWidget } from "@/main";
 import { WidgetUpdater, canUseNative } from "@/lib/widgetUpdater";
 import { format } from "date-fns";
@@ -93,7 +93,7 @@ const EpubReaderV3 = () => {
 
     // Ensure baseline exists for today BEFORE updating progress
     // (only create if missing, don't update existing)
-    const base = getDailyBaseline(epubId, todayISO);
+    const base = await getDailyBaselineAsync(epubId, todayISO);
     if (!base && oldPercentage > 0) {
       // Create baseline with the OLD progress (before this update) as starting point
       // This ensures that today's progress is calculated correctly
@@ -144,12 +144,12 @@ const EpubReaderV3 = () => {
       console.error("[EpubReaderV3] DB Persistence error:", error);
     }
 
-    // Atualizar baseline e widgets (operações "leves")
-    const updatedBase = getDailyBaseline(epubId, todayISO);
+    // Atualizar baseline e widgets (operações "leves", mas agora garantidas)
+    const updatedBase = await getDailyBaselineAsync(epubId, todayISO);
     const baselinePercent = updatedBase ? updatedBase.percent : oldPercentage;
 
-    const plan = getReadingPlan(epubId);
-    if (plan) { // Calc apenas se tiver plano
+    const plan = await getReadingPlanAsync(epubId);
+    if (plan?.targetDateISO) {
       const daysRemaining = computeDaysRemaining(plan.targetDateISO);
       const dailyTargetPercent = daysRemaining ? Math.ceil(Math.max(0, 100 - baselinePercent) / daysRemaining) : null;
       const achievedPercentToday = Math.max(0, percent - baselinePercent);
@@ -158,10 +158,15 @@ const EpubReaderV3 = () => {
       if (canUseNative()) {
         try {
           const hasGoal = dailyTargetPercent != null && dailyTargetPercent > 0;
-          updateDailyProgressWidget(dailyProgressPercent, hasGoal);
-          WidgetUpdater.update?.();
-        } catch { }
+          console.log("[EpubReaderV3] Updating widget:", { dailyProgressPercent, hasGoal });
+          await updateDailyProgressWidget(dailyProgressPercent, hasGoal);
+          await WidgetUpdater.update?.();
+        } catch (err) {
+          console.error("[EpubReaderV3] Widget update failed:", err);
+        }
       }
+    } else {
+      console.log("[EpubReaderV3] No reading plan found for widget update");
     }
   }, [epubId]);
 
