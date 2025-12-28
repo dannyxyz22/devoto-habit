@@ -882,7 +882,7 @@ const Index = () => {
       return;
     }
     // Use consistent percent: EPUB/Physical uses p.percent; non-EPUB uses words-based totalBookProgressPercent
-    const baselinePercent = isPercentBased ? (p.percent || 0) : (parts ? calculateWordPercent(wordsUpToCurrent, totalWords) : 0);
+    const baselinePercent = isPercentBased ? (p.percent || 0) : (parts ? calculateWordPercent(wordsUpToCurrent, totalWords, { round: false }) : 0);
     setDailyBaseline(activeBookId, todayISO, { words: wordsUpToCurrent, percent: baselinePercent });
     try { console.log('[Baseline] persistida', { scope: 'Index', bookId: activeBookId, todayISO, words: wordsUpToCurrent, percent: baselinePercent, isPercentBased }); } catch { }
   }, [activeBookId, todayISO, parts, isPercentBased, wordsUpToCurrent, p.percent, totalWords]);
@@ -964,7 +964,7 @@ const Index = () => {
       }
       const denom = Math.max(1, 100 - startPercent);
       const num = Math.max(0, (p.percent || 0) - startPercent);
-      return calculateRatioPercent(num, denom);
+      return calculateRatioPercent(num, denom, { round: false });
     }
     return computePlanProgressPercent(parts, wordsUpToCurrent, targetWords, planStart);
   }, [isPercentBased, parts, wordsUpToCurrent, targetWords, planStart, p.percent, activeBookId]);
@@ -1052,7 +1052,7 @@ const Index = () => {
           {used && activeBookId && plan?.targetDateISO && planProgressPercent != null ? (
             <>
               <Progress value={planProgressPercent} />
-              <p className="text-sm text-muted-foreground mt-2">Meta: {planProgressPercent}%
+              <p className="text-sm text-muted-foreground mt-2">Meta: {planProgressPercent?.toFixed(1)}%
                 {daysRemaining ? ` • ${daysRemaining} dia(s) restantes` : ""}
               </p>
               {!isPercentBased && parts && plan?.targetPartIndex != null && (

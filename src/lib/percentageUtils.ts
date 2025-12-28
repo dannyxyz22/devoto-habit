@@ -20,13 +20,13 @@ export function calculatePercent(
   } = {}
 ): number {
   const { min = 0, max = 100, round = true } = options;
-  
+
   if (total === 0 || total < 0) return min;
   if (part < 0) return min;
-  
+
   const percent = (part / total) * 100;
   const clamped = Math.max(min, Math.min(max, percent));
-  
+
   return round ? Math.round(clamped) : clamped;
 }
 
@@ -36,8 +36,8 @@ export function calculatePercent(
  * @param totalPages - Total pages in the book
  * @returns Percentage (0-100)
  */
-export function calculatePagePercent(currentPage: number, totalPages: number): number {
-  return calculatePercent(currentPage, totalPages);
+export function calculatePagePercent(currentPage: number, totalPages: number, options: { round?: boolean } = {}): number {
+  return calculatePercent(currentPage, totalPages, options);
 }
 
 /**
@@ -46,8 +46,12 @@ export function calculatePagePercent(currentPage: number, totalPages: number): n
  * @param totalWords - Total words in the book
  * @returns Percentage (0-100)
  */
-export function calculateWordPercent(wordsUpToCurrent: number, totalWords: number): number {
-  return calculatePercent(wordsUpToCurrent, Math.max(1, totalWords));
+export function calculateWordPercent(
+  wordsUpToCurrent: number,
+  totalWords: number,
+  options: { round?: boolean } = {}
+): number {
+  return calculatePercent(wordsUpToCurrent, Math.max(1, totalWords), options);
 }
 
 /**
@@ -96,10 +100,11 @@ export function pagesToPercent(pages: number, totalPages: number): number {
  */
 export function calculateProgressPercent(
   achieved: number,
-  target: number | null
+  target: number | null,
+  options: { round?: boolean } = {}
 ): number | null {
   if (!target || target <= 0) return null;
-  return calculatePercent(achieved, target);
+  return calculatePercent(achieved, target, options);
 }
 
 /**
@@ -109,8 +114,12 @@ export function calculateProgressPercent(
  * @param denominator - Denominator value
  * @returns Percentage (0-100)
  */
-export function calculateRatioPercent(numerator: number, denominator: number): number {
+export function calculateRatioPercent(
+  numerator: number,
+  denominator: number,
+  options: { round?: boolean } = {}
+): number {
   const denom = Math.max(1, denominator);
   const num = Math.max(0, numerator);
-  return calculatePercent(num, denom);
+  return calculatePercent(num, denom, options);
 }
