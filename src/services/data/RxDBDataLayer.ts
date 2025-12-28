@@ -1,4 +1,5 @@
 import { DataLayer } from './DataLayer';
+import { formatISO } from 'date-fns';
 import { getDatabase } from '@/lib/database/db';
 import { RxBookDocumentType, RxSettingsDocumentType, RxReadingPlanDocumentType, RxDailyBaselineDocumentType, RxUserStatsDocumentType } from '@/lib/database/schema';
 import { authService } from '@/services/auth/SupabaseAuthService';
@@ -303,6 +304,22 @@ class RxDBDataLayerImpl implements DataLayer {
                 added_date_readable: new Date(newBook.added_date).toLocaleString(),
                 _modified: newBook._modified
             });
+
+            // PROACTIVE BASELINE: Initialize baseline for today to anchor "Read Today" at 0
+            try {
+                const todayISO = formatISO(new Date(), { representation: 'date' });
+                await this.saveDailyBaseline({
+                    book_id: newBook.id,
+                    date_iso: todayISO,
+                    words: dataToSave.type === 'physical' ? 0 : 0, // Words will be 0 for physical initially
+                    percent: dataToSave.percentage || 0,
+                    page: dataToSave.current_page || 0
+                });
+                console.log('[DataLayer] 📏 Proactive baseline created for new physical/static book:', newBook.id);
+            } catch (err) {
+                console.warn('[DataLayer] ⚠️ Failed to create proactive baseline:', err);
+            }
+
             // Force immediate sync
             replicationManager.quickSync().catch(e => console.warn('[DataLayer] ⚠️ Quick sync failed:', e));
             return newBook.toJSON();
@@ -442,6 +459,22 @@ class RxDBDataLayerImpl implements DataLayer {
             } as import('@/lib/database/schema').RxUserEpubDocumentType;
 
             const newEpub = await db.user_epubs.insert(dataToSave);
+
+            // PROACTIVE BASELINE: Initialize baseline for today to anchor "Read Today" at 0
+            try {
+                const todayISO = formatISO(new Date(), { representation: 'date' });
+                await this.saveDailyBaseline({
+                    book_id: newEpub.id,
+                    date_iso: todayISO,
+                    words: 0,
+                    percent: dataToSave.percentage || 0,
+                    page: undefined // EPUBs don't use page field usually
+                });
+                console.log('[DataLayer] 📏 Proactive baseline created for new EPUB:', newEpub.id);
+            } catch (err) {
+                console.warn('[DataLayer] ⚠️ Failed to create proactive baseline:', err);
+            }
+
             // Force immediate sync
             replicationManager.quickSync().catch(e => console.warn('[DataLayer] ⚠️ Quick sync failed:', e));
             return newEpub.toJSON();

@@ -8,8 +8,10 @@ Este documento descreve como é feito o cálculo dinâmico da **Meta Diária** n
 
 ### 1. Baseline do Dia (`baselineForToday`)
 O sistema identifica onde o usuário começou a leitura no dia atual para medir o progresso específico de "hoje".
-- **Lógica**: Utiliza o valor persistido no RxDB ou `localStorage` correspondente à data atual (ISO). Se for o primeiro acesso do dia, o progresso atual é salvo como o baseline.
-- **Implementação**: Localizado na função `useMemo` de `baselineForToday`.
+- **Lógica**: Utiliza o valor persistido no RxDB ou `localStorage` correspondente à data atual (ISO).
+- **Criação Proativa**: O baseline é criado **imediatamente** quando um livro é adicionado à biblioteca (ou migrado de offline para online), gravando o progresso inicial naquele momento. Isso evita que o esforço feito no dia da adição seja "zerado" ao abrir o dashboard.
+- **Precisão Física**: Para livros físicos, o campo `page` armazena o número exato da página inicial do dia, evitando erros de arredondamento em porcentagem.
+- **Implementação**: Localizado na função `useMemo` de `baselineForToday` no `Index.tsx`.
 
 ### 2. Dias Restantes (`daysRemaining`)
 - **Lógica**: Calcula a diferença em dias entre a data alvo (`targetDateISO`) e a data atual.

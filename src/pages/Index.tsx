@@ -49,6 +49,7 @@ const Index = () => {
   const [activeIsPhysical, setActiveIsPhysical] = useState(false);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
 
   // Reactive progress from RxDB subscription
   const [activeBookProgress, setActiveBookProgress] = useState<{ partIndex: number; chapterIndex: number; percent: number }>(
@@ -248,12 +249,14 @@ const Index = () => {
     import('@/services/auth/SupabaseAuthService').then(({ authService }) => {
       authService.getUser().then(({ user }) => {
         setUserId(user ? user.id : 'local-user');
+        setIsAuthLoading(false);
       });
 
       // Listen for changes
       authService.onAuthStateChange((event, session) => {
         console.log('[Index] 🔐 Auth state change:', event, session?.user?.id);
         setUserId(session?.user ? session.user.id : 'local-user');
+        setIsAuthLoading(false);
       });
     });
   }, []);
@@ -823,7 +826,7 @@ const Index = () => {
   const p = activeBookProgress;
   const totalWords = useMemo(() => computeTotalWords(parts), [parts]);
 
-  const isPercentBased = activeIsEpub || activeIsPhysical;
+  const isPercentBased = (activeBookId?.startsWith('user-') || activeIsEpub || activeIsPhysical);
 
   const wordsUpToCurrent = useMemo(
     () => isPercentBased ? 0 : computeWordsUpToPosition(parts, { partIndex: p.partIndex, chapterIndex: p.chapterIndex }),
@@ -857,7 +860,7 @@ const Index = () => {
 
   // Use reactive baseline from RxDB subscription, with fallback
   const baselineForToday = useMemo(() => {
-    if (!activeBookId) return isPercentBased ? (p.percent || 0) : wordsUpToCurrent;
+    if (!activeBookId || isAuthLoading) return isPercentBased ? (p.percent || 0) : wordsUpToCurrent;
 
     if (baselineEntryForToday) {
       const result = isPercentBased ? baselineEntryForToday.percent : baselineEntryForToday.words;
@@ -868,11 +871,11 @@ const Index = () => {
     const fallback = isPercentBased ? (p.percent || 0) : wordsUpToCurrent;
     console.log('[Index] 📏 baselineForToday: using fallback (current progress)', { fallback, p: p.percent, isPercentBased });
     return fallback;
-  }, [activeBookId, isPercentBased, wordsUpToCurrent, p.percent, baselineEntryForToday]);
+  }, [activeBookId, isPercentBased, wordsUpToCurrent, p.percent, baselineEntryForToday, isAuthLoading]);
 
   // Persist baseline if missing, with guards and logs
   useEffect(() => {
-    if (!activeBookId) return;
+    if (!activeBookId || isAuthLoading) return;
     const base = getDailyBaseline(activeBookId, todayISO);
     if (base) {
       try { console.log('[Baseline] existente', { scope: 'Index', bookId: activeBookId, todayISO, base }); } catch { }
@@ -907,7 +910,7 @@ const Index = () => {
 
     setDailyBaseline(activeBookId, todayISO, { words: baselineWords, percent: baselinePercent, page: baselinePage });
     try { console.log('[Baseline] persistida', { scope: 'Index', bookId: activeBookId, todayISO, words: baselineWords, percent: baselinePercent, page: baselinePage }); } catch { }
-  }, [activeBookId, todayISO, parts, isPercentBased, wordsUpToCurrent, p.percent, totalWords, activeIsPhysical, activeBookPhysicalInfo]);
+  }, [activeBookId, todayISO, parts, isPercentBased, wordsUpToCurrent, p.percent, totalWords, activeIsPhysical, activeBookPhysicalInfo, isAuthLoading]);
 
   const daysRemaining = useMemo(() => computeDaysRemaining(plan?.targetDateISO), [plan]);
   // EPUB/Physical daily target uses percentage instead of words
