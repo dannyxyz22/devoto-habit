@@ -738,7 +738,7 @@ const Index = () => {
     return () => {
       window.removeEventListener('rxdb-initial-replication-complete', handleReplicationComplete);
     };
-  }, []);
+  }, [userId]);
 
   // Ensure active book is in allBooks list (handles case where user_id mismatch or not loaded yet)
   useEffect(() => {

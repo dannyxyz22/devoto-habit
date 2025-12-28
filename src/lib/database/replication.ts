@@ -74,11 +74,13 @@ export class ReplicationManager {
         // We'll setup Realtime listener after replications are created
         // to trigger reSync when changes come from other clients
 
+        // setup replications
         try {
-            // Replicate Books
+            console.log('ReplicationManager: Setting up sync for all collections...');
 
-
-            const booksReplication = await replicateSupabase<RxBookDocumentType>({
+            // Note: replicateSupabase returns a RxReplicationState. 
+            // We want to trigger all of them quickly.
+            const booksReplicationPromise = replicateSupabase<RxBookDocumentType>({
                 tableName: 'books',
                 client: supabase,
                 collection: db.books,
@@ -111,9 +113,10 @@ export class ReplicationManager {
                     }
                 }
             });
+            console.log('ReplicationManager: Books replication initialized');
 
             // Replicate Settings
-            const settingsReplication = await replicateSupabase<RxSettingsDocumentType>({
+            const settingsReplicationPromise = replicateSupabase<RxSettingsDocumentType>({
                 tableName: 'user_settings',
                 client: supabase,
                 collection: db.settings,
@@ -143,9 +146,10 @@ export class ReplicationManager {
                     }
                 }
             });
+            console.log('ReplicationManager: Settings replication initialized');
 
             // Replicate User EPUBs
-            const userEpubsReplication = await replicateSupabase<RxUserEpubDocumentType>({
+            const userEpubsReplicationPromise = replicateSupabase<RxUserEpubDocumentType>({
                 tableName: 'user_epubs',
                 client: supabase,
                 collection: db.user_epubs,
@@ -179,9 +183,10 @@ export class ReplicationManager {
                     }
                 }
             });
+            console.log('ReplicationManager: User EPUBs replication initialized');
 
             // Replicate Reading Plans
-            const readingPlansReplication = await replicateSupabase<RxReadingPlanDocumentType>({
+            const readingPlansReplicationPromise = replicateSupabase<RxReadingPlanDocumentType>({
                 tableName: 'reading_plans',
                 client: supabase,
                 collection: db.reading_plans,
@@ -210,10 +215,11 @@ export class ReplicationManager {
                     }
                 }
             });
+            console.log('ReplicationManager: Reading Plans replication initialized');
 
             // Replicate Daily Baselines
 
-            const dailyBaselinesReplication = await replicateSupabase<RxDailyBaselineDocumentType>({
+            const dailyBaselinesReplicationPromise = replicateSupabase<RxDailyBaselineDocumentType>({
                 tableName: 'daily_baselines',
                 client: supabase,
                 collection: db.daily_baselines,
@@ -236,12 +242,13 @@ export class ReplicationManager {
                     }
                 }
             });
+            console.log('ReplicationManager: Daily Baselines replication initialized');
 
 
 
             // Replicate User Stats
             // minutes_by_date is now stored as JSON string in both RxDB and Supabase
-            const userStatsReplication = await replicateSupabase<RxUserStatsDocumentType>({
+            const userStatsReplicationPromise = replicateSupabase<RxUserStatsDocumentType>({
                 tableName: 'user_stats',
                 client: supabase,
                 collection: db.user_stats,
@@ -311,6 +318,24 @@ export class ReplicationManager {
                     }
                 } as any
             });
+            console.log('ReplicationManager: User Stats replication initialized');
+
+            // Wait for all replication state objects to be created (they might be async)
+            const [
+                booksReplication,
+                userEpubsReplication,
+                settingsReplication,
+                readingPlansReplication,
+                dailyBaselinesReplication,
+                userStatsReplication
+            ] = await Promise.all([
+                booksReplicationPromise,
+                userEpubsReplicationPromise,
+                settingsReplicationPromise,
+                readingPlansReplicationPromise,
+                dailyBaselinesReplicationPromise,
+                userStatsReplicationPromise
+            ]);
 
             this.replicationStates = [booksReplication, userEpubsReplication, settingsReplication, readingPlansReplication, dailyBaselinesReplication, userStatsReplication];
             //this.replicationStates = [userStatsReplication];
@@ -344,11 +369,19 @@ export class ReplicationManager {
 
             // Wait for initial sync
             try {
+                const names = ['Books', 'User EPUBs', 'Settings', 'Reading Plans', 'Daily Baselines', 'User Stats'];
                 await Promise.race([
-                    Promise.all(this.replicationStates.map(s => s.awaitInitialReplication())),
-                    new Promise((_, reject) => setTimeout(() => reject(new Error('Replication timeout')), 10000))
+                    Promise.all(this.replicationStates.map(async (s, i) => {
+                        try {
+                            await s.awaitInitialReplication();
+                            console.log(`ReplicationManager: ${names[i]} initial sync complete ✓`);
+                        } catch (err) {
+                            console.warn(`ReplicationManager: ${names[i]} initial sync failed or partial:`, err);
+                        }
+                    })),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('Replication timeout')), 30000))
                 ]);
-                console.log('ReplicationManager: Initial replication complete ✓');
+                console.log('ReplicationManager: Initial replication attempt finished ✓');
             } catch (err) {
                 if ((err as Error).message === 'Replication timeout') {
                     console.warn('ReplicationManager: Replication timeout (continuing anyway)');
@@ -363,7 +396,8 @@ export class ReplicationManager {
 
             // Log final sync count
             const totalBooks = await db.books.count().exec();
-            console.log(`ReplicationManager: Synced ${totalBooks} books`);
+            const totalEpubs = await db.user_epubs.count().exec();
+            console.log(`ReplicationManager: Final counts - ${totalBooks} books, ${totalEpubs} EPUBs in local RxDB`);
 
             // Setup Realtime listener to trigger reSync when changes come from other clients
             // The replicateSupabase plugin should handle this, but as a fallback we do it manually
@@ -452,25 +486,18 @@ export class ReplicationManager {
      * Returns a promise that resolves when all reSyncs have been triggered.
      */
     async quickSync(): Promise<void> {
-        console.log('Quick sync triggered, but void implementation');
-        return;
-
-        console.log('ReplicationManager: Quick sync triggered...');
-        console.trace('ReplicationManager: quickSync stack trace');
-
-
         if (this.replicationStates.length === 0) {
-            console.warn('ReplicationManager: No active replications for quick sync');
-            // Try to start replication if not active
+            console.warn('ReplicationManager: No active replications for quick sync, starting...');
             await this.startReplication();
             return;
         }
 
-        const names = ['Books', 'User EPUBs', 'Settings'];
+        console.log('ReplicationManager: Quick sync (reSync) triggered on all collections...');
+        const names = ['Books', 'User EPUBs', 'Settings', 'Reading Plans', 'Daily Baselines', 'User Stats'];
 
         for (let i = 0; i < this.replicationStates.length; i++) {
             const state = this.replicationStates[i];
-            const name = names[i];
+            const name = names[i] || `State ${i}`;
 
             if (state && typeof (state as any).reSync === 'function') {
                 console.log(`[${name}] Triggering reSync...`);
@@ -478,9 +505,10 @@ export class ReplicationManager {
             }
         }
 
-        // Wait a bit for the sync to process
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        console.log('ReplicationManager: Quick sync complete');
+        // We don't necessarily await everything here as reSync is fire-and-forget in RxDB
+        // but we wait a bit to give it a head start before resolving
+        await new Promise(resolve => setTimeout(resolve, 500));
+        console.log('ReplicationManager: Quick sync calls dispatched');
     }
 
     /**
