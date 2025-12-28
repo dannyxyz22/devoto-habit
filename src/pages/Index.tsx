@@ -1100,7 +1100,7 @@ const Index = () => {
   }, [dailyProgressPercent, dailyTargetWords]);
 
   return (
-    <main>
+    <main className="safe-top">
       <SEO
         title="Leitura Devota — Clássicos Católicos"
         description="Crie o hábito de leitura espiritual diária com clássicos católicos em português."

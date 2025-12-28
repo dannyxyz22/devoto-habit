@@ -11,8 +11,10 @@
 @layer base {
   :root {
     /* Light Theme: Warm Parchment */
-    --background: 40 20% 97%; /* Softer, warmer white */
-    --foreground: 20 10% 15%; /* Deep brownish-grey for text, softer than black */
+    --background: 40 20% 97%;
+    /* Softer, warmer white */
+    --foreground: 20 10% 15%;
+    /* Deep brownish-grey for text, softer than black */
 
     --card: 40 20% 98%;
     --card-foreground: 20 10% 15%;
@@ -43,7 +45,8 @@
     --input: 40 20% 85%;
     --ring: 355 45% 35%;
 
-    --radius: 0.75rem; /* Slightly more rounded for a friendly, modern feel */
+    --radius: 0.75rem;
+    /* Slightly more rounded for a friendly, modern feel */
 
     /* Sidebar / Navigation */
     --sidebar-background: 40 20% 96%;
@@ -58,8 +61,10 @@
 
   .dark {
     /* Dark Theme: Deep Monastic Slate */
-    --background: 220 15% 10%; /* Very dark slate, almost black */
-    --foreground: 40 20% 90%; /* Warm off-white text */
+    --background: 220 15% 10%;
+    /* Very dark slate, almost black */
+    --foreground: 40 20% 90%;
+    /* Warm off-white text */
 
     --card: 220 15% 12%;
     --card-foreground: 40 20% 90%;
@@ -103,15 +108,69 @@
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
     font-family: 'Cardo', ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
-  
+
   /* Typography enhancements */
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     @apply font-semibold tracking-tight;
+  }
+
+  /* Safe Area Insets for Capacitor/Android status bar */
+  :root {
+    --safe-area-inset-top: env(safe-area-inset-top, 0px);
+    --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-area-inset-left: env(safe-area-inset-left, 0px);
+    --safe-area-inset-right: env(safe-area-inset-right, 0px);
+  }
+}
+
+@layer utilities {
+
+  /* Safe area padding utilities */
+  .safe-top {
+    padding-top: var(--safe-area-inset-top);
+  }
+
+  .safe-bottom {
+    padding-bottom: var(--safe-area-inset-bottom);
+  }
+
+  .safe-left {
+    padding-left: var(--safe-area-inset-left);
+  }
+
+  .safe-right {
+    padding-right: var(--safe-area-inset-right);
+  }
+
+  .safe-x {
+    padding-left: var(--safe-area-inset-left);
+    padding-right: var(--safe-area-inset-right);
+  }
+
+  .safe-y {
+    padding-top: var(--safe-area-inset-top);
+    padding-bottom: var(--safe-area-inset-bottom);
+  }
+
+  .safe-all {
+    padding: var(--safe-area-inset-top) var(--safe-area-inset-right) var(--safe-area-inset-bottom) var(--safe-area-inset-left);
+  }
+
+  /* Minimum height that accounts for safe areas */
+  .min-h-screen-safe {
+    min-height: 100vh;
+    min-height: calc(100vh - var(--safe-area-inset-top) - var(--safe-area-inset-bottom));
   }
 }

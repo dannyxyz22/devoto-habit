@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ReactReader } from "react-reader";
+import { ReactReader, ReactReaderStyle } from "react-reader";
 import type { NavItem, Rendition } from "epubjs";
 import { BOOKS } from "@/lib/books";
 import { resolveEpubSource } from "@/lib/utils";
@@ -22,6 +22,18 @@ import { useIsMobile } from "@/hooks/use-mobile";
  * Segue o padrão do exemplo Persist.tsx:
  * https://github.com/gerhardsletten/react-reader/blob/main/src/examples/Persist.tsx
  */
+
+const readerStyles = {
+  ...ReactReaderStyle,
+  tocButton: {
+    ...ReactReaderStyle.tocButton,
+    top: 'calc(10px + var(--safe-area-inset-top, 0px))'
+  },
+  tocButtonExpanded: {
+    ...ReactReaderStyle.tocButtonExpanded,
+    top: 'calc(10px + var(--safe-area-inset-top, 0px))'
+  }
+};
 
 const EpubReaderV3 = () => {
   const { epubId = "" } = useParams();
@@ -438,11 +450,13 @@ const EpubReaderV3 = () => {
         title=""
         showToc={true}
         swipeable={isMobile}
+        readerStyles={readerStyles}
       />
       {/* Botão de voltar posicionado abaixo do botão de TOC */}
       <button
         onClick={() => navigate("/biblioteca")}
-        className="absolute left-2.5 top-12 z-10 flex items-center justify-center w-8 h-8 rounded-full bg-white/90 hover:bg-white shadow-md transition-colors"
+        className="absolute left-2.5 z-10 flex items-center justify-center w-8 h-8 rounded-full bg-white/90 hover:bg-white shadow-md transition-colors"
+        style={{ top: 'calc(3rem + var(--safe-area-inset-top, 0px))' }}
         aria-label="Voltar para Biblioteca"
         title="Voltar para Biblioteca"
       >
