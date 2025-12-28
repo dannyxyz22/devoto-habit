@@ -349,16 +349,16 @@ export class ReplicationManager {
                     new Promise((_, reject) => setTimeout(() => reject(new Error('Replication timeout')), 10000))
                 ]);
                 console.log('ReplicationManager: Initial replication complete ✓');
-
-                // Dispatch a global event to notify listeners that replication is complete
-                window.dispatchEvent(new CustomEvent('rxdb-initial-replication-complete'));
-                console.log('ReplicationManager: Dispatched rxdb-initial-replication-complete event');
             } catch (err) {
                 if ((err as Error).message === 'Replication timeout') {
                     console.warn('ReplicationManager: Replication timeout (continuing anyway)');
                 } else {
-                    throw err;
+                    console.error('ReplicationManager: Initial replication failed:', err);
                 }
+            } finally {
+                // Dispatch a global event to notify listeners that replication is complete (or at least attempted)
+                window.dispatchEvent(new CustomEvent('rxdb-initial-replication-complete'));
+                console.log('ReplicationManager: Dispatched rxdb-initial-replication-complete event');
             }
 
             // Log final sync count

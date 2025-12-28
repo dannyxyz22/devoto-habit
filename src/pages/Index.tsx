@@ -40,6 +40,27 @@ import { Calendar } from "lucide-react";
 // Types now shared via lib/reading
 
 const Index = () => {
+  const [userId, setUserId] = useState<string>('local-user');
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+
+  // Listen for auth changes to update userId
+  useEffect(() => {
+    // Initial check
+    import('@/services/auth/SupabaseAuthService').then(({ authService }) => {
+      authService.getUser().then(({ user }) => {
+        setUserId(user ? user.id : 'local-user');
+        setIsAuthLoading(false);
+      });
+
+      // Listen for changes
+      authService.onAuthStateChange((event, session) => {
+        console.log('[Index] 🔐 Auth state change:', event, session?.user?.id);
+        setUserId(session?.user ? session.user.id : 'local-user');
+        setIsAuthLoading(false);
+      });
+    });
+  }, []);
+
   const [streak, setStreak] = useState<Streak>(() => getStreak());
   const [used, setUsed] = useState(false);
   const [activeBookId, setActiveBookId] = useState<string | null>(null);
@@ -49,7 +70,6 @@ const Index = () => {
   const [activeIsPhysical, setActiveIsPhysical] = useState(false);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [isAuthLoading, setIsAuthLoading] = useState(true);
 
   // Reactive progress from RxDB subscription
   const [activeBookProgress, setActiveBookProgress] = useState<{ partIndex: number; chapterIndex: number; percent: number }>(
@@ -65,6 +85,27 @@ const Index = () => {
 
   // Physical book info for page calculations
   const [activeBookPhysicalInfo, setActiveBookPhysicalInfo] = useState<{ totalPages: number; currentPage: number } | null>(null);
+
+  const [isReplicationComplete, setIsReplicationComplete] = useState(false);
+
+  // Initialize isReplicationComplete for local-user or wait for event
+  useEffect(() => {
+    if (userId === 'local-user') {
+      setIsReplicationComplete(true);
+    } else {
+      setIsReplicationComplete(false); // Reset on login to wait for new replication
+    }
+  }, [userId]);
+
+  // Listen for replication complete event to update state
+  useEffect(() => {
+    const handleReplication = () => {
+      console.log('[Index] 📥 Global replication complete event received');
+      setIsReplicationComplete(true);
+    };
+    window.addEventListener('rxdb-initial-replication-complete', handleReplication);
+    return () => window.removeEventListener('rxdb-initial-replication-complete', handleReplication);
+  }, []);
 
   // Subscribe to RxDB for reactive progress updates
   useEffect(() => {
@@ -241,25 +282,6 @@ const Index = () => {
     };
   }, [activeBookId]);
 
-  const [userId, setUserId] = useState<string>('local-user');
-
-  // Listen for auth changes to update userId
-  useEffect(() => {
-    // Initial check
-    import('@/services/auth/SupabaseAuthService').then(({ authService }) => {
-      authService.getUser().then(({ user }) => {
-        setUserId(user ? user.id : 'local-user');
-        setIsAuthLoading(false);
-      });
-
-      // Listen for changes
-      authService.onAuthStateChange((event, session) => {
-        console.log('[Index] 🔐 Auth state change:', event, session?.user?.id);
-        setUserId(session?.user ? session.user.id : 'local-user');
-        setIsAuthLoading(false);
-      });
-    });
-  }, []);
 
   // Subscribe to user_stats for reactive streak and lastBookId updates
   useEffect(() => {
@@ -860,7 +882,12 @@ const Index = () => {
 
   // Use reactive baseline from RxDB subscription, with fallback
   const baselineForToday = useMemo(() => {
-    if (!activeBookId || isAuthLoading) return isPercentBased ? (p.percent || 0) : wordsUpToCurrent;
+    // If not local user and replication not complete, don't fallback to current progress yet.
+    // This avoids creating a "session-only" baseline that might be wrong.
+    const isLocalUser = userId === 'local-user';
+    const canUseFallback = isLocalUser || isReplicationComplete;
+
+    if (!activeBookId || isAuthLoading) return (isPercentBased ? (p.percent || 0) : wordsUpToCurrent);
 
     if (baselineEntryForToday) {
       const result = isPercentBased ? baselineEntryForToday.percent : baselineEntryForToday.words;
@@ -868,14 +895,26 @@ const Index = () => {
       return result;
     }
 
+    if (!canUseFallback) {
+      console.log('[Index] 📏 baselineForToday: replication pending, returning current as temporary (will not persist)...');
+      return isPercentBased ? (p.percent || 0) : wordsUpToCurrent;
+    }
+
     const fallback = isPercentBased ? (p.percent || 0) : wordsUpToCurrent;
     console.log('[Index] 📏 baselineForToday: using fallback (current progress)', { fallback, p: p.percent, isPercentBased });
     return fallback;
-  }, [activeBookId, isPercentBased, wordsUpToCurrent, p.percent, baselineEntryForToday, isAuthLoading]);
+  }, [activeBookId, isPercentBased, wordsUpToCurrent, p.percent, baselineEntryForToday, isAuthLoading, isReplicationComplete, userId]);
 
   // Persist baseline if missing, with guards and logs
   useEffect(() => {
     if (!activeBookId || isAuthLoading) return;
+
+    // GUARD: Don't create baseline until replication is complete for real users
+    if (userId !== 'local-user' && !isReplicationComplete) {
+      try { console.log('[Baseline] waiting for replication before creating', { scope: 'Index', bookId: activeBookId }); } catch { }
+      return;
+    }
+
     const base = getDailyBaseline(activeBookId, todayISO);
     if (base) {
       try { console.log('[Baseline] existente', { scope: 'Index', bookId: activeBookId, todayISO, base }); } catch { }
