@@ -936,11 +936,10 @@ const Library = () => {
                 </div>
               )}
               {book.type === 'epub' && (() => {
-                // Use percentage from RxDB (book.percentage) or fallback to local storage
-                // We take the max to ensure that if local has more progress (e.g. offline reading), it shows.
-                const localProgress = getProgress(book.id).percent || 0;
                 const dbProgress = book.percentage || 0;
-                const percent = Math.max(localProgress, dbProgress);
+                const localProgress = getProgress(book.id).percent || 0;
+                // Trust DB progress (it's reactive); if 0, fallback to local storage
+                const percent = dbProgress || localProgress;
 
                 return percent > 0 ? (
                   <div className="mb-4">
