@@ -198,7 +198,7 @@ class RxDBDataLayerImpl implements DataLayer {
 
         // Calculate NEW percentage for physical books
         const newPercentage = totalPages > 0
-            ? calculatePagePercent(newPage, totalPages)
+            ? calculatePagePercent(newPage, totalPages, { round: false })
             : oldPercentage;
 
         // Ensure baseline exists for today BEFORE updating progress
