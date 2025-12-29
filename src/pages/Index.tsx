@@ -530,7 +530,8 @@ const Index = () => {
           console.log('[Index] 📏 loadFromRxDB - daily_baseline found:', { id: baselineId, baseline });
           setActiveBaseline({
             words: baseline.words || 0,
-            percent: baseline.percent || 0
+            percent: baseline.percent || 0,
+            page: baseline.page
           });
           return true;
         }
@@ -559,7 +560,8 @@ const Index = () => {
             });
             setActiveBaseline({
               words: baseline.words || 0,
-              percent: baseline.percent || 0
+              percent: baseline.percent || 0,
+              page: baseline.page
             });
           } else {
             console.log('[Index] 📏 Baseline subscription: no doc found', { baselineId, bookId: activeBookId, userId, todayISO });
@@ -941,7 +943,7 @@ const Index = () => {
 
     // For physical books, use specific 'page' field.
     // For others, store wordsUpToCurrent in 'words'.
-    // Avoid overloading 'words' with page numbers.
+
     const baselineWords = isPercentBased ? 0 : wordsUpToCurrent;
     const baselinePage = (activeIsPhysical && activeBookPhysicalInfo)
       ? activeBookPhysicalInfo.currentPage
@@ -976,19 +978,11 @@ const Index = () => {
     let baselinePage = 0;
 
     // NEW: Use exact page from baseline entry if available (more precise for physical books)
-    if (baselineEntryForToday && activeIsPhysical) {
-      if (baselineEntryForToday.page !== undefined) {
-        baselinePage = baselineEntryForToday.page;
-      } else if (baselineEntryForToday.words > 0) {
-        // Legacy fallback: reuse words if it looks like a page (from previous version)
-        baselinePage = baselineEntryForToday.words;
-      }
-      // Sanity check: if baseline page > total pages (impossible), fallback to calculation
-      if (baselinePage > activeBookPhysicalInfo.totalPages) {
-        baselinePage = Math.round((baselinePercent / 100) * activeBookPhysicalInfo.totalPages);
-      }
+    // Find the best baseline page available
+    if (baselineEntryForToday?.page !== undefined) {
+      baselinePage = baselineEntryForToday.page;
     } else {
-      // Fallback: calculate from percent
+      // Fallback: calculate from percent (less precise but works if page info is missing)
       baselinePage = Math.round((baselinePercent / 100) * activeBookPhysicalInfo.totalPages);
     }
 

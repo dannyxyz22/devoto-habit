@@ -214,10 +214,11 @@ class RxDBDataLayerImpl implements DataLayer {
             await this.saveDailyBaseline({
                 book_id: bookId,
                 date_iso: todayISO,
-                words: 0, // Physical books use percent, not words
-                percent: oldPercentage // Use old progress, not new
+                words: 0,
+                percent: oldPercentage, // Use old progress, not new
+                page: book.get('current_page') || 0
             });
-            console.log('[DataLayer] 📏 Baseline created for today:', { bookId, todayISO, percent: oldPercentage });
+            console.log('[DataLayer] 📏 Baseline created for today:', { bookId, todayISO, percent: oldPercentage, page: book.get('current_page') });
         }
 
         // Now update the book progress
