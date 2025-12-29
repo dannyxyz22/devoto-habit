@@ -58,6 +58,11 @@ Para gerar a versão nativa Android:
    npx cap sync
    ```
 
+Opcionalmente faça:
+   ```bash
+   npm run build:native & npx cap sync
+   ```
+
 3. Abra no Android Studio:
    ```bash
    npx cap open android
