@@ -15,7 +15,7 @@ import { dataLayer } from "@/services/data/RxDBDataLayer";
 import { getDatabase } from "@/lib/database/db";
 import { differenceInCalendarDays, formatISO, parseISO, format } from "date-fns";
 import { useTodayISO } from "@/hooks/use-today";
-import { getStreak, getReadingPlan, getProgress, getDailyBaseline, setDailyBaseline, getStats, getLastBookIdAsync, setLastBookId, type Streak, type ReadingPlan, type BaselineEntry } from "@/lib/storage";
+import { getStreak, getReadingPlan, getProgress, getDailyBaseline, getDailyBaselineAsync, setDailyBaseline, getStats, getLastBookIdAsync, setLastBookId, type Streak, type ReadingPlan, type BaselineEntry } from "@/lib/storage";
 import {
   type Part,
   computeTotalWords,
@@ -911,47 +911,63 @@ const Index = () => {
   useEffect(() => {
     if (!activeBookId || isAuthLoading) return;
 
-    // GUARD: Don't create baseline until replication is complete for real users
-    if (userId !== 'local-user' && !isReplicationComplete) {
-      try { console.log('[Baseline] waiting for replication before creating', { scope: 'Index', bookId: activeBookId }); } catch { }
-      return;
-    }
+    const persistBaseline = async () => {
+      // 1. Check state first (fastest)
+      if (activeBaseline) return;
 
-    const base = getDailyBaseline(activeBookId, todayISO);
-    if (base) {
-      try { console.log('[Baseline] existente', { scope: 'Index', bookId: activeBookId, todayISO, base }); } catch { }
-      return;
-    }
+      // GUARD: Don't create baseline until replication is complete for real users
+      if (userId !== 'local-user' && !isReplicationComplete) {
+        try { console.log('[Baseline] waiting for replication before creating', { scope: 'Index', bookId: activeBookId }); } catch { }
+        return;
+      }
 
-    // GUARD: For physical books, wait for page info to ensure precision
-    if (activeIsPhysical && !activeBookPhysicalInfo) {
-      try { console.log('[Baseline] waiting for physical info', { scope: 'Index', bookId: activeBookId }); } catch { }
-      return;
-    }
+      // 2. Check sync local storage (fast)
+      const base = getDailyBaseline(activeBookId, todayISO);
+      if (base) {
+        try { console.log('[Baseline] existente (localStorage)', { scope: 'Index', bookId: activeBookId, todayISO, base }); } catch { }
+        return;
+      }
 
-    const hasProgress = isPercentBased ? ((p?.percent ?? 0) > 0) : (wordsUpToCurrent > 0);
-    if (!parts && !isPercentBased) {
-      try { console.log('[Baseline] skip persist: parts não carregadas', { scope: 'Index', bookId: activeBookId, todayISO, wordsUpToCurrent, p, isPercentBased }); } catch { }
-      return;
-    }
-    if (!hasProgress) {
-      try { console.log('[Baseline] skip persist: sem progresso ainda', { scope: 'Index', bookId: activeBookId, todayISO, wordsUpToCurrent, percent: p.percent, isPercentBased }); } catch { }
-      return;
-    }
-    // Use consistent percent: EPUB/Physical uses p.percent; non-EPUB uses words-based totalBookProgressPercent
-    const baselinePercent = isPercentBased ? (p.percent || 0) : (parts ? calculateWordPercent(wordsUpToCurrent, totalWords, { round: false }) : 0);
+      // 3. Check RxDB async (authoritative)
+      // This prevents overwriting if data exists in DB but not yet in state/localStorage
+      const rxBase = await getDailyBaselineAsync(activeBookId, todayISO);
+      if (rxBase) {
+        try { console.log('[Baseline] existente (RxDB async)', { scope: 'Index', bookId: activeBookId, todayISO, rxBase }); } catch { }
+        return;
+      }
 
-    // For physical books, use specific 'page' field.
-    // For others, store wordsUpToCurrent in 'words'.
+      // GUARD: For physical books, wait for page info to ensure precision
+      if (activeIsPhysical && !activeBookPhysicalInfo) {
+        try { console.log('[Baseline] waiting for physical info', { scope: 'Index', bookId: activeBookId }); } catch { }
+        return;
+      }
 
-    const baselineWords = isPercentBased ? 0 : wordsUpToCurrent;
-    const baselinePage = (activeIsPhysical && activeBookPhysicalInfo)
-      ? activeBookPhysicalInfo.currentPage
-      : undefined;
+      const hasProgress = isPercentBased ? ((p?.percent ?? 0) > 0) : (wordsUpToCurrent > 0);
+      if (!parts && !isPercentBased) {
+        try { console.log('[Baseline] skip persist: parts não carregadas', { scope: 'Index', bookId: activeBookId, todayISO, wordsUpToCurrent, p, isPercentBased }); } catch { }
+        return;
+      }
+      if (!hasProgress) {
+        try { console.log('[Baseline] skip persist: sem progresso ainda', { scope: 'Index', bookId: activeBookId, todayISO, wordsUpToCurrent, percent: p.percent, isPercentBased }); } catch { }
+        return;
+      }
+      // Use consistent percent: EPUB/Physical uses p.percent; non-EPUB uses words-based totalBookProgressPercent
+      const baselinePercent = isPercentBased ? (p.percent || 0) : (parts ? calculateWordPercent(wordsUpToCurrent, totalWords, { round: false }) : 0);
 
-    setDailyBaseline(activeBookId, todayISO, { words: baselineWords, percent: baselinePercent, page: baselinePage });
-    try { console.log('[Baseline] persistida', { scope: 'Index', bookId: activeBookId, todayISO, words: baselineWords, percent: baselinePercent, page: baselinePage }); } catch { }
-  }, [activeBookId, todayISO, parts, isPercentBased, wordsUpToCurrent, p.percent, totalWords, activeIsPhysical, activeBookPhysicalInfo, isAuthLoading]);
+      // For physical books, use specific 'page' field.
+      // For others, store wordsUpToCurrent in 'words'.
+
+      const baselineWords = isPercentBased ? 0 : wordsUpToCurrent;
+      const baselinePage = (activeIsPhysical && activeBookPhysicalInfo)
+        ? activeBookPhysicalInfo.currentPage
+        : undefined;
+
+      setDailyBaseline(activeBookId, todayISO, { words: baselineWords, percent: baselinePercent, page: baselinePage });
+      try { console.log('[Baseline] persistida', { scope: 'Index', bookId: activeBookId, todayISO, words: baselineWords, percent: baselinePercent, page: baselinePage }); } catch { }
+    };
+
+    persistBaseline();
+  }, [activeBookId, todayISO, parts, isPercentBased, wordsUpToCurrent, p.percent, totalWords, activeIsPhysical, activeBookPhysicalInfo, isAuthLoading, activeBaseline]);
 
   const daysRemaining = useMemo(() => computeDaysRemaining(plan?.targetDateISO), [plan]);
   // EPUB/Physical daily target uses percentage instead of words
