@@ -1,5 +1,5 @@
 import { DataLayer } from './DataLayer';
-import { formatISO } from 'date-fns';
+import { formatISO, format } from 'date-fns';
 import { getDatabase } from '@/lib/database/db';
 import { RxBookDocumentType, RxSettingsDocumentType, RxReadingPlanDocumentType, RxDailyBaselineDocumentType, RxUserStatsDocumentType } from '@/lib/database/schema';
 import { authService } from '@/services/auth/SupabaseAuthService';
@@ -203,7 +203,7 @@ class RxDBDataLayerImpl implements DataLayer {
 
         // Ensure baseline exists for today BEFORE updating progress
         // (only create if missing, don't update existing)
-        const todayISO = new Date().toISOString().split('T')[0];
+        const todayISO = format(new Date(), 'yyyy-MM-dd');
         const userId = await this.getUserId();
         const baselineId = `${userId}:${bookId}:${todayISO}`;
         const existingBaseline = await db.daily_baselines.findOne(baselineId).exec();
@@ -308,7 +308,7 @@ class RxDBDataLayerImpl implements DataLayer {
 
             // PROACTIVE BASELINE: Initialize baseline for today to anchor "Read Today" at 0
             try {
-                const todayISO = formatISO(new Date(), { representation: 'date' });
+                const todayISO = format(new Date(), 'yyyy-MM-dd');
                 await this.saveDailyBaseline({
                     book_id: newBook.id,
                     date_iso: todayISO,
@@ -463,7 +463,7 @@ class RxDBDataLayerImpl implements DataLayer {
 
             // PROACTIVE BASELINE: Initialize baseline for today to anchor "Read Today" at 0
             try {
-                const todayISO = formatISO(new Date(), { representation: 'date' });
+                const todayISO = format(new Date(), 'yyyy-MM-dd');
                 await this.saveDailyBaseline({
                     book_id: newEpub.id,
                     date_iso: todayISO,
