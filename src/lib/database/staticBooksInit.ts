@@ -1,6 +1,6 @@
 import { BOOKS } from '@/lib/books';
 import { RxBookDocumentType } from '@/lib/database/schema';
-import { DevotoDatabase } from '@/lib/database/db';
+import type { DevotoDatabase } from './db';
 
 /**
  * Ensures all static EPUBs (from books.ts) exist in the RxDB books collection.
@@ -60,6 +60,7 @@ export async function ensureStaticBooks(db: DevotoDatabase, userId: string = 'lo
                 total_pages: 0,
                 current_page: 0,
                 percentage: 0,
+                progress_version: 0,
                 part_index: 0,
                 chapter_index: 0,
                 last_location_cfi: undefined,
