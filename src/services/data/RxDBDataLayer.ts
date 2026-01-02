@@ -293,6 +293,83 @@ class RxDBDataLayerImpl implements DataLayer {
                 console.log('DataLayer: No local-user reading plans to migrate');
             }
 
+            // Migrate user stats (last_book_id, streaks, etc.)
+            const localStats = await db.user_stats.find({
+                selector: {
+                    user_id: 'local-user',
+                    _deleted: { $eq: false }
+                }
+            }).exec();
+
+            if (localStats.length > 0) {
+                console.log(`DataLayer: Migrating ${localStats.length} local-user stats to user ${userId}`);
+
+                for (const stats of localStats) {
+                    try {
+                        // Check if server stats exist
+                        const serverStats = await db.user_stats.find({
+                            selector: {
+                                user_id: userId,
+                                _deleted: { $eq: false }
+                            }
+                        }).exec();
+
+                        if (serverStats.length === 0) {
+                            // No server stats exist, create new stats with authenticated user_id
+                            await db.user_stats.insert({
+                                id: crypto.randomUUID(),
+                                user_id: userId,
+                                streak_current: stats.streak_current,
+                                streak_longest: stats.streak_longest,
+                                last_read_iso: stats.last_read_iso,
+                                freeze_available: stats.freeze_available,
+                                total_minutes: stats.total_minutes,
+                                last_book_id: stats.last_book_id,
+                                minutes_by_date: stats.minutes_by_date,
+                                _modified: Date.now(),
+                                _deleted: false
+                            });
+                            console.log(`DataLayer: User stats migrated for user ${userId}`);
+                        } else {
+                            // Server stats exist - compare timestamps to keep the most recent
+                            const serverStat = serverStats[0];
+                            const localMod = stats._modified || 0;
+                            const serverMod = serverStat._modified || 0;
+                            
+                            if (localMod > serverMod) {
+                                // Local is newer, update server data
+                                await serverStat.incrementalPatch({
+                                    streak_current: stats.streak_current,
+                                    streak_longest: stats.streak_longest,
+                                    last_read_iso: stats.last_read_iso,
+                                    freeze_available: stats.freeze_available,
+                                    total_minutes: stats.total_minutes,
+                                    last_book_id: stats.last_book_id,
+                                    minutes_by_date: stats.minutes_by_date,
+                                    _modified: Math.max(Date.now(), serverMod + 1)
+                                });
+                                console.log(`DataLayer: User stats updated (local newer) for user ${userId}`);
+                            } else {
+                                // Server is newer or equal, keep server data
+                                console.log(`DataLayer: User stats skipped (server data is newer) for user ${userId}`);
+                            }
+                        }
+                        
+                        // Delete the old local-user stats
+                        await stats.incrementalPatch({
+                            _deleted: true,
+                            _modified: Date.now()
+                        });
+                    } catch (err: any) {
+                        console.error(`DataLayer: Failed to migrate user stats ${stats.id}:`, err);
+                    }
+                }
+
+                console.log('DataLayer: User stats migration complete');
+            } else {
+                console.log('DataLayer: No local-user stats to migrate');
+            }
+
             console.log('DataLayer: All migrations complete');
         } catch (error) {
             console.error('DataLayer: Migration failed:', error);
@@ -878,12 +955,35 @@ class RxDBDataLayerImpl implements DataLayer {
         const db = await getDatabase();
         const userId = await this.getUserId();
 
-        // user_stats PK is now 'id', so we must search by user_id field
-        const stats = await db.user_stats.findOne({
-            selector: { user_id: userId }
+        // Try to find with current userId first
+        let stats = await db.user_stats.find({
+            selector: { 
+                user_id: userId,
+                _deleted: { $eq: false }
+            }
         }).exec();
 
-        return stats ? stats.toJSON() : null;
+        // If not found and user is local-user (logged out), search for ANY stats
+        // This ensures that after logout, we still show the last_book_id from the authenticated session
+        if (stats.length === 0 && userId === 'local-user') {
+            const allStats = await db.user_stats.find({
+                selector: {
+                    _deleted: { $eq: false }
+                },
+                sort: [{ _modified: 'desc' }] // Get most recent
+            }).exec();
+            
+            if (allStats.length > 0) {
+                stats = [allStats[0]];
+                console.log('[DataLayer] 📊 Found existing stats from authenticated user:', {
+                    originalUserId: allStats[0].user_id,
+                    last_book_id: allStats[0].last_book_id,
+                    streak_current: allStats[0].streak_current
+                });
+            }
+        }
+
+        return stats.length > 0 ? stats[0].toJSON() : null;
     }
 
     async saveUserStats(statsData: Partial<RxUserStatsDocumentType>): Promise<RxUserStatsDocumentType> {
