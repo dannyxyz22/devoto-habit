@@ -1116,7 +1116,7 @@ const Index = () => {
         description="Crie o hábito de leitura espiritual diária com clássicos católicos em português."
         canonical="/"
       />
-      <Hero />
+      <Hero activeBookId={activeBookId} used={used} />
       <section className="mt-8 grid md:grid-cols-3 gap-6">
         {/* Meta diária (se houver) */}
         <div className="rounded-lg border p-4">

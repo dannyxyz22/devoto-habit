@@ -8,57 +8,31 @@ import { useToast } from "@/components/ui/use-toast";
 import { getLastBookIdAsync } from "@/lib/storage";
 
 
-export const Hero = () => {
-  const [ctaLabel, setCtaLabel] = useState("Começar agora");
-  const [ctaHref, setCtaHref] = useState("/biblioteca");
+export interface HeroProps {
+  activeBookId?: string | null;
+  used?: boolean;
+}
+
+export const Hero = ({ activeBookId, used }: HeroProps) => {
   const { toast } = useToast();
   const [debugCount, setDebugCount] = useState(0);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const ls = window.localStorage;
-        let used = false;
-        // Any saved progress or plan implies prior interaction
-        for (let i = 0; i < ls.length; i++) {
-          const key = ls.key(i) || "";
-          if (key.startsWith("progress:") || key.startsWith("plan:")) {
-            used = true;
-            break;
-          }
-        }
-        // Streak or stats also count
-        if (!used) {
-          const streak = ls.getItem("streak");
-          if (streak) {
-            const s = JSON.parse(streak || "null");
-            if (s?.lastReadISO) used = true;
-          }
-        }
-        if (!used) {
-          const stats = ls.getItem("stats");
-          if (stats) {
-            const st = JSON.parse(stats || "null");
-            if (st?.minutesByDate && Object.keys(st.minutesByDate).length > 0) used = true;
-          }
-        }
-        if (used) {
-          setCtaLabel("Continuar");
-          const last = await getLastBookIdAsync();
-          if (last) {
-            if (last.startsWith('physical-')) {
-              setCtaHref(`/physical/${last}`);
-            } else if (last.startsWith('user-')) {
-              setCtaHref(`/epub/${last}`);
-            } else {
-              const meta = BOOKS.find(b => b.id === last);
-              setCtaHref(meta?.type === 'epub' ? `/epub/${last}` : `/leitor/${last}`);
-            }
-          }
-        }
-      } catch { }
-    })();
-  }, []);
+  let ctaLabel = "Começar agora";
+  let ctaHref = "/biblioteca";
+
+  if (used) {
+    ctaLabel = "Continuar";
+    if (activeBookId) {
+      if (activeBookId.startsWith('physical-')) {
+        ctaHref = `/physical/${activeBookId}`;
+      } else if (activeBookId.startsWith('user-')) {
+        ctaHref = `/epub/${activeBookId}`;
+      } else {
+        const meta = BOOKS.find(b => b.id === activeBookId);
+        ctaHref = meta?.type === 'epub' ? `/epub/${activeBookId}` : `/leitor/${activeBookId}`;
+      }
+    }
+  }
 
   const handleSecretDebug = () => {
     const next = debugCount + 1;
