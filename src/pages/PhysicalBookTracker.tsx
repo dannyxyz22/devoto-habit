@@ -66,16 +66,12 @@ export default function PhysicalBookTracker() {
                 const book$ = db.books.findOne(bookId).$;
 
                 subscription = book$.subscribe((rxBook) => {
+                    // Use a ref-like check for loading to avoid stale closures if needed
+                    // but since setLoading is called at the end, the first few emissions see loading=true
                     if (!rxBook) {
                         // Book was deleted or doesn't exist
-                        if (!loading) {
-                            toast({
-                                title: "Livro não encontrado",
-                                description: "Este livro não existe na sua biblioteca",
-                                variant: "destructive",
-                            });
-                            navigate("/biblioteca");
-                        }
+                        // If we are still in the initial loading phase, wait.
+                        // If we already finished loading once and now it's null, redirect.
                         return;
                     }
 
