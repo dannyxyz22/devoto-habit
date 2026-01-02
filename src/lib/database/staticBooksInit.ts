@@ -1,4 +1,4 @@
-import { BOOKS } from '@/lib/books';
+import { BOOKS } from '../books';
 import { RxBookDocumentType } from '@/lib/database/schema';
 import type { DevotoDatabase } from './db';
 
