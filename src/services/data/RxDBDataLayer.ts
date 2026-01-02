@@ -34,15 +34,25 @@ class RxDBDataLayerImpl implements DataLayer {
 
                 this.migrationInProgress = true;
                 try {
-                    console.log(`DataLayer: ${event} - migrating local data and starting replication...`);
+                    console.log(`DataLayer: ${event} - starting replication first, then migrating local data...`);
+                    
+                    // Start replication FIRST to fetch server data
+                    await replicationManager.startReplication();
+                    
+                    // Wait for initial replication to complete
+                    console.log('DataLayer: Waiting for initial replication to complete...');
+                    await new Promise(resolve => setTimeout(resolve, 2000)); // Give time for initial pull
+                    
+                    // NOW migrate local-user data (will check if server data exists)
                     await this.migrateLocalUserData(session.user.id);
+                    
                     // Ensure static books have correct user_id after login
                     const db = await getDatabase();
                     await ensureStaticBooks(db, session.user.id);
-                    // Reconcile user_epubs to ensure missing rows are upserted before replication
+                    
+                    // Reconcile user_epubs to ensure missing rows are upserted
                     await replicationManager.reconcileUserEpubs();
                     await replicationManager.reconcileReadingPlans();
-                    await replicationManager.startReplication();
 
                     this.lastMigratedUserId = session.user.id;
                 } finally {
@@ -137,6 +147,150 @@ class RxDBDataLayerImpl implements DataLayer {
                 console.log('DataLayer: EPUBs migration complete');
             } else {
                 console.log('DataLayer: No local-user EPUBs to migrate');
+            }
+
+            // Migrate daily baselines
+            const localBaselines = await db.daily_baselines.find({
+                selector: {
+                    user_id: 'local-user',
+                    _deleted: { $eq: false }
+                }
+            }).exec();
+
+            if (localBaselines.length > 0) {
+                console.log(`DataLayer: Migrating ${localBaselines.length} local-user baselines to user ${userId}`);
+
+                for (const baseline of localBaselines) {
+                    try {
+                        // Need to create a new document with the correct composite ID
+                        const bookId = baseline.book_id;
+                        const dateISO = baseline.date_iso;
+                        const newId = `${userId}:${bookId}:${dateISO}`;
+                        
+                        // Check if already exists for the authenticated user (from server replication)
+                        const existing = await db.daily_baselines.findOne(newId).exec();
+                        if (!existing) {
+                            // No server data exists, safe to migrate local baseline
+                            await db.daily_baselines.insert({
+                                id: newId,
+                                user_id: userId,
+                                book_id: bookId,
+                                date_iso: dateISO,
+                                words: baseline.words,
+                                percent: baseline.percent,
+                                page: baseline.page,
+                                _modified: Date.now(),
+                                _deleted: false
+                            });
+                            console.log(`DataLayer: Baseline migrated: ${bookId} - ${dateISO}`);
+                        } else {
+                            // Server data exists - compare timestamps to keep the most recent
+                            const localMod = baseline._modified || 0;
+                            const serverMod = existing._modified || 0;
+                            
+                            if (localMod > serverMod) {
+                                // Local is newer, update server data
+                                await existing.incrementalPatch({
+                                    words: baseline.words,
+                                    percent: baseline.percent,
+                                    page: baseline.page,
+                                    _modified: Math.max(Date.now(), serverMod + 1)
+                                });
+                                console.log(`DataLayer: Baseline updated (local newer): ${bookId} - ${dateISO}`);
+                            } else {
+                                // Server is newer or equal, keep server data
+                                console.log(`DataLayer: Baseline skipped (server data is newer): ${bookId} - ${dateISO}`);
+                            }
+                        }
+                        
+                        // Delete the old local-user baseline
+                        await baseline.incrementalPatch({
+                            _deleted: true,
+                            _modified: Date.now()
+                        });
+                    } catch (err: any) {
+                        console.error(`DataLayer: Failed to migrate baseline ${baseline.id}:`, err);
+                    }
+                }
+
+                console.log('DataLayer: Baselines migration complete');
+            } else {
+                console.log('DataLayer: No local-user baselines to migrate');
+            }
+
+            // Migrate reading plans
+            const localPlans = await db.reading_plans.find({
+                selector: {
+                    user_id: 'local-user',
+                    _deleted: { $eq: false }
+                }
+            }).exec();
+
+            if (localPlans.length > 0) {
+                console.log(`DataLayer: Migrating ${localPlans.length} local-user reading plans to user ${userId}`);
+
+                for (const plan of localPlans) {
+                    try {
+                        // Need to create a new document with the correct composite ID
+                        const bookId = plan.book_id;
+                        const newId = `${userId}:${bookId}`;
+                        
+                        // Check if already exists for the authenticated user (from server replication)
+                        const existing = await db.reading_plans.findOne(newId).exec();
+                        if (!existing) {
+                            // No server data exists, safe to migrate local plan
+                            await db.reading_plans.insert({
+                                id: newId,
+                                user_id: userId,
+                                book_id: bookId,
+                                target_date_iso: plan.target_date_iso,
+                                target_part_index: plan.target_part_index,
+                                target_chapter_index: plan.target_chapter_index,
+                                start_percent: plan.start_percent,
+                                start_part_index: plan.start_part_index,
+                                start_chapter_index: plan.start_chapter_index,
+                                start_words: plan.start_words,
+                                _modified: Date.now(),
+                                _deleted: false
+                            });
+                            console.log(`DataLayer: Reading plan migrated: ${bookId}`);
+                        } else {
+                            // Server data exists - compare timestamps to keep the most recent
+                            const localMod = plan._modified || 0;
+                            const serverMod = existing._modified || 0;
+                            
+                            if (localMod > serverMod) {
+                                // Local is newer, update server data
+                                await existing.incrementalPatch({
+                                    target_date_iso: plan.target_date_iso,
+                                    target_part_index: plan.target_part_index,
+                                    target_chapter_index: plan.target_chapter_index,
+                                    start_percent: plan.start_percent,
+                                    start_part_index: plan.start_part_index,
+                                    start_chapter_index: plan.start_chapter_index,
+                                    start_words: plan.start_words,
+                                    _modified: Math.max(Date.now(), serverMod + 1)
+                                });
+                                console.log(`DataLayer: Reading plan updated (local newer): ${bookId}`);
+                            } else {
+                                // Server is newer or equal, keep server data
+                                console.log(`DataLayer: Reading plan skipped (server data is newer): ${bookId}`);
+                            }
+                        }
+                        
+                        // Delete the old local-user plan
+                        await plan.incrementalPatch({
+                            _deleted: true,
+                            _modified: Date.now()
+                        });
+                    } catch (err: any) {
+                        console.error(`DataLayer: Failed to migrate reading plan ${plan.id}:`, err);
+                    }
+                }
+
+                console.log('DataLayer: Reading plans migration complete');
+            } else {
+                console.log('DataLayer: No local-user reading plans to migrate');
             }
 
             console.log('DataLayer: All migrations complete');
@@ -501,19 +655,28 @@ class RxDBDataLayerImpl implements DataLayer {
         const db = await getDatabase();
         const userId = await this.getUserId();
 
-        // Try to find by composite ID first (user_id:book_id), then by book_id alone
+        // Try to find by composite ID first (user_id:book_id)
         const compositeId = `${userId}:${bookId}`;
         let plan = await db.reading_plans.findOne(compositeId).exec();
 
         if (!plan) {
-            // Fallback: search by book_id for local-user plans
+            // Fallback: search by book_id for any user (especially when logged out)
             const plans = await db.reading_plans.find({
                 selector: {
                     book_id: bookId,
                     _deleted: { $eq: false }
-                }
+                },
+                sort: [{ _modified: 'desc' }] // Get most recent
             }).exec();
             plan = plans[0] || null;
+            
+            if (plan && userId === 'local-user') {
+                console.log('[DataLayer] 📅 Found existing reading plan from authenticated user:', {
+                    bookId,
+                    originalUserId: plan.user_id,
+                    targetDate: plan.target_date_iso
+                });
+            }
         }
 
         return plan ? plan.toJSON() : null;
@@ -611,8 +774,34 @@ class RxDBDataLayerImpl implements DataLayer {
         const db = await getDatabase();
         const userId = await this.getUserId();
 
+        // Try to find with current userId first
         const id = `${userId}:${bookId}:${dateISO}`;
-        const baseline = await db.daily_baselines.findOne(id).exec();
+        let baseline = await db.daily_baselines.findOne(id).exec();
+
+        // If not found and user is local-user (logged out), search for ANY baseline for this book/date
+        // This prevents creating duplicate baselines when user logs out
+        if (!baseline && userId === 'local-user') {
+            const baselines = await db.daily_baselines.find({
+                selector: {
+                    book_id: bookId,
+                    date_iso: dateISO,
+                    _deleted: { $eq: false }
+                },
+                sort: [{ _modified: 'desc' }] // Get most recent
+            }).exec();
+            
+            baseline = baselines[0] || null;
+            
+            if (baseline) {
+                console.log('[DataLayer] 📏 Found existing baseline from authenticated user:', {
+                    bookId,
+                    dateISO,
+                    originalUserId: baseline.user_id,
+                    percent: baseline.percent,
+                    page: baseline.page
+                });
+            }
+        }
 
         return baseline ? baseline.toJSON() : null;
     }
@@ -625,7 +814,32 @@ class RxDBDataLayerImpl implements DataLayer {
         const dateISO = baselineData.date_iso!;
         const id = baselineData.id || `${userId}:${bookId}:${dateISO}`;
 
-        const existingBaseline = await db.daily_baselines.findOne(id).exec();
+        let existingBaseline = await db.daily_baselines.findOne(id).exec();
+
+        // If user is local-user and baseline doesn't exist, check if there's an existing baseline
+        // from a previous authenticated session to avoid creating duplicates
+        if (!existingBaseline && userId === 'local-user') {
+            const baselines = await db.daily_baselines.find({
+                selector: {
+                    book_id: bookId,
+                    date_iso: dateISO,
+                    _deleted: { $eq: false }
+                },
+                sort: [{ _modified: 'desc' }]
+            }).exec();
+            
+            if (baselines.length > 0) {
+                existingBaseline = baselines[0];
+                console.log('[DataLayer] 📏 Found existing baseline from authenticated user, skipping duplicate creation:', {
+                    bookId,
+                    dateISO,
+                    originalUserId: existingBaseline.user_id,
+                    percent: existingBaseline.percent,
+                    page: existingBaseline.page
+                });
+                return existingBaseline.toJSON();
+            }
+        }
 
         if (existingBaseline) {
             const updates: any = {

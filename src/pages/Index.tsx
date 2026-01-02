@@ -524,9 +524,35 @@ const Index = () => {
         const db = await getDatabase();
         // Build baselineId with userId (same format as RxDBDataLayer)
         const baselineId = `${userId}:${activeBookId}:${todayISO}`;
+        
+        let baseline = null;
+        
+        // Try specific ID first
         const doc = await db.daily_baselines.findOne(baselineId).exec();
         if (doc) {
-          const baseline = doc.toJSON();
+          baseline = doc.toJSON();
+        } else if (userId === 'local-user') {
+          // If not found and user is local-user, search for ANY baseline for this book/date
+          const docs = await db.daily_baselines.find({
+            selector: {
+              book_id: activeBookId,
+              date_iso: todayISO,
+              _deleted: { $eq: false }
+            },
+            sort: [{ _modified: 'desc' }]
+          }).exec();
+          
+          if (docs && docs.length > 0) {
+            baseline = docs[0].toJSON();
+            console.log('[Index] 📏 loadFromRxDB - found baseline from authenticated user:', {
+              originalUserId: baseline.user_id,
+              page: baseline.page,
+              percent: baseline.percent
+            });
+          }
+        }
+        
+        if (baseline) {
           console.log('[Index] 📏 loadFromRxDB - daily_baseline found:', { id: baselineId, baseline });
           setActiveBaseline({
             words: baseline.words || 0,
@@ -547,29 +573,66 @@ const Index = () => {
     const setupSubscription = async () => {
       try {
         const db = await getDatabase();
-        // Build baselineId with userId (same format as RxDBDataLayer)
+        // When logged out (userId='local-user'), search by book_id and date_iso to find baseline
+        // from ANY user (especially from previous authenticated session)
+        // When logged in, still try specific ID first for performance
         const baselineId = `${userId}:${activeBookId}:${todayISO}`;
-        const sub = db.daily_baselines.findOne(baselineId).$.subscribe(doc => {
-          if (doc) {
-            const baseline = doc.toJSON();
-            console.log('[Index] 📏 Baseline subscription fired:', {
-              baselineId,
-              baseline,
-              bookId: activeBookId,
-              userId,
-              todayISO
-            });
-            setActiveBaseline({
-              words: baseline.words || 0,
-              percent: baseline.percent || 0,
-              page: baseline.page,
-              timestamp: baseline._modified
-            });
-          } else {
-            console.log('[Index] 📏 Baseline subscription: no doc found', { baselineId, bookId: activeBookId, userId, todayISO });
-          }
-        });
-        subscription = { unsubscribe: () => sub.unsubscribe() };
+        
+        if (userId === 'local-user') {
+          // For local-user, subscribe to ANY baseline for this book/date
+          const sub = db.daily_baselines.find({
+            selector: {
+              book_id: activeBookId,
+              date_iso: todayISO,
+              _deleted: { $eq: false }
+            },
+            sort: [{ _modified: 'desc' }]
+          }).$.subscribe(docs => {
+            if (docs && docs.length > 0) {
+              const baseline = docs[0].toJSON();
+              console.log('[Index] 📏 Baseline subscription fired (any user):', {
+                baseline,
+                bookId: activeBookId,
+                originalUserId: baseline.user_id,
+                todayISO
+              });
+              setActiveBaseline({
+                words: baseline.words || 0,
+                percent: baseline.percent || 0,
+                page: baseline.page,
+                timestamp: baseline._modified
+              });
+            } else {
+              console.log('[Index] 📏 Baseline subscription: no doc found', { bookId: activeBookId, todayISO });
+              setActiveBaseline(null);
+            }
+          });
+          subscription = { unsubscribe: () => sub.unsubscribe() };
+        } else {
+          // For authenticated user, use specific ID
+          const sub = db.daily_baselines.findOne(baselineId).$.subscribe(doc => {
+            if (doc) {
+              const baseline = doc.toJSON();
+              console.log('[Index] 📏 Baseline subscription fired:', {
+                baselineId,
+                baseline,
+                bookId: activeBookId,
+                userId,
+                todayISO
+              });
+              setActiveBaseline({
+                words: baseline.words || 0,
+                percent: baseline.percent || 0,
+                page: baseline.page,
+                timestamp: baseline._modified
+              });
+            } else {
+              console.log('[Index] 📏 Baseline subscription: no doc found', { baselineId, bookId: activeBookId, userId, todayISO });
+              setActiveBaseline(null);
+            }
+          });
+          subscription = { unsubscribe: () => sub.unsubscribe() };
+        }
       } catch (err) {
         console.error('[Index] Failed to setup daily_baselines subscription:', err);
       }
