@@ -116,9 +116,11 @@ export default function PhysicalBookTracker() {
 
                     // Initialize progress in storage
                     const todayISO = format(new Date(), "yyyy-MM-dd");
+                    // Determine if we need to update local storage progress
                     const existingProgress = getProgress(bookId);
 
-                    if (!existingProgress) {
+                    // Update if missing or if page count is out of sync (e.g. from cloud sync)
+                    if (!existingProgress || existingProgress.currentPage !== physicalBook.currentPage) {
                         const percent = calculatePagePercent(physicalBook.currentPage, physicalBook.totalPages);
                         setProgress(bookId, {
                             partIndex: 0,
@@ -131,11 +133,26 @@ export default function PhysicalBookTracker() {
 
                     // Initialize baseline if needed
                     const baseline = getDailyBaseline(bookId, todayISO);
-                    if (!baseline) {
+
+                    // Create if missing OR repair if missing 'page' property for physical book
+                    if (!baseline || (baseline.page === undefined)) {
+                        // Use current page as baseline. 
+                        // Note: If user already read today and we are just loading now, using currentPage 
+                        // might mean daily progress = 0. But for a fresh "start of day", this is correct.
+                        // If repairing, we technically don't know the "start" page, so using current is the safest fallback 
+                        // to avoid negative progress or wild jumps, enabling tracking FROM NOW.
                         const percent = calculatePagePercent(physicalBook.currentPage, physicalBook.totalPages);
+
                         setDailyBaseline(bookId, todayISO, {
                             words: 0,
                             percent,
+                            page: physicalBook.currentPage // Explicitly save page for physical books
+                        });
+
+                        console.log('[PhysicalBookTracker] 📏 Baseline initialized/repaired:', {
+                            bookId,
+                            page: physicalBook.currentPage,
+                            wasMissing: !baseline
                         });
                     }
 
