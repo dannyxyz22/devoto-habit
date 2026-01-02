@@ -245,7 +245,7 @@ export const setReadingPlan = async (bookId: string, targetDateISO: string | nul
 };
 
 // Daily baseline per book - now uses RxDB
-export type BaselineEntry = { words: number; percent: number; page?: number };
+export type BaselineEntry = { words: number; percent: number; page?: number; timestamp?: number };
 
 const getBaselineMap = (bookId: string): Record<string, BaselineEntry> =>
   storage.get<Record<string, BaselineEntry>>(`baseline:${bookId}`, {});
@@ -254,7 +254,12 @@ export const getDailyBaselineAsync = async (bookId: string, dateISO: string): Pr
   try {
     const baseline = await dataLayer.getDailyBaseline(bookId, dateISO);
     if (baseline) {
-      return { words: baseline.words ?? 0, percent: baseline.percent ?? 0, page: baseline.page };
+      return {
+        words: baseline.words ?? 0,
+        percent: baseline.percent ?? 0,
+        page: baseline.page,
+        timestamp: baseline._modified // Map _modified to timestamp
+      };
     }
   } catch (e) {
     console.warn('[storage] Failed to get daily baseline from RxDB:', e);

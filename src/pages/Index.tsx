@@ -531,7 +531,8 @@ const Index = () => {
           setActiveBaseline({
             words: baseline.words || 0,
             percent: baseline.percent || 0,
-            page: baseline.page
+            page: baseline.page,
+            timestamp: baseline._modified
           });
           return true;
         }
@@ -561,7 +562,8 @@ const Index = () => {
             setActiveBaseline({
               words: baseline.words || 0,
               percent: baseline.percent || 0,
-              page: baseline.page
+              page: baseline.page,
+              timestamp: baseline._modified
             });
           } else {
             console.log('[Index] 📏 Baseline subscription: no doc found', { baselineId, bookId: activeBookId, userId, todayISO });
@@ -1138,6 +1140,11 @@ const Index = () => {
                 {activeIsPhysical && activeBookPhysicalInfo
                   ? `Página ${baselineEntryForToday?.page ?? 0} de ${activeBookPhysicalInfo.totalPages} do livro`
                   : `${(baselineEntryForToday?.percent ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} % do livro`}
+                {baselineEntryForToday?.timestamp && (
+                  <span className="block text-[10px] opacity-70">
+                    Criado às {format(new Date(baselineEntryForToday.timestamp), 'HH:mm')}
+                  </span>
+                )}
               </p>
             </>
           ) : (
