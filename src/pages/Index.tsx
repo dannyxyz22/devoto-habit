@@ -524,9 +524,9 @@ const Index = () => {
         const db = await getDatabase();
         // Build baselineId with userId (same format as RxDBDataLayer)
         const baselineId = `${userId}:${activeBookId}:${todayISO}`;
-        
+
         let baseline = null;
-        
+
         // Try specific ID first
         const doc = await db.daily_baselines.findOne(baselineId).exec();
         if (doc) {
@@ -541,7 +541,7 @@ const Index = () => {
             },
             sort: [{ _modified: 'desc' }]
           }).exec();
-          
+
           if (docs && docs.length > 0) {
             baseline = docs[0].toJSON();
             console.log('[Index] 📏 loadFromRxDB - found baseline from authenticated user:', {
@@ -551,7 +551,7 @@ const Index = () => {
             });
           }
         }
-        
+
         if (baseline) {
           console.log('[Index] 📏 loadFromRxDB - daily_baseline found:', { id: baselineId, baseline });
           setActiveBaseline({
@@ -577,7 +577,7 @@ const Index = () => {
         // from ANY user (especially from previous authenticated session)
         // When logged in, still try specific ID first for performance
         const baselineId = `${userId}:${activeBookId}:${todayISO}`;
-        
+
         if (userId === 'local-user') {
           // For local-user, subscribe to ANY baseline for this book/date
           const sub = db.daily_baselines.find({
@@ -1254,7 +1254,12 @@ const Index = () => {
               {activeBookId && totalBookProgressPercent != null && (
                 <div className="mt-2">
                   <Progress value={totalBookProgressPercent} />
-                  <p className="text-sm text-muted-foreground mt-2">Livro: {totalBookProgressPercent.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%</p>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Livro: {totalBookProgressPercent.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%
+                    {activeIsPhysical && activeBookPhysicalInfo && (
+                      <span className="opacity-75"> • Página {activeBookPhysicalInfo.currentPage} de {activeBookPhysicalInfo.totalPages}</span>
+                    )}
+                  </p>
                 </div>
               )}
             </>
