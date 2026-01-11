@@ -7,12 +7,11 @@ import { resolveEpubSource } from "@/lib/utils";
 import { getUserEpubBlob } from "@/lib/userEpubs";
 import { SEO } from "@/components/app/SEO";
 import { getDailyBaselineAsync, setDailyBaseline, setProgress, getReadingPlanAsync, getProgress } from "@/lib/storage";
-import { updateDailyProgressWidget } from "@/main";
-import { WidgetUpdater, canUseNative } from "@/lib/widgetUpdater";
+import { canUseNative } from "@/lib/widgetUpdater";
 import { format } from "date-fns";
-import { computeDaysRemaining, computeDailyProgressPercent } from "@/lib/reading";
 import { dataLayer } from "@/services/data/RxDBDataLayer";
 import { calculatePercent } from "@/lib/percentageUtils";
+import { refreshWidget } from "@/lib/widgetService"; // Use centralized widget service
 import { ChevronLeft } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -145,29 +144,8 @@ const EpubReaderV3 = () => {
     }
 
     // Atualizar baseline e widgets (operações "leves", mas agora garantidas)
-    const updatedBase = await getDailyBaselineAsync(epubId, todayISO);
-    const baselinePercent = updatedBase ? updatedBase.percent : oldPercentage;
-
-    const plan = await getReadingPlanAsync(epubId);
-    if (plan?.targetDateISO) {
-      const daysRemaining = computeDaysRemaining(plan.targetDateISO);
-      const dailyTargetPercent = daysRemaining ? Math.ceil(Math.max(0, 100 - baselinePercent) / daysRemaining) : null;
-      const achievedPercentToday = Math.max(0, percent - baselinePercent);
-      const dailyProgressPercent = computeDailyProgressPercent(achievedPercentToday, dailyTargetPercent) ?? 0;
-
-      if (canUseNative()) {
-        try {
-          const hasGoal = dailyTargetPercent != null && dailyTargetPercent > 0;
-          console.log("[EpubReaderV3] Updating widget:", { dailyProgressPercent, hasGoal });
-          await updateDailyProgressWidget(dailyProgressPercent, hasGoal);
-          await WidgetUpdater.update?.();
-        } catch (err) {
-          console.error("[EpubReaderV3] Widget update failed:", err);
-        }
-      }
-    } else {
-      console.log("[EpubReaderV3] No reading plan found for widget update");
-    }
+    // Usar serviço centralizado para garantir consistência entre Reader, PhysicalTracker e Index
+    await refreshWidget(epubId);
   }, [epubId]);
 
   // Função agendadora (debounce)

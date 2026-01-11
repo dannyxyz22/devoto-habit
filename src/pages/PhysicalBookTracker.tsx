@@ -19,6 +19,7 @@ import { Label } from "@/components/ui/label";
 import { Pencil, Upload } from "lucide-react";
 import { saveCoverBlob } from "@/lib/coverCache";
 import { calculatePagePercent } from "@/lib/percentageUtils";
+import { refreshWidget } from "@/lib/widgetService";
 
 
 
@@ -222,6 +223,9 @@ export default function PhysicalBookTracker() {
                 title: "Progresso atualizado!",
                 description: `Você está na página ${newPage} de ${book.totalPages}`,
             });
+
+            // 7. Update widget
+            await refreshWidget(bookId);
         } catch (error) {
             console.error("Error updating progress:", error);
             toast({
@@ -365,6 +369,9 @@ export default function PhysicalBookTracker() {
                 console.log(`[Debounced Save] Saving final page: ${newPage} for book ${bookId}`);
                 await dataLayer.saveBookProgress(bookId, newPage);
                 console.log('[Debounced Save] Success');
+
+                // NEW: Update widget
+                await refreshWidget(bookId);
             } catch (error) {
                 console.error("[Debounced Save] Error:", error);
                 // Since this is delayed, showing a toast here might be confusing if the user has moved on,
