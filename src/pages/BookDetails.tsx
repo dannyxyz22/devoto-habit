@@ -430,7 +430,9 @@ export default function BookDetails() {
                   <CardContent className="pt-6">
                     <div className="text-center">
                       <p className="text-sm text-muted-foreground">Dias de leitura</p>
-                      <p className="text-3xl font-bold text-primary">{progressData.length}</p>
+                      <p className="text-3xl font-bold text-primary">
+                        {progressData.filter(d => !d.isGoal).length}
+                      </p>
                     </div>
                   </CardContent>
                 </Card>
@@ -439,7 +441,7 @@ export default function BookDetails() {
                     <div className="text-center">
                       <p className="text-sm text-muted-foreground">Início</p>
                       <p className="text-lg font-semibold">
-                        {format(parseISO(progressData[0].date), "dd/MM/yyyy")}
+                        {format(parseISO(progressData.find(d => !d.isGoal)?.date || progressData[0].date), "dd/MM/yyyy")}
                       </p>
                     </div>
                   </CardContent>
