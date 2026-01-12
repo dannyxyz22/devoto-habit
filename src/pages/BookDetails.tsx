@@ -43,6 +43,11 @@ export default function BookDetails() {
   const yAxisLabel = isPhysical ? "Páginas" : "Progresso (%)";
   const yAxisMax = isPhysical ? (book?.totalPages || 100) : 100;
 
+  // Scroll to top when page loads
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   useEffect(() => {
     if (!bookId) {
       navigate("/biblioteca");

@@ -667,7 +667,7 @@ const Library = () => {
         description="Escolha um clássico católico em português e comece sua leitura devocional."
         canonical="/biblioteca"
       />
-      <div className="container mx-auto">
+      <div className="container mx-auto px-4">
         <nav className="mb-4 text-sm">
           <BackLink to="/" label="Início" className="text-muted-foreground hover:text-foreground" />
         </nav>
@@ -686,7 +686,7 @@ const Library = () => {
           </div>
         </div>
       </div>
-      <div className="container mx-auto mb-6">
+      <div className="container mx-auto mb-6 px-4">
         <input
           ref={fileInputRef}
           type="file"
@@ -757,7 +757,7 @@ const Library = () => {
         onOpenChange={setShowBookSearch}
         onBookAdded={handleBookAdded}
       />
-      <section className="container mx-auto grid md:grid-cols-2 gap-6">
+      <section className="container mx-auto grid grid-cols-1 md:grid-cols-2 gap-6 px-4 md:px-0">
         {sortedBooks.map((book) => (
           <Card key={book.id} className="hover:shadow-lg transition-shadow">
             <div
