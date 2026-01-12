@@ -425,7 +425,7 @@ export default function BookDetails() {
 
             {/* Stats Summary */}
             {progressData.length > 1 && (
-              <div className="grid gap-4 sm:grid-cols-3">
+              <div className="grid gap-4 grid-cols-2">
                 <Card>
                   <CardContent className="pt-6">
                     <div className="text-center">
@@ -440,16 +440,6 @@ export default function BookDetails() {
                       <p className="text-sm text-muted-foreground">Início</p>
                       <p className="text-lg font-semibold">
                         {format(parseISO(progressData[0].date), "dd/MM/yyyy")}
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="text-center">
-                      <p className="text-sm text-muted-foreground">Última Leitura</p>
-                      <p className="text-lg font-semibold">
-                        {format(parseISO(progressData[progressData.length - 1].date), "dd/MM/yyyy")}
                       </p>
                     </div>
                   </CardContent>
