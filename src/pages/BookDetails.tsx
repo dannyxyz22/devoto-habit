@@ -366,9 +366,9 @@ export default function BookDetails() {
                             formatter={(value, name, item) => {
                               const isGoalPoint = item?.payload?.isGoal;
                               if (isGoalPoint) {
-                                return isPhysical ? `🎯 Meta: ${value} páginas` : `🎯 Meta: ${value}%`;
+                                return isPhysical ? `🎯 Meta: ${value}` : `🎯 Meta: ${value}%`;
                               }
-                              return isPhysical ? `${value} páginas` : `${value}%`;
+                              return isPhysical ? `${value}` : `${value}%`;
                             }}
                           />
                         }
