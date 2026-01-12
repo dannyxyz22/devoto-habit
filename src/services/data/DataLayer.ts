@@ -76,6 +76,13 @@ export interface DataLayer {
     getDailyBaseline(bookId: string, dateISO: string): Promise<RxDailyBaselineDocumentType | null>;
 
     /**
+     * Get all baselines for a book, ordered by date ascending
+     * @param bookId The book ID
+     * @param limit Optional limit on number of baselines to return (default: 90 days)
+     */
+    getBaselinesForBook(bookId: string, limit?: number): Promise<RxDailyBaselineDocumentType[]>;
+
+    /**
      * Save daily baseline for a book
      */
     saveDailyBaseline(baseline: Partial<RxDailyBaselineDocumentType>): Promise<RxDailyBaselineDocumentType>;

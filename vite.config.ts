@@ -12,6 +12,9 @@ export default defineConfig(({ mode }) => ({
     port: 8080,
     strictPort: false, // Se 8080 estiver ocupado, tenta outra porta
     open: false, // Não abre automaticamente no navegador
+    allowedHosts: [
+      "gustavo-overcommon-sandy.ngrok-free.dev" // AUTORIZA o domínio do ngrok
+    ],
   },
   plugins: [
     react(),

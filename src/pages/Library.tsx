@@ -773,11 +773,8 @@ const Library = () => {
                   return;
                 }
 
-                if (book.isPhysical) {
-                  navigate(`/physical/${book.id}`);
-                } else {
-                  navigate(book.type === 'epub' ? `/epub/${book.id}` : `/leitor/${book.id}`);
-                }
+                // Navigate to unified book details page
+                navigate(`/book/${book.id}`);
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
@@ -792,11 +789,8 @@ const Library = () => {
                     return;
                   }
 
-                  if (book.isPhysical) {
-                    navigate(`/physical/${book.id}`);
-                  } else {
-                    navigate(book.type === 'epub' ? `/epub/${book.id}` : `/leitor/${book.id}`);
-                  }
+                  // Navigate to unified book details page
+                  navigate(`/book/${book.id}`);
                 }
               }}
               className="cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2"
@@ -1059,11 +1053,8 @@ const Library = () => {
                   onClick={() => {
                     // Save as current book before navigating
                     setLastBookId(book.id);
-                    if (book.isPhysical) {
-                      navigate(`/physical/${book.id}`);
-                    } else {
-                      navigate(book.type === 'epub' ? `/epub/${book.id}` : `/leitor/${book.id}`);
-                    }
+                    // Navigate to unified book details page
+                    navigate(`/book/${book.id}`);
                   }}
                   disabled={book.type === 'epub' && book.isUserUpload && !book.hasLocalFile}
                 >

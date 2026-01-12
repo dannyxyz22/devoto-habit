@@ -13,6 +13,7 @@ import Library from "./pages/Library";
 import Reader from "./pages/Reader";
 import EpubReaderV3 from "./pages/EpubReaderV3";
 import PhysicalBookTracker from "./pages/PhysicalBookTracker";
+import BookDetails from "./pages/BookDetails";
 import Stats from "./pages/Stats";
 import NotFound from "./pages/NotFound";
 import { ThemeProvider } from "next-themes";
@@ -70,6 +71,7 @@ const App = () => {
             <Route path="/leitor/:bookId" element={<Reader />} />
             <Route path="/epub/:epubId" element={<EpubReaderV3 />} />
             <Route path="/physical/:bookId" element={<PhysicalBookTracker />} />
+            <Route path="/book/:bookId" element={<BookDetails />} />
             <Route path="/estatisticas" element={<Stats />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

@@ -883,6 +883,28 @@ class RxDBDataLayerImpl implements DataLayer {
         return baseline ? baseline.toJSON() : null;
     }
 
+    async getBaselinesForBook(bookId: string, limit: number = 90): Promise<RxDailyBaselineDocumentType[]> {
+        const db = await getDatabase();
+        
+        const baselines = await db.daily_baselines.find({
+            selector: {
+                book_id: bookId,
+                _deleted: { $eq: false }
+            },
+            sort: [{ date_iso: 'asc' }]
+        }).exec();
+
+        // Convert to JSON and apply limit
+        const result = baselines.map(b => b.toJSON());
+        
+        // If we have more than limit, take the most recent ones
+        if (result.length > limit) {
+            return result.slice(-limit);
+        }
+        
+        return result;
+    }
+
     async saveDailyBaseline(baselineData: Partial<RxDailyBaselineDocumentType>): Promise<RxDailyBaselineDocumentType> {
         const db = await getDatabase();
         const userId = await this.getUserId();
