@@ -68,6 +68,19 @@ Opcionalmente faça:
    npx cap open android
    ```
 
+### Ngrok
+
+Para facilitar o desenvolvimento mobile foi adicionado um OAuth com redirect pelo ngrok.
+```bash
+ngrok config add-authtoken <token>
+```
+
+E, depois:
+```bash
+ngrok http --url=gustavo-overcommon-sandy.ngrok-free.dev 8080
+```
+
+
 ### Widget Android
 
 O projeto inclui um Widget nativo para Android que exibe o progresso da meta diária.
