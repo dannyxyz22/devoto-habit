@@ -135,10 +135,22 @@ export default function BookDetails() {
         // Use foundBook to determine if physical (not state which isn't updated yet)
         const bookIsPhysical = foundBook.isPhysical || foundBook.type === "physical";
         
+        // Get today's date in ISO format
+        const todayISO = format(new Date(), "yyyy-MM-dd");
+        
+        // Get current progress for today
+        const currentProgress = bookIsPhysical 
+          ? foundBook.currentPage || 0
+          : foundBook.percentage || 0;
+        
         const chartData: ProgressDataPoint[] = baselines.map((baseline) => {
-          const value = bookIsPhysical
-            ? baseline.page ?? Math.round((baseline.percent / 100) * (foundBook?.totalPages || 100))
-            : baseline.percent;
+          // For today, use current progress instead of baseline
+          const isToday = baseline.date_iso === todayISO;
+          const value = isToday 
+            ? (bookIsPhysical ? currentProgress : currentProgress)
+            : (bookIsPhysical
+              ? baseline.page ?? Math.round((baseline.percent / 100) * (foundBook?.totalPages || 100))
+              : baseline.percent);
 
           return {
             date: baseline.date_iso,
