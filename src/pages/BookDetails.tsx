@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { dataLayer } from "@/services/data/RxDBDataLayer";
+import { getDatabase } from "@/lib/database/db";
 import { getUserEpubs } from "@/lib/userEpubs";
 import { BOOKS, type BookMeta } from "@/lib/books";
 import { getProgress, setLastBookId, getReadingPlanAsync, setReadingPlan, type ReadingPlan } from "@/lib/storage";
@@ -54,6 +55,61 @@ export default function BookDetails() {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
+
+  // Reactive subscription to reading plan changes (sync from other devices)
+  useEffect(() => {
+    if (!bookId) return;
+
+    let subscription: any;
+
+    const setupSubscription = async () => {
+      try {
+        const db = await getDatabase();
+        
+        // Subscribe to reading_plans collection for this book
+        subscription = db.reading_plans.findOne({
+          selector: { book_id: bookId }
+        }).$.subscribe((planDoc) => {
+          if (planDoc) {
+            const planData = planDoc.toJSON();
+            // Check if the plan is deleted or has no valid target date
+            if (planData._deleted || !planData.target_date_iso || planData.target_date_iso.trim() === '') {
+              console.log('[BookDetails] Reading plan deleted or empty, clearing state');
+              setReadingPlanState({ targetDateISO: null });
+              setRefetchTrigger((prev) => prev + 1);
+            } else {
+              console.log('[BookDetails] Reading plan updated:', planData.target_date_iso);
+              setReadingPlanState({
+                targetDateISO: planData.target_date_iso,
+                targetPartIndex: planData.target_part_index,
+                targetChapterIndex: planData.target_chapter_index,
+                startPercent: planData.start_percent,
+                startPartIndex: planData.start_part_index,
+                startChapterIndex: planData.start_chapter_index,
+                startWords: planData.start_words,
+              });
+              setRefetchTrigger((prev) => prev + 1);
+            }
+          } else {
+            // No plan document found
+            console.log('[BookDetails] No reading plan found for book');
+            setReadingPlanState({ targetDateISO: null });
+            setRefetchTrigger((prev) => prev + 1);
+          }
+        });
+      } catch (error) {
+        console.error('[BookDetails] Error setting up reading plan subscription:', error);
+      }
+    };
+
+    setupSubscription();
+
+    return () => {
+      if (subscription) {
+        subscription.unsubscribe();
+      }
+    };
+  }, [bookId]);
 
   useEffect(() => {
     if (!bookId) {
