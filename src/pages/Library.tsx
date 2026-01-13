@@ -9,16 +9,15 @@ import { BOOKS, type BookMeta } from "@/lib/books";
 import { SEO } from "@/components/app/SEO";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { setReadingPlan, getProgress, getReadingPlan, getDailyBaseline, setLastBookId, getLastBookIdAsync } from "@/lib/storage";
+import { getProgress, getReadingPlan, getDailyBaseline, setLastBookId, getLastBookIdAsync } from "@/lib/storage";
 import { toast } from "@/hooks/use-toast";
-import { format, parseISO } from "date-fns";
 import { resolveEpubSource } from "@/lib/utils";
 import ePub from "epubjs";
 import { getCoverObjectUrl, saveCoverBlob } from "@/lib/coverCache";
 import { saveUserEpub, getUserEpubs, deleteUserEpub, reUploadEpub } from "@/lib/userEpubs";
 import { getDatabase } from "@/lib/database/db";
 import { BookSearchDialog } from "@/components/app/BookSearchDialog";
-import { Upload, Trash2, BookPlus, AlertCircle, X, Bookmark, Calendar } from "lucide-react";
+import { Upload, Trash2, BookPlus, AlertCircle, Bookmark } from "lucide-react";
 import { BookCover } from "@/components/book/BookCover";
 import { calculatePagePercent } from "@/lib/percentageUtils";
 
@@ -627,10 +626,15 @@ const Library = () => {
               ) : null}
             </div>
             <CardHeader>
+              {book.id === activeBookId && (
+                <div className="flex items-center gap-1 bg-primary/10 text-primary text-xs px-2 py-1 rounded-full w-fit mb-2">
+                  <Bookmark className="h-3 w-3 fill-current" />
+                  <span>Lendo agora</span>
+                </div>
+              )}
               <CardTitle className="flex items-center justify-between">
                 <span>{book.title}</span>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">{book.author}</span>
                   {(book.isUserUpload || book.isPhysical) && (
                     <Button
                       variant="ghost"
@@ -645,14 +649,11 @@ const Library = () => {
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   )}
-                  {book.id === activeBookId && (
-                    <div className="flex items-center gap-1 bg-primary/10 text-primary text-xs px-2 py-1 rounded-full whitespace-nowrap">
-                      <Bookmark className="h-3 w-3 fill-current" />
-                      <span>Lendo agora</span>
-                    </div>
-                  )}
                 </div>
               </CardTitle>
+              {book.author && (
+                <p className="text-sm text-muted-foreground">{book.author}</p>
+              )}
               {book.addedDate && (
                 <p className="text-xs text-muted-foreground mt-1">
                   Adicionado em: {new Date(book.addedDate).toLocaleDateString()}
@@ -661,61 +662,6 @@ const Library = () => {
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground mb-4">{book.description}</p>
-
-              {/* Reading plan target date */}
-              {(() => {
-                const targetDateISO = (book as any).targetDateISO;
-                // Only show if targetDateISO is a valid non-empty string
-                if (targetDateISO && typeof targetDateISO === 'string' && targetDateISO.trim() !== '') {
-                  try {
-                    const targetDate = parseISO(targetDateISO);
-                    // Validate that the date is valid
-                    if (isNaN(targetDate.getTime())) {
-                      console.warn('[Library] Invalid date:', targetDateISO);
-                      return null;
-                    }
-                    return (
-                      <div className="mb-4 p-2 bg-muted/50 rounded-md flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                          <p className="text-sm font-medium text-muted-foreground">
-                            Meta de leitura: {format(targetDate, "dd/MM/yyyy")}
-                          </p>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            try {
-                              await setReadingPlan(book.id, null);
-                              toast({
-                                title: "Meta removida",
-                                description: "A meta de leitura foi removida com sucesso.",
-                              });
-                            } catch (error) {
-                              console.error('[Library] Error removing plan:', error);
-                              toast({
-                                title: "Erro ao remover meta",
-                                description: "Não foi possível remover a meta de leitura.",
-                                variant: "destructive",
-                              });
-                            }
-                          }}
-                          title="Remover meta de leitura"
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    );
-                  } catch (error) {
-                    console.warn('[Library] Error parsing date:', targetDateISO, error);
-                    return null;
-                  }
-                }
-                return null;
-              })()}
 
               {/* EPUB not available locally message */}
               {book.type === 'epub' && book.isUserUpload && !book.hasLocalFile && (
@@ -878,7 +824,7 @@ const Library = () => {
                   }}
                   disabled={book.type === 'epub' && book.isUserUpload && !book.hasLocalFile}
                 >
-                  Continuar leitura
+                  Detalhes
                 </Button>
               </div>
             </CardContent>
