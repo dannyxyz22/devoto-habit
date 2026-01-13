@@ -8,6 +8,7 @@ import { BOOKS, type BookMeta } from "@/lib/books";
 import { getProgress, setLastBookId, getReadingPlanAsync, setReadingPlan, type ReadingPlan } from "@/lib/storage";
 import { calculatePagePercent } from "@/lib/percentageUtils";
 import { getCoverObjectUrl } from "@/lib/coverCache";
+import { computeDaysRemaining } from "@/lib/reading";
 import { toast } from "@/hooks/use-toast";
 
 import { BackLink } from "@/components/app/BackLink";
@@ -363,17 +364,45 @@ export default function BookDetails() {
                       Terminar até {format(parseISO(readingPlan.targetDateISO), "dd/MM/yyyy")}
                     </span>
                   </div>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {(() => {
-                      const targetDate = parseISO(readingPlan.targetDateISO);
-                      const todayDate = new Date();
-                      const diffDays = Math.ceil((targetDate.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24));
-                      if (diffDays < 0) return "Meta atrasada";
-                      if (diffDays === 0) return "Hoje é o dia!";
-                      if (diffDays === 1) return "Falta 1 dia";
-                      return `Faltam ${diffDays} dias`;
-                    })()}
-                  </p>
+                  {(() => {
+                    const daysRemaining = computeDaysRemaining(readingPlan.targetDateISO);
+                    if (daysRemaining === null) return null;
+                    
+                    // Calculate remaining progress
+                    const currentProgressValue = isPhysical
+                      ? calculatePagePercent(book?.currentPage || 0, book?.totalPages || 1)
+                      : currentProgress || 0;
+                    const remainingPercent = Math.max(0, 100 - currentProgressValue);
+                    
+                    // Daily target
+                    const dailyPercentTarget = remainingPercent / daysRemaining;
+                    
+                    // For physical books, convert to pages
+                    const dailyPagesTarget = isPhysical && book?.totalPages
+                      ? Math.ceil((dailyPercentTarget / 100) * book.totalPages)
+                      : null;
+                    
+                    return (
+                      <>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {daysRemaining < 0
+                            ? "Meta atrasada"
+                            : daysRemaining === 1
+                              ? "Hoje é o dia!"
+                              : `Faltam ${daysRemaining} dias`}
+                        </p>
+                        {remainingPercent > 0 && daysRemaining > 0 && (
+                          <p className="text-sm font-medium text-primary mt-2 flex items-center gap-1">
+                            <TrendingUp className="h-4 w-4" />
+                            Meta diária: {isPhysical && dailyPagesTarget
+                              ? `${dailyPagesTarget} página${dailyPagesTarget > 1 ? 's' : ''}`
+                              : `${dailyPercentTarget.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
+                            }
+                          </p>
+                        )}
+                      </>
+                    );
+                  })()}
                 </CardContent>
               </Card>
             )}
