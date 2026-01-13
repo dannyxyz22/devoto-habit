@@ -15,7 +15,7 @@ import { dataLayer } from "@/services/data/RxDBDataLayer";
 import { getDatabase } from "@/lib/database/db";
 import { differenceInCalendarDays, formatISO, parseISO, format } from "date-fns";
 import { useTodayISO } from "@/hooks/use-today";
-import { getStreak, getReadingPlan, getProgress, getDailyBaseline, getDailyBaselineAsync, setDailyBaseline, getStats, getLastBookIdAsync, setLastBookId, type Streak, type ReadingPlan, type BaselineEntry } from "@/lib/storage";
+import { getStreak, getProgress, getDailyBaseline, getDailyBaselineAsync, setDailyBaseline, getStats, getLastBookIdAsync, setLastBookId, type Streak, type ReadingPlan, type BaselineEntry } from "@/lib/storage";
 import {
   type Part,
   computeTotalWords,
@@ -413,8 +413,8 @@ const Index = () => {
       return;
     }
 
-    // Load from localStorage immediately
-    setActivePlan(getReadingPlan(activeBookId));
+    // Don't load from localStorage - it may have stale data
+    // Let RxDB (which syncs with server) be the source of truth
 
     let subscription: { unsubscribe: () => void } | null = null;
 
@@ -710,9 +710,10 @@ const Index = () => {
         // This is just a fallback for first-time users or when no lastBookId exists
         const last = await getLastBookIdAsync();
         if (!last) {
+          // Use RxDB to get plans (source of truth, synced with server)
           for (const b of BOOKS) {
-            const plan = getReadingPlan(b.id);
-            if (plan?.targetDateISO) {
+            const plan = await dataLayer.getReadingPlan(b.id);
+            if (plan?.target_date_iso) {
               setActiveBookId(b.id);
               break;
             }

@@ -931,8 +931,7 @@ export class ReplicationManager {
                     });
                 } else {
                     // Check if server is missing start data that we have locally (in RxDB or localStorage)
-                    // AND check timestamp to respect latest target_date
-                    // Relaxed condition: if server is null OR 0, and we have a valid local start > 0
+                    // NEVER overwrite server's target_date_iso - it's the user's intentional goal setting
                     const serverValue = serverPlan.start_percent;
                     const localHasValue = localStartPercent !== undefined && localStartPercent > 0;
                     const serverMissingStart = (serverValue === null || serverValue === 0) && localHasValue;
@@ -940,26 +939,19 @@ export class ReplicationManager {
                     if (serverMissingStart) {
                         console.log(`[Reading Plans Reconciliation] enhancing server plan ${localJson.id} with local start data (Server: ${serverValue}, Local: ${localStartPercent})`);
 
-                        // Timestamp check: if local is newer (or equal), use local date. If server is strictly newer, use server date.
-                        // _modified can be number or string? strict comparison usually safer if types known. 
-                        // Assuming numbers from previous code context, but handling potential nulls.
-                        const serverMod = serverPlan._modified || 0;
-                        const localMod = localJson._modified || 0;
-
-                        // If server is newer, we want to KEEP server's date but PATCH the start stats.
-                        // If local is newer, we overwrite everything (which upsert does by default for the fields we provide).
-                        const useServerDate = serverMod > localMod;
-                        const targetDate = useServerDate ? serverPlan.target_date_iso : localJson.target_date_iso;
+                        // ALWAYS preserve server's target_date_iso if it exists
+                        // Only use local date if server doesn't have one
+                        const targetDate = serverPlan.target_date_iso || localJson.target_date_iso;
 
                         updateDocs.push({
                             ...localJson,
                             user_id: userId,
-                            // Patch start data
+                            // Patch start data only
                             start_percent: localStartPercent,
                             start_part_index: localStartPart,
                             start_chapter_index: localStartChapter,
                             start_words: localStartWords,
-                            // Respect strict timestamp for target date
+                            // PRESERVE server's target_date if it exists
                             target_date_iso: targetDate
                         });
                     }

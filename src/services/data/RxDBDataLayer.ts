@@ -255,26 +255,39 @@ class RxDBDataLayerImpl implements DataLayer {
                             });
                             console.log(`DataLayer: Reading plan migrated: ${bookId}`);
                         } else {
-                            // Server data exists - compare timestamps to keep the most recent
-                            const localMod = plan._modified || 0;
-                            const serverMod = existing._modified || 0;
+                            // Server data exists - PRESERVE server's target_date_iso (user-set goal)
+                            // Only fill in start_* fields if they're missing on server
+                            const serverData = existing.toJSON();
+                            const updates: Record<string, any> = {};
                             
-                            if (localMod > serverMod) {
-                                // Local is newer, update server data
-                                await existing.incrementalPatch({
-                                    target_date_iso: plan.target_date_iso,
-                                    target_part_index: plan.target_part_index,
-                                    target_chapter_index: plan.target_chapter_index,
-                                    start_percent: plan.start_percent,
-                                    start_part_index: plan.start_part_index,
-                                    start_chapter_index: plan.start_chapter_index,
-                                    start_words: plan.start_words,
-                                    _modified: Math.max(Date.now(), serverMod + 1)
-                                });
-                                console.log(`DataLayer: Reading plan updated (local newer): ${bookId}`);
+                            // Only fill start_* fields if server is missing them and local has them
+                            if ((serverData.start_percent == null || serverData.start_percent === 0) && plan.start_percent != null && plan.start_percent > 0) {
+                                updates.start_percent = plan.start_percent;
+                            }
+                            if (serverData.start_part_index == null && plan.start_part_index != null) {
+                                updates.start_part_index = plan.start_part_index;
+                            }
+                            if (serverData.start_chapter_index == null && plan.start_chapter_index != null) {
+                                updates.start_chapter_index = plan.start_chapter_index;
+                            }
+                            if (serverData.start_words == null && plan.start_words != null) {
+                                updates.start_words = plan.start_words;
+                            }
+                            
+                            // Only update target_date_iso if server doesn't have one and local does
+                            if (!serverData.target_date_iso && plan.target_date_iso) {
+                                updates.target_date_iso = plan.target_date_iso;
+                                console.log(`DataLayer: Reading plan - filling missing target_date from local: ${bookId}`);
+                            }
+                            
+                            // Only apply if there are updates to make
+                            if (Object.keys(updates).length > 0) {
+                                updates._modified = Math.max(Date.now(), (serverData._modified || 0) + 1);
+                                await existing.incrementalPatch(updates);
+                                console.log(`DataLayer: Reading plan enhanced with local start data: ${bookId}`, updates);
                             } else {
-                                // Server is newer or equal, keep server data
-                                console.log(`DataLayer: Reading plan skipped (server data is newer): ${bookId}`);
+                                // Server has all data, keep server data
+                                console.log(`DataLayer: Reading plan skipped (server has complete data): ${bookId}`);
                             }
                         }
                         
