@@ -34,6 +34,8 @@ export type DevotoDatabaseCollections = {
 export type DevotoDatabase = RxDatabase<DevotoDatabaseCollections>;
 
 let _dbPromise: Promise<DevotoDatabase> | null = null;
+let _deadlockTimerId: ReturnType<typeof setTimeout> | null = null;
+let _dbInitStartTime: number | null = null;
 
 const _createDatabase = async (): Promise<DevotoDatabase> => {
     console.log('DatabaseService: Creating database...');
@@ -122,21 +124,40 @@ const _createDatabase = async (): Promise<DevotoDatabase> => {
 const getDatabase = async (): Promise<DevotoDatabase> => {
     if (!_dbPromise) {
         console.log('Initializing Database Promise...');
-        _dbPromise = _createDatabase().catch(err => {
-            _dbPromise = null; // Reset on error
-            throw err;
-        });
+        _dbInitStartTime = Date.now();
+        
+        // Setup a single deadlock detection timer (only once when DB creation starts)
+        if (!_deadlockTimerId) {
+            _deadlockTimerId = setTimeout(() => {
+                const elapsed = _dbInitStartTime ? Date.now() - _dbInitStartTime : 0;
+                console.warn(`getDatabase() is taking ${elapsed}ms. This may be normal for first load with migrations.`);
+                _deadlockTimerId = null;
+            }, 10000); // Increased to 10s and changed to warning, not critical
+        }
+        
+        _dbPromise = _createDatabase()
+            .then(db => {
+                // Clear the timeout when DB is ready
+                if (_deadlockTimerId) {
+                    clearTimeout(_deadlockTimerId);
+                    _deadlockTimerId = null;
+                }
+                const elapsed = _dbInitStartTime ? Date.now() - _dbInitStartTime : 0;
+                console.log(`DatabaseService: Database ready in ${elapsed}ms`);
+                return db;
+            })
+            .catch(err => {
+                // Clear the timeout on error
+                if (_deadlockTimerId) {
+                    clearTimeout(_deadlockTimerId);
+                    _deadlockTimerId = null;
+                }
+                _dbPromise = null; // Reset on error
+                throw err;
+            });
     }
 
-    // Add deadlock detection
-    const timeout = new Promise<never>((_, reject) =>
-        setTimeout(() => {
-            console.error('CRITICAL: getDatabase() is taking too long! Possible deadlock/circular dependency.');
-            // Don't reject, just log, so we don't crash if it's just slow
-        }, 5000)
-    );
-
-    return Promise.race([_dbPromise, timeout.then(() => _dbPromise!)]);
+    return _dbPromise;
 };
 
 export { getDatabase };
