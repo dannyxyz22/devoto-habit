@@ -213,7 +213,7 @@ export default function BookDetails() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-background py-6 md:py-10">
+      <main className="safe-top pt-6 min-h-screen bg-background pb-6 md:py-10">
         <div className="container mx-auto px-4">
           <BackLink to="/biblioteca" label="Biblioteca" />
           <div className="mt-6 flex flex-col gap-6 md:grid md:grid-cols-[280px_1fr]">
@@ -242,7 +242,7 @@ export default function BookDetails() {
     : `${(currentProgress || 0).toFixed(1)}%`;
 
   return (
-    <main className="min-h-screen bg-background py-6 md:py-10">
+    <main className="safe-top pt-6 min-h-screen bg-background pb-6 md:py-10">
       <SEO
         title={`${book.title} — Detalhes`}
         description={`Acompanhe seu progresso em ${book.title}`}
