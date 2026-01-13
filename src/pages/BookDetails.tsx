@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -6,11 +6,12 @@ import { dataLayer } from "@/services/data/RxDBDataLayer";
 import { getDatabase } from "@/lib/database/db";
 import { getUserEpubs } from "@/lib/userEpubs";
 import { BOOKS, type BookMeta } from "@/lib/books";
-import { getProgress, setLastBookId, getReadingPlanAsync, setReadingPlan, type ReadingPlan } from "@/lib/storage";
+import { getProgress, setProgress, setLastBookId, getReadingPlanAsync, setReadingPlan, getDailyBaselineAsync, setDailyBaseline, type ReadingPlan } from "@/lib/storage";
 import { calculatePagePercent } from "@/lib/percentageUtils";
-import { getCoverObjectUrl } from "@/lib/coverCache";
+import { getCoverObjectUrl, saveCoverBlob } from "@/lib/coverCache";
 import { computeDaysRemaining } from "@/lib/reading";
 import { toast } from "@/hooks/use-toast";
+import { refreshWidget } from "@/lib/widgetService";
 
 import { BackLink } from "@/components/app/BackLink";
 import { SEO } from "@/components/app/SEO";
@@ -19,10 +20,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, ReferenceDot } from "recharts";
-import { BookOpen, TrendingUp, Calendar, ArrowRight, Target, Trash2 } from "lucide-react";
+import { BookOpen, TrendingUp, Calendar, ArrowRight, Target, Trash2, Plus, Pencil, Upload } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 type ProgressDataPoint = {
   date: string;
@@ -45,6 +47,22 @@ export default function BookDetails() {
   const [goalDialogOpen, setGoalDialogOpen] = useState(false);
   const [goalDate, setGoalDate] = useState<string>("");
   const [refetchTrigger, setRefetchTrigger] = useState(0);
+
+  // Physical book progress tracking state
+  const [currentPageInput, setCurrentPageInput] = useState("");
+  const lastAppliedProgressVersionRef = useRef<number>(-1);
+  const isUserEditing = useRef(false);
+  const persistenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Edit dialog state
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editAuthor, setEditAuthor] = useState("");
+  const [editTotalPages, setEditTotalPages] = useState("");
+  const [editCoverFile, setEditCoverFile] = useState<File | null>(null);
+  const [editCoverPreview, setEditCoverPreview] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [coverVersion, setCoverVersion] = useState(0);
 
   // Determine if book uses pages (physical) or percentage (epub)
   const isPhysical = book?.isPhysical || book?.type === "physical";
@@ -103,6 +121,66 @@ export default function BookDetails() {
     };
 
     setupSubscription();
+
+    return () => {
+      if (subscription) {
+        subscription.unsubscribe();
+      }
+    };
+  }, [bookId]);
+
+  // Reactive subscription to physical book changes (sync from other devices)
+  useEffect(() => {
+    if (!bookId) return;
+
+    let subscription: any;
+
+    const setupBookSubscription = async () => {
+      try {
+        const db = await getDatabase();
+        const book$ = db.books.findOne(bookId).$;
+
+        subscription = book$.subscribe((rxBook) => {
+          if (!rxBook) return;
+
+          const incomingVersion = rxBook.progress_version ?? 0;
+
+          if (incomingVersion < lastAppliedProgressVersionRef.current) {
+            console.warn('[BookDetails] Ignored stale progress', {
+              incomingVersion,
+              lastApplied: lastAppliedProgressVersionRef.current,
+              current_page: rxBook.current_page
+            });
+            return;
+          }
+
+          lastAppliedProgressVersionRef.current = incomingVersion;
+
+          const bookData = rxBook.toJSON();
+          
+          // Update book state for physical books
+          if (bookData.type === 'physical') {
+            setBook(prev => prev ? {
+              ...prev,
+              title: bookData.title,
+              author: bookData.author || "",
+              totalPages: bookData.total_pages || 0,
+              currentPage: bookData.current_page || 0,
+              percentage: calculatePagePercent(bookData.current_page || 0, bookData.total_pages || 1),
+            } : prev);
+
+            // Only update input if user is not currently editing
+            if (!isUserEditing.current) {
+              setCurrentPageInput((bookData.current_page || 0).toString());
+            }
+          }
+        });
+      } catch (error) {
+        console.error('[BookDetails] Error setting up book subscription:', error);
+      }
+    };
+
+    setupBookSubscription();
 
     return () => {
       if (subscription) {
@@ -178,6 +256,11 @@ export default function BookDetails() {
         }
 
         setBook(foundBook);
+
+        // Initialize currentPageInput for physical books
+        if (foundBook.isPhysical || foundBook.type === "physical") {
+          setCurrentPageInput((foundBook.currentPage || 0).toString());
+        }
 
         // Load cover from cache if available
         const cachedCover = await getCoverObjectUrl(bookId);
@@ -258,12 +341,195 @@ export default function BookDetails() {
     if (!book || !bookId) return;
     await setLastBookId(bookId);
 
-    if (isPhysical) {
-      navigate(`/physical/${bookId}`);
-    } else if (book.type === "epub" || book.isUserUpload) {
+    if (book.type === "epub" || book.isUserUpload) {
       navigate(`/epub/${bookId}`);
     } else {
       navigate(`/leitor/${bookId}`);
+    }
+  };
+
+  // Physical book progress handlers
+  const handleUpdateProgress = async () => {
+    if (!book || !bookId || !isPhysical) return;
+
+    const newPage = parseInt(currentPageInput, 10);
+
+    if (isNaN(newPage) || newPage < 0 || newPage > (book.totalPages || 0)) {
+      toast({
+        title: "Página inválida",
+        description: `Digite um número entre 0 e ${book.totalPages}`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // 1. Advance local version BEFORE writing
+      const nextVersion = lastAppliedProgressVersionRef.current + 1;
+      lastAppliedProgressVersionRef.current = nextVersion;
+
+      // 2. Optimistic local state update
+      setBook(prev => prev ? { ...prev, currentPage: newPage } : prev);
+
+      // 3. Single persistence via DataLayer
+      await dataLayer.saveBookProgress(bookId, newPage);
+
+      // 4. Local metrics update
+      const percent = calculatePagePercent(newPage, book.totalPages || 1);
+      setProgress(bookId, {
+        partIndex: 0,
+        chapterIndex: 0,
+        percent,
+        currentPage: newPage,
+        totalPages: book.totalPages || 0,
+      });
+
+      // 5. Auxiliary metadata
+      setLastBookId(bookId);
+
+      // 6. User feedback
+      toast({
+        title: "Progresso atualizado!",
+        description: `Você está na página ${newPage} de ${book.totalPages}`,
+      });
+
+      // 7. Update widget
+      await refreshWidget(bookId);
+
+      // 8. Trigger chart refresh
+      setRefetchTrigger((prev) => prev + 1);
+    } catch (error) {
+      console.error("Error updating progress:", error);
+      toast({
+        title: "Erro ao atualizar progresso",
+        description: "Tente novamente",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleQuickAdd = async (pages: number) => {
+    if (!book || !bookId || !isPhysical) return;
+    const newPage = Math.min((book.currentPage || 0) + pages, book.totalPages || 0);
+
+    // 1. Optimistic UI update immediately
+    setCurrentPageInput(newPage.toString());
+
+    const nextVersion = lastAppliedProgressVersionRef.current + 1;
+    lastAppliedProgressVersionRef.current = nextVersion;
+
+    setBook(prev => prev ? { ...prev, currentPage: newPage } : prev);
+
+    // 2. Update local storage immediately
+    const percent = calculatePagePercent(newPage, book.totalPages || 1);
+    setProgress(bookId, {
+      partIndex: 0,
+      chapterIndex: 0,
+      percent,
+      currentPage: newPage,
+      totalPages: book.totalPages || 0,
+    });
+
+    // Feedback
+    toast({
+      title: "Progresso atualizado!",
+      description: `Você está na página ${newPage} de ${book.totalPages}`,
+    });
+
+    // Update last book immediately
+    setLastBookId(bookId).catch(console.error);
+
+    // 3. Debounced Database Persistence
+    if (persistenceTimeoutRef.current) {
+      clearTimeout(persistenceTimeoutRef.current);
+    }
+
+    persistenceTimeoutRef.current = setTimeout(async () => {
+      try {
+        await dataLayer.saveBookProgress(bookId, newPage);
+        await refreshWidget(bookId);
+        setRefetchTrigger((prev) => prev + 1);
+      } catch (error) {
+        console.error("[Debounced Save] Error:", error);
+      }
+    }, 1000);
+  };
+
+  // Edit dialog handlers
+  const handleOpenEditDialog = () => {
+    if (!book) return;
+    setEditTitle(book.title);
+    setEditAuthor(book.author || "");
+    setEditTotalPages((book.totalPages || 0).toString());
+    setEditCoverFile(null);
+    setEditCoverPreview(null);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleCoverFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setEditCoverFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setEditCoverPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSaveMetadata = async () => {
+    if (!book || !bookId) return;
+
+    const newTotalPages = parseInt(editTotalPages, 10);
+    if (!editTitle.trim() || !editAuthor.trim() || isNaN(newTotalPages) || newTotalPages <= 0) {
+      toast({
+        title: "Dados inválidos",
+        description: "Verifique os campos preenchidos",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      // 1. Save cover if changed
+      if (editCoverFile) {
+        await saveCoverBlob(bookId, editCoverFile);
+        setCoverVersion(v => v + 1);
+      }
+
+      // 2. Update book metadata
+      await dataLayer.saveBook({
+        id: bookId,
+        title: editTitle.trim(),
+        author: editAuthor.trim(),
+        total_pages: newTotalPages,
+        ...(editCoverFile ? { cover_url: undefined } : {})
+      });
+
+      // 3. Update local state immediately
+      setBook(prev => prev ? {
+        ...prev,
+        title: editTitle.trim(),
+        author: editAuthor.trim(),
+        totalPages: newTotalPages
+      } : null);
+
+      setIsEditDialogOpen(false);
+      toast({
+        title: "Livro atualizado!",
+        description: "As informações foram salvas com sucesso.",
+      });
+    } catch (error) {
+      console.error("Error updating book:", error);
+      toast({
+        title: "Erro ao salvar",
+        description: "Não foi possível atualizar o livro.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -371,19 +637,30 @@ export default function BookDetails() {
                   className="w-full h-full object-cover"
                 />
               ) : (
-              <BookCover bookId={bookId!} coverUrl={book.coverImage} title={book.title} className="w-full h-full" />
+              <BookCover bookId={bookId!} coverUrl={book.coverImage} title={book.title} className="w-full h-full" coverVersion={coverVersion} />
               )}
             </div>
 
             <div className="space-y-2 text-center md:text-left">
-              <h1 className="text-xl md:text-2xl font-bold leading-tight">{book.title}</h1>
+              <div className="flex items-center justify-center md:justify-between gap-2">
+                <h1 className="text-xl md:text-2xl font-bold leading-tight">{book.title}</h1>
+                {isPhysical && (
+                  <Button variant="ghost" size="icon" onClick={handleOpenEditDialog} className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                    <Pencil className="h-4 w-4" />
+                    <span className="sr-only">Editar</span>
+                  </Button>
+                )}
+              </div>
               <p className="text-muted-foreground">{book.author}</p>
             </div>
 
-            <Button onClick={handleContinueReading} className="w-full" size="lg">
-              <BookOpen className="mr-2 h-5 w-5" />
-              Continuar Leitura
-            </Button>
+            {/* Continue Reading button - only for EPUBs */}
+            {!isPhysical && (
+              <Button onClick={handleContinueReading} className="w-full" size="lg">
+                <BookOpen className="mr-2 h-5 w-5" />
+                Continuar Leitura
+              </Button>
+            )}
 
             {/* Goal Button */}
             <Button onClick={openGoalDialog} variant="outline" className="w-full" size="lg">
@@ -491,6 +768,77 @@ export default function BookDetails() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Physical Book Progress Update Card */}
+            {isPhysical && (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <BookOpen className="h-5 w-5 text-primary" />
+                    Atualizar Progresso
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <label htmlFor="current-page" className="text-sm font-medium mb-2 block">
+                      Página atual
+                    </label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="current-page"
+                        type="number"
+                        min="0"
+                        max={book.totalPages || 0}
+                        value={currentPageInput}
+                        onChange={(e) => setCurrentPageInput(e.target.value)}
+                        onFocus={() => { isUserEditing.current = true; }}
+                        onBlur={() => { isUserEditing.current = false; }}
+                        className="flex-1"
+                      />
+                      <Button onClick={handleUpdateProgress}>Atualizar</Button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-medium mb-2">Adicionar páginas rapidamente:</p>
+                    <div className="flex gap-2 flex-wrap">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleQuickAdd(1)}
+                        disabled={(book.currentPage || 0) >= (book.totalPages || 0)}
+                      >
+                        <Plus className="h-3 w-3 mr-1" />1
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleQuickAdd(5)}
+                        disabled={(book.currentPage || 0) >= (book.totalPages || 0)}
+                      >
+                        <Plus className="h-3 w-3 mr-1" />5
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleQuickAdd(10)}
+                        disabled={(book.currentPage || 0) >= (book.totalPages || 0)}
+                      >
+                        <Plus className="h-3 w-3 mr-1" />10
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleQuickAdd(20)}
+                        disabled={(book.currentPage || 0) >= (book.totalPages || 0)}
+                      >
+                        <Plus className="h-3 w-3 mr-1" />20
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Progress Chart */}
             <Card>
@@ -679,6 +1027,84 @@ export default function BookDetails() {
             </Button>
             <Button onClick={handleSetGoal} disabled={!goalDate}>
               {readingPlan?.targetDateISO ? "Atualizar meta" : "Definir meta"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Book Dialog - Physical Books Only */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Livro</DialogTitle>
+            <DialogDescription>
+              Altere as informações do livro ou a capa.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="edit-title">Título</Label>
+              <Input
+                id="edit-title"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-author">Autor</Label>
+              <Input
+                id="edit-author"
+                value={editAuthor}
+                onChange={(e) => setEditAuthor(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-pages">Total de Páginas</Label>
+              <Input
+                id="edit-pages"
+                type="number"
+                value={editTotalPages}
+                onChange={(e) => setEditTotalPages(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Capa do Livro</Label>
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-24 bg-muted rounded overflow-hidden flex-shrink-0 border">
+                  {editCoverPreview ? (
+                    <img src={editCoverPreview} alt="Preview" className="w-full h-full object-cover" />
+                  ) : (
+                    <BookCover
+                      bookId={bookId!}
+                      title={book?.title || ""}
+                      coverUrl={book?.coverImage}
+                      className="w-full h-full"
+                    />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <Label htmlFor="cover-upload" className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-secondary text-secondary-foreground hover:bg-secondary/80 rounded-md text-sm font-medium transition-colors">
+                    <Upload className="w-4 h-4" />
+                    Escolher nova capa
+                  </Label>
+                  <Input
+                    id="cover-upload"
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleCoverFileChange}
+                  />
+                  <p className="text-xs text-muted-foreground mt-2">
+                    A imagem será salva apenas neste dispositivo.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleSaveMetadata} disabled={isSaving}>
+              {isSaving ? "Salvando..." : "Salvar Alterações"}
             </Button>
           </DialogFooter>
         </DialogContent>
