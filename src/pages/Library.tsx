@@ -7,12 +7,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { BOOKS, type BookMeta } from "@/lib/books";
 import { SEO } from "@/components/app/SEO";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { setReadingPlan, getProgress, getReadingPlan, setDailyBaseline, setProgress, getDailyBaseline, setLastBookId, getLastBookIdAsync } from "@/lib/storage";
+import { setReadingPlan, getProgress, getReadingPlan, getDailyBaseline, setLastBookId, getLastBookIdAsync } from "@/lib/storage";
 import { toast } from "@/hooks/use-toast";
-import { formatISO, format, parseISO } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { resolveEpubSource } from "@/lib/utils";
 import ePub from "epubjs";
 import { getCoverObjectUrl, saveCoverBlob } from "@/lib/coverCache";
@@ -21,11 +20,7 @@ import { getDatabase } from "@/lib/database/db";
 import { BookSearchDialog } from "@/components/app/BookSearchDialog";
 import { Upload, Trash2, BookPlus, AlertCircle, X, Bookmark, Calendar } from "lucide-react";
 import { BookCover } from "@/components/book/BookCover";
-import { calculateRatioPercent, calculatePagePercent } from "@/lib/percentageUtils";
-
-type Paragraph = { type: string; content: string };
-type Chapter = { chapter_title: string; content: Paragraph[] };
-type Part = { part_title: string; chapters: Chapter[] };
+import { calculatePagePercent } from "@/lib/percentageUtils";
 
 const Library = () => {
   const Cover = ({ src, alt }: { src: string; alt: string }) => (
@@ -33,14 +28,6 @@ const Library = () => {
       <img src={ensureHttps(src)} alt={alt} className="w-full h-full object-contain object-center" loading="lazy" />
     </div>
   );
-  const [open, setOpen] = useState(false);
-  const [selectedBook, setSelectedBook] = useState<string | null>(null);
-  const [endDate, setEndDate] = useState<string>("");
-  const [currentPosition, setCurrentPosition] = useState<string>("0-0");
-  const [targetChapter, setTargetChapter] = useState<string>("end");
-  const [bookParts, setBookParts] = useState<Part[] | null>(null);
-  const [selectedIsEpub, setSelectedIsEpub] = useState<boolean>(false);
-  const [selectedIsPhysical, setSelectedIsPhysical] = useState<boolean>(false);
   const [allBooks, setAllBooks] = useState<BookMeta[]>([]);
   const [activeBookId, setActiveBookId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -481,173 +468,6 @@ const Library = () => {
     setAllBooks([...allUserBooks, ...BOOKS]);
   };
 
-  const onChooseBook = async (bookId: string) => {
-    setSelectedBook(bookId);
-    const plan = getReadingPlan(bookId);
-    setEndDate(plan.targetDateISO ?? "");
-    // Default current position from saved progress or start
-    const prog = getProgress(bookId);
-    setCurrentPosition(`${prog.partIndex}-${prog.chapterIndex}`);
-
-    // Set target chapter from plan
-    if (plan.targetPartIndex !== undefined && plan.targetChapterIndex !== undefined) {
-      setTargetChapter(`${plan.targetPartIndex}-${plan.targetChapterIndex}`);
-    } else {
-      setTargetChapter("end");
-    }
-
-    // Load book structure for chapter selection
-    const book = allBooks.find(b => b.id === bookId);
-    const isEpub = book?.type === 'epub';
-    const isPhysical = book?.type === 'physical';
-
-    setSelectedIsEpub(isEpub);
-    setSelectedIsPhysical(isPhysical);
-
-    if (book) {
-      if (isEpub || isPhysical) {
-        // EPUB/Physical: no JSON structure; skip fetch and open dialog with date only
-        setBookParts(null);
-        setOpen(true);
-        return;
-      } else {
-        try {
-          const cacheKey = `book:${bookId}`;
-          const cached = localStorage.getItem(cacheKey);
-          if (cached) {
-            setBookParts(JSON.parse(cached));
-          } else {
-            const response = await fetch(book.sourceUrl!);
-            const data = await response.json();
-            setBookParts(data);
-            localStorage.setItem(cacheKey, JSON.stringify(data));
-          }
-        } catch (error) {
-          console.error("Failed to load book:", error);
-        }
-      }
-    }
-
-    setOpen(true);
-  };
-
-  const startReading = async (withPlan: boolean) => {
-    if (!selectedBook) return;
-    const meta = allBooks.find(b => b.id === selectedBook);
-
-    if (selectedIsEpub || selectedIsPhysical || meta?.type === 'epub') {
-      if (withPlan) {
-        if (!endDate) {
-          toast({ title: "Selecione uma data", description: "Escolha uma data de término ou comece sem meta." });
-          return;
-        }
-        setReadingPlan(selectedBook, endDate);
-        // Persist plan start percent from current saved progress
-        try {
-          const prog = getProgress(selectedBook);
-          localStorage.setItem(
-            `planStart:${selectedBook}`,
-            JSON.stringify({ startPercent: prog?.percent || 0 })
-          );
-        } catch { }
-      } else {
-        setReadingPlan(selectedBook, null);
-        // Don't initialize baseline here for EPUBs - let EpubReader do it when user actually starts reading
-      }
-
-      // Navigate based on type
-      setOpen(false);
-      if (selectedIsPhysical || meta?.type === 'physical') {
-        navigate(`/physical/${selectedBook}`);
-      } else {
-        navigate(`/epub/${selectedBook}`);
-      }
-      return;
-    }
-    // Parse current position from selection
-    let curPartIndex = 0;
-    let curChapterIndex = 0;
-    if (currentPosition && currentPosition.includes("-")) {
-      const [pStr, cStr] = currentPosition.split("-");
-      curPartIndex = Number(pStr) || 0;
-      curChapterIndex = Number(cStr) || 0;
-    }
-    if (withPlan) {
-      if (!endDate) {
-        toast({ title: "Selecione uma data", description: "Escolha uma data de término ou comece sem meta." });
-        return;
-      }
-
-      // Parse target chapter
-      let targetPartIndex: number | undefined;
-      let targetChapterIndex: number | undefined;
-
-      if (targetChapter !== "end") {
-        const [partIdx, chapterIdx] = targetChapter.split("-").map(Number);
-        targetPartIndex = partIdx;
-        targetChapterIndex = chapterIdx;
-      }
-
-      setReadingPlan(selectedBook, endDate, targetPartIndex, targetChapterIndex);
-
-      // Set progress to chosen current position and reset daily baseline accordingly
-      if (bookParts) {
-        // Compute percent based on flat chapters
-        const flat: Array<{ pi: number; ci: number }> = [];
-        bookParts.forEach((part, pi) => part.chapters.forEach((_, ci) => flat.push({ pi, ci })));
-        const idx = flat.findIndex((x) => x.pi === curPartIndex && x.ci === curChapterIndex);
-        const percent = idx >= 0 ? calculateRatioPercent(idx + 1, flat.length) : 0;
-        setProgress(selectedBook, { partIndex: curPartIndex, chapterIndex: curChapterIndex, percent });
-        // Compute baseline words up to current position
-        let wordsUpToCurrent = 0;
-        bookParts.forEach((part, pi) => {
-          part.chapters.forEach((ch, ci) => {
-            if (pi < curPartIndex || (pi === curPartIndex && ci < curChapterIndex)) {
-              ch.content?.forEach((blk) => {
-                wordsUpToCurrent += blk.content.trim().split(/\s+/).filter(Boolean).length;
-              });
-            }
-          });
-        });
-        const todayISO = formatISO(new Date(), { representation: "date" });
-        setDailyBaseline(selectedBook, todayISO, { words: wordsUpToCurrent, percent });
-        try { console.log('[Baseline] persistida', { scope: 'Library', bookId: selectedBook, todayISO, words: wordsUpToCurrent, percent }); } catch { }
-        // Persist plan start for plan progress calculations (start indexes and words)
-        try {
-          localStorage.setItem(
-            `planStart:${selectedBook}`,
-            JSON.stringify({ startPartIndex: curPartIndex, startChapterIndex: curChapterIndex, startWords: wordsUpToCurrent })
-          );
-        } catch { }
-      }
-    } else {
-      setReadingPlan(selectedBook, null);
-      // Also set progress to chosen current position when starting without plan
-      if (bookParts) {
-        const flat: Array<{ pi: number; ci: number }> = [];
-        bookParts.forEach((part, pi) => part.chapters.forEach((_, ci) => flat.push({ pi, ci })));
-        const idx = flat.findIndex((x) => x.pi === curPartIndex && x.ci === curChapterIndex);
-        const percent = idx >= 0 ? calculateRatioPercent(idx + 1, flat.length) : 0;
-        setProgress(selectedBook, { partIndex: curPartIndex, chapterIndex: curChapterIndex, percent });
-        let wordsUpToCurrent = 0;
-        bookParts.forEach((part, pi) => {
-          part.chapters.forEach((ch, ci) => {
-            if (pi < curPartIndex || (pi === curPartIndex && ci < curChapterIndex)) {
-              ch.content?.forEach((blk) => {
-                wordsUpToCurrent += blk.content.trim().split(/\s+/).filter(Boolean).length;
-              });
-            }
-          });
-        });
-        const todayISO = formatISO(new Date(), { representation: "date" });
-        setDailyBaseline(selectedBook, todayISO, { words: wordsUpToCurrent, percent });
-        try { console.log('[Baseline] persistida', { scope: 'Library', bookId: selectedBook, todayISO, words: wordsUpToCurrent, percent }); } catch { }
-      }
-    }
-    setOpen(false);
-    navigate(selectedIsEpub ? `/epub/${selectedBook}` : `/leitor/${selectedBook}`);
-  };
-
   const sortedBooks = [...allBooks].sort((a, b) => {
     // Active book always comes first
     if (a.id === activeBookId) return -1;
@@ -1060,13 +880,6 @@ const Library = () => {
                 >
                   Continuar leitura
                 </Button>
-                <Button
-                  variant="secondary"
-                  onClick={() => onChooseBook(book.id)}
-                  disabled={book.type === 'epub' && book.isUserUpload && !book.hasLocalFile}
-                >
-                  Definir meta
-                </Button>
               </div>
             </CardContent>
           </Card>
@@ -1131,78 +944,6 @@ const Library = () => {
           🗑️ Deletar dados locais
         </Button>
       </div>
-
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Definir meta de término (opcional)</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            {!selectedIsEpub && !selectedIsPhysical && (
-              <>
-                <div>
-                  <label htmlFor="currentPosition" className="text-sm font-medium">Posição atual</label>
-                  <Select value={currentPosition} onValueChange={setCurrentPosition}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione seu ponto atual" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {bookParts?.map((part, partIndex) =>
-                        part.chapters.map((chapter, chapterIndex) => (
-                          <SelectItem key={`cur-${partIndex}-${chapterIndex}`} value={`${partIndex}-${chapterIndex}`}>
-                            {part.part_title} - {chapter.chapter_title}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label htmlFor="targetChapter" className="text-sm font-medium">Meta de leitura</label>
-                  <Select value={targetChapter} onValueChange={setTargetChapter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione até onde quer ler" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="end">Final do livro</SelectItem>
-                      {bookParts?.map((part, partIndex) =>
-                        part.chapters.map((chapter, chapterIndex) => (
-                          <SelectItem key={`${partIndex}-${chapterIndex}`} value={`${partIndex}-${chapterIndex}`}>
-                            {part.part_title} - {chapter.chapter_title}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </>
-            )}
-
-            <div>
-              <label htmlFor="endDate" className="text-sm font-medium">Data para concluir a leitura</label>
-              <Input
-                id="endDate"
-                type="date"
-                min={today}
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-              />
-            </div>
-
-            <p className="text-xs text-muted-foreground">
-              {selectedIsEpub
-                ? "Defina uma data para concluir o EPUB. Calcularemos metas diárias em porcentagem lida."
-                : selectedIsPhysical
-                  ? "Defina uma data para concluir o livro. Calcularemos metas diárias em páginas."
-                  : "Defina uma meta específica e uma data. Calcularemos uma meta diária a partir do seu ponto atual de leitura."}
-            </p>
-          </div>
-          <DialogFooter>
-            <Button variant="secondary" onClick={() => startReading(false)}>Começar sem meta</Button>
-            <Button onClick={() => startReading(true)}>Definir meta e começar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </main>
   );
 };
