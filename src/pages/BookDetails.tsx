@@ -1,13 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { dataLayer } from "@/services/data/RxDBDataLayer";
 import { getUserEpubs } from "@/lib/userEpubs";
 import { BOOKS, type BookMeta } from "@/lib/books";
-import { getProgress, setLastBookId, getReadingPlanAsync, type ReadingPlan } from "@/lib/storage";
+import { getProgress, setLastBookId, getReadingPlanAsync, setReadingPlan, type ReadingPlan } from "@/lib/storage";
 import { calculatePagePercent } from "@/lib/percentageUtils";
 import { getCoverObjectUrl } from "@/lib/coverCache";
+import { toast } from "@/hooks/use-toast";
 
 import { BackLink } from "@/components/app/BackLink";
 import { SEO } from "@/components/app/SEO";
@@ -16,8 +17,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, ReferenceDot } from "recharts";
-import { BookOpen, TrendingUp, Calendar, ArrowRight, Target } from "lucide-react";
+import { BookOpen, TrendingUp, Calendar, ArrowRight, Target, Trash2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 
 type ProgressDataPoint = {
   date: string;
@@ -36,7 +39,10 @@ export default function BookDetails() {
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [progressData, setProgressData] = useState<ProgressDataPoint[]>([]);
   const [showAllData, setShowAllData] = useState(false);
-  const [readingPlan, setReadingPlan] = useState<ReadingPlan | null>(null);
+  const [readingPlan, setReadingPlanState] = useState<ReadingPlan | null>(null);
+  const [goalDialogOpen, setGoalDialogOpen] = useState(false);
+  const [goalDate, setGoalDate] = useState<string>("");
+  const [refetchTrigger, setRefetchTrigger] = useState(0);
 
   // Determine if book uses pages (physical) or percentage (epub)
   const isPhysical = book?.isPhysical || book?.type === "physical";
@@ -130,7 +136,7 @@ export default function BookDetails() {
 
         // Load reading plan (goal)
         const plan = await getReadingPlanAsync(bookId);
-        setReadingPlan(plan);
+        setReadingPlanState(plan);
 
         // Use foundBook to determine if physical (not state which isn't updated yet)
         const bookIsPhysical = foundBook.isPhysical || foundBook.type === "physical";
@@ -189,7 +195,7 @@ export default function BookDetails() {
     };
 
     loadBookData();
-  }, [bookId, navigate, showAllData]);
+  }, [bookId, navigate, showAllData, refetchTrigger]);
 
   const handleContinueReading = async () => {
     if (!book || !bookId) return;
@@ -210,6 +216,51 @@ export default function BookDetails() {
       color: "hsl(var(--primary))",
     },
   };
+
+  // Handle setting a goal
+  const handleSetGoal = useCallback(async () => {
+    if (!bookId || !goalDate) {
+      toast({ title: "Selecione uma data", description: "Escolha uma data de término." });
+      return;
+    }
+
+    try {
+      await setReadingPlan(bookId, goalDate);
+      toast({ title: "Meta definida!", description: `Meta: terminar até ${format(parseISO(goalDate), "dd/MM/yyyy")}` });
+      setGoalDialogOpen(false);
+      setGoalDate("");
+      setRefetchTrigger((prev) => prev + 1); // Trigger chart refresh
+    } catch (error) {
+      console.error("Error setting goal:", error);
+      toast({ title: "Erro ao definir meta", description: "Tente novamente.", variant: "destructive" });
+    }
+  }, [bookId, goalDate]);
+
+  // Handle deleting a goal
+  const handleDeleteGoal = useCallback(async () => {
+    if (!bookId) return;
+
+    try {
+      await setReadingPlan(bookId, null);
+      toast({ title: "Meta removida", description: "A meta de leitura foi removida." });
+      setRefetchTrigger((prev) => prev + 1); // Trigger chart refresh
+    } catch (error) {
+      console.error("Error deleting goal:", error);
+      toast({ title: "Erro ao remover meta", description: "Tente novamente.", variant: "destructive" });
+    }
+  }, [bookId]);
+
+  // Open goal dialog with current goal date if exists
+  const openGoalDialog = useCallback(() => {
+    if (readingPlan?.targetDateISO) {
+      setGoalDate(readingPlan.targetDateISO);
+    } else {
+      setGoalDate("");
+    }
+    setGoalDialogOpen(true);
+  }, [readingPlan]);
+
+  const today = new Date().toISOString().slice(0, 10);
 
   if (loading) {
     return (
@@ -276,10 +327,57 @@ export default function BookDetails() {
               <BookOpen className="mr-2 h-5 w-5" />
               Continuar Leitura
             </Button>
+
+            {/* Goal Button */}
+            <Button onClick={openGoalDialog} variant="outline" className="w-full" size="lg">
+              <Target className="mr-2 h-5 w-5" />
+              {readingPlan?.targetDateISO ? "Alterar Meta" : "Definir Meta"}
+            </Button>
           </div>
 
           {/* Progress Section */}
           <div className="space-y-6">
+            {/* Reading Goal Card */}
+            {readingPlan?.targetDateISO && (
+              <Card className="border-primary/30 bg-primary/5">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center justify-between text-lg">
+                    <span className="flex items-center gap-2">
+                      <Target className="h-5 w-5 text-primary" />
+                      Meta de Leitura
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleDeleteGoal}
+                      className="text-muted-foreground hover:text-destructive h-8 w-8 p-0"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-lg font-medium">
+                      Terminar até {format(parseISO(readingPlan.targetDateISO), "dd/MM/yyyy")}
+                    </span>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {(() => {
+                      const targetDate = parseISO(readingPlan.targetDateISO);
+                      const todayDate = new Date();
+                      const diffDays = Math.ceil((targetDate.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24));
+                      if (diffDays < 0) return "Meta atrasada";
+                      if (diffDays === 0) return "Hoje é o dia!";
+                      if (diffDays === 1) return "Falta 1 dia";
+                      return `Faltam ${diffDays} dias`;
+                    })()}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Current Progress Card */}
             <Card>
               <CardHeader className="pb-2">
@@ -375,7 +473,7 @@ export default function BookDetails() {
                       />
                       {/* Actual progress area */}
                       <Area
-                        type="monotone"
+                        type="linear"
                         dataKey="value"
                         stroke="hsl(var(--primary))"
                         fill="url(#colorValue)"
@@ -463,6 +561,43 @@ export default function BookDetails() {
           </div>
         </div>
       </div>
+
+      {/* Goal Dialog */}
+      <Dialog open={goalDialogOpen} onOpenChange={setGoalDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {readingPlan?.targetDateISO ? "Alterar meta de leitura" : "Definir meta de leitura"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="goalDate" className="text-sm font-medium">
+                Data para concluir a leitura
+              </label>
+              <Input
+                id="goalDate"
+                type="date"
+                min={today}
+                value={goalDate}
+                onChange={(e) => setGoalDate(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Defina uma data para concluir o livro. A meta aparecerá no gráfico de progresso.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setGoalDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSetGoal} disabled={!goalDate}>
+              {readingPlan?.targetDateISO ? "Atualizar meta" : "Definir meta"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }
