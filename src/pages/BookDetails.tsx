@@ -64,6 +64,9 @@ export default function BookDetails() {
   const [isSaving, setIsSaving] = useState(false);
   const [coverVersion, setCoverVersion] = useState(0);
 
+  // Daily progress state (for showing today's progress in reading goal card)
+  const [baselineForToday, setBaselineForToday] = useState<{ percent: number; page?: number } | null>(null);
+
   // Determine if book uses pages (physical) or percentage (epub)
   const isPhysical = book?.isPhysical || book?.type === "physical";
   const yAxisLabel = isPhysical ? "Páginas" : "Progresso (%)";
@@ -274,15 +277,21 @@ export default function BookDetails() {
         const limit = showAllData ? 365 : 90;
         const baselines = await dataLayer.getBaselinesForBook(bookId, limit);
 
+        // Find today's baseline for daily progress calculation
+        const todayISO = format(new Date(), "yyyy-MM-dd");
+        const todayBaseline = baselines.find(b => b.date_iso === todayISO);
+        if (todayBaseline) {
+          setBaselineForToday({ percent: todayBaseline.percent, page: todayBaseline.page });
+        } else {
+          setBaselineForToday(null);
+        }
+
         // Load reading plan (goal)
         const plan = await getReadingPlanAsync(bookId);
         setReadingPlanState(plan);
 
         // Use foundBook to determine if physical (not state which isn't updated yet)
         const bookIsPhysical = foundBook.isPhysical || foundBook.type === "physical";
-        
-        // Get today's date in ISO format
-        const todayISO = format(new Date(), "yyyy-MM-dd");
         
         // Get current progress for today
         const currentProgress = bookIsPhysical 
@@ -708,12 +717,32 @@ export default function BookDetails() {
                     const remainingPercent = Math.max(0, 100 - currentProgressValue);
                     
                     // Daily target
-                    const dailyPercentTarget = remainingPercent / daysRemaining;
+                    const dailyPercentTarget = daysRemaining > 0 ? remainingPercent / daysRemaining : 0;
                     
                     // For physical books, convert to pages
-                    const dailyPagesTarget = isPhysical && book?.totalPages
+                    const dailyPagesTarget = isPhysical && book?.totalPages && daysRemaining > 0
                       ? Math.ceil((dailyPercentTarget / 100) * book.totalPages)
                       : null;
+
+                    // Calculate today's progress
+                    let pagesReadToday: number | null = null;
+                    let percentReadToday: number | null = null;
+                    let dailyProgressPercent: number | null = null;
+
+                    if (baselineForToday) {
+                      if (isPhysical && book?.totalPages) {
+                        const baselinePage = baselineForToday.page ?? Math.round((baselineForToday.percent / 100) * book.totalPages);
+                        pagesReadToday = Math.max(0, (book.currentPage || 0) - baselinePage);
+                        if (dailyPagesTarget && dailyPagesTarget > 0) {
+                          dailyProgressPercent = Math.min(100, (pagesReadToday / dailyPagesTarget) * 100);
+                        }
+                      } else {
+                        percentReadToday = Math.max(0, currentProgressValue - baselineForToday.percent);
+                        if (dailyPercentTarget > 0) {
+                          dailyProgressPercent = Math.min(100, (percentReadToday / dailyPercentTarget) * 100);
+                        }
+                      }
+                    }
                     
                     return (
                       <>
@@ -725,13 +754,36 @@ export default function BookDetails() {
                               : `Faltam ${daysRemaining} dias`}
                         </p>
                         {remainingPercent > 0 && daysRemaining > 0 && (
-                          <p className="text-sm font-medium text-primary mt-2 flex items-center gap-1">
-                            <TrendingUp className="h-4 w-4" />
-                            Meta diária: {isPhysical && dailyPagesTarget
-                              ? `${dailyPagesTarget} página${dailyPagesTarget > 1 ? 's' : ''}`
-                              : `${dailyPercentTarget.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
-                            }
-                          </p>
+                          <>
+                            <p className="text-sm font-medium text-primary mt-2 flex items-center gap-1">
+                              <TrendingUp className="h-4 w-4" />
+                              Meta diária: {isPhysical && dailyPagesTarget
+                                ? `${dailyPagesTarget} página${dailyPagesTarget > 1 ? 's' : ''}`
+                                : `${dailyPercentTarget.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
+                              }
+                            </p>
+                            {baselineForToday && dailyProgressPercent !== null && (
+                              <div className="mt-2">
+                                <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                                  <span>Progresso de hoje</span>
+                                  <span>
+                                    {isPhysical && pagesReadToday !== null && dailyPagesTarget
+                                      ? `${pagesReadToday}/${dailyPagesTarget} páginas`
+                                      : percentReadToday !== null
+                                        ? `${percentReadToday.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}/${dailyPercentTarget.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
+                                        : ''
+                                    }
+                                  </span>
+                                </div>
+                                <div className="w-full bg-secondary rounded-full h-2">
+                                  <div
+                                    className="bg-primary h-2 rounded-full transition-all"
+                                    style={{ width: `${Math.min(100, dailyProgressPercent)}%` }}
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </>
                         )}
                       </>
                     );
