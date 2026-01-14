@@ -1281,7 +1281,7 @@ const Index = () => {
                 <p className="text-sm text-muted-foreground mt-1">{(p.percent || 0).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}% lido</p>
                 <div className="mt-2">
                   <Button asChild variant="link">
-                    <Link to={activeIsPhysical ? `/physical/${activeBookId}` : `/epub/${activeBookId}`} onClick={() => setLastBookId(activeBookId)}>Continuar leitura</Link>
+                    <Link to={activeIsPhysical ? `/book/${activeBookId}` : `/epub/${activeBookId}`} onClick={() => setLastBookId(activeBookId)}>Continuar leitura</Link>
                   </Button>
                 </div>
               </>

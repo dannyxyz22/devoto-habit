@@ -24,7 +24,7 @@ export const Hero = ({ activeBookId, used }: HeroProps) => {
     ctaLabel = "Continuar";
     if (activeBookId) {
       if (activeBookId.startsWith('physical-')) {
-        ctaHref = `/physical/${activeBookId}`;
+        ctaHref = `/book/${activeBookId}`;
       } else if (activeBookId.startsWith('user-')) {
         ctaHref = `/epub/${activeBookId}`;
       } else {
