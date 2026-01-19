@@ -36,6 +36,14 @@ const validateBookIds = (books: BookMeta[]): BookMeta[] => {
 
 export const BOOKS: BookMeta[] = validateBookIds([
   {
+    id: "filoteia",
+    title: "Introdução à Vida Devota (Filotéia)",
+    author: "São Francisco de Sales",
+    sourceUrl: "/epubs/filoteia-Sales-47b6009.epub",
+    description: "Clássico atemporal que ensina a viver a devoção no cotidiano, escrito por São Francisco de Sales.",
+    type: 'epub',
+  },
+  {
     id: "imitacao-cristo",
     title: "Imitação de Cristo",
     author: "Tomás de Kempis",
@@ -50,6 +58,14 @@ export const BOOKS: BookMeta[] = validateBookIds([
     author: "Santo Agostinho",
     sourceUrl: "/epubs/confissoes-agostinho.epub",
     description: "A jornada espiritual e intelectual de Santo Agostinho. Obtido de https://archive.org/details/santo-agostinho-confissoes",
+    type: 'epub',
+  },
+  {
+    id: "castelo-interior",
+    title: "O Castelo Interior ou Moradas",
+    author: "Santa Tereza d'Ávila",
+    sourceUrl: "/epubs/castelo-Tereza-2023-11-09.epub",
+    description: "Uma das obras mais profundas sobre a vida contemplativa e o caminho espiritual. Escrito por Santa Tereza d'Ávila. Obtido de https://archive.org/details/santa-tereza-davila-o-castelo-interior/ ",
     type: 'epub',
   },
   // {
