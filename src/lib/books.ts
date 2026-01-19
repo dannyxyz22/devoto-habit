@@ -69,15 +69,6 @@ export const BOOKS: BookMeta[] = validateBookIds([
   //   description: "Exemplo de EPUB servido externamente.",
   //   type: 'epub',
   // },
-  {
-    id: "imitacao-cristo-English",
-    title: "Imitation of Christ",
-    author: "Tomás de Kempis",
-    sourceUrl: "https://www.gutenberg.org/ebooks/1653.epub3.images",
-    description: "Um dos livros devocionais mais influentes do cristianismo.",
-    type: 'epub',
-  },
-
 
 
 ]);
