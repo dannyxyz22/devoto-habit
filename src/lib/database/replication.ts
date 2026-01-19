@@ -98,7 +98,7 @@ export class ReplicationManager {
                 },
                 push: {
                     batchSize: 50,
-                    modifier: (doc) => {
+                    modifier: async (doc) => {
                         const { created_at, updated_at, ...rest } = doc as any;
                         // Skip documents with local-user (pre-login data)
                         if (rest.user_id === 'local-user') return null;
@@ -106,8 +106,21 @@ export class ReplicationManager {
                         if (rest.cover_url && rest.cover_url.startsWith('data:')) {
                             delete rest.cover_url;
                         }
-                        console.log('[Replication Books] ⬆️ Pushing doc:', { id: rest.id, title: rest.title, percent: rest.percentage });
-                        return rest;
+
+                        console.log('[Replication Books] ⬆️ Manually upserting doc to avoid 409 Conflict', { id: rest.id, title: rest.title });
+
+                        // Perform manual upsert
+                        const { error } = await supabase
+                            .from('books')
+                            .upsert(rest, { onConflict: 'id' });
+
+                        if (error) {
+                            console.error('[Replication Books] ❌ Manual upsert failed:', error);
+                        } else {
+                            console.log('[Replication Books] ✅ Manual upsert success');
+                        }
+
+                        return null;
                     }
                 }
             });
@@ -164,16 +177,31 @@ export class ReplicationManager {
                 },
                 push: {
                     batchSize: 50,
-                    modifier: (doc) => {
+                    modifier: async (doc) => {
                         const { created_at, updated_at, ...rest } = doc as any;
                         // Skip documents with local-user (pre-login data)
                         if (rest.user_id === 'local-user') return null;
+
                         // Filter out base64 cover_url, keep external URLs only
                         if (rest.cover_url && rest.cover_url.startsWith('data:')) {
                             delete rest.cover_url;
                         }
-                        console.log('[Replication UserEpubs] ⬆️ Pushing doc:', { id: rest.id, percent: rest.percentage });
-                        return rest;
+
+                        console.log('[Replication UserEpubs] ⬆️ Manually upserting doc to avoid 409 Conflict', { id: rest.id, percent: rest.percentage });
+
+                        // Perform manual upsert
+                        const { error } = await supabase
+                            .from('user_epubs')
+                            .upsert(rest, { onConflict: 'id' });
+
+                        if (error) {
+                            console.error('[Replication UserEpubs] ❌ Manual upsert failed:', error);
+                        } else {
+                            console.log('[Replication UserEpubs] ✅ Manual upsert success');
+                        }
+
+                        // Return null to prevent RxDB from trying to insert
+                        return null;
                     }
                 }
             });
