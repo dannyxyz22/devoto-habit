@@ -401,6 +401,13 @@ if (!existingBaseline && userId === 'local-user') {
   - Forçar atualização do widget
   - Recarregar dados
 - Persistência no `localStorage` (`showDebugButton`)
+- Gate: 7 cliques rápidos no título "Clássicos católicos" do Hero
+
+##### RF-19: Onboarding de Usuário
+- Exibição automática de um carrossel de boas-vindas na primeira visita
+- Conteúdo: 4 slides cobrindo Introdução, Hábitos/Streaks, Biblioteca Digital e Widget Android
+- Persistência do estado "visto" no `localStorage` (`hasSeenOnboarding_v1`)
+- Interface responsiva com suporte a scroll em dispositivos pequenos e bordas arredondadas (estilo iOS/Premium)
 
 ---
 

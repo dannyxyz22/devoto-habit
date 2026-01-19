@@ -34,24 +34,6 @@ export const Hero = ({ activeBookId, used }: HeroProps) => {
     }
   }
 
-  const handleSecretDebug = () => {
-    const next = debugCount + 1;
-    setDebugCount(next);
-    if (next === 7) {
-      const current = localStorage.getItem('showDebugButton') === 'true';
-      const newValue = !current;
-      localStorage.setItem('showDebugButton', String(newValue));
-      toast({
-        title: newValue ? "Modo Debug ATIVADO" : "Modo Debug DESATIVADO",
-        description: "Recarregando aplicação...",
-      });
-      setTimeout(() => {
-        window.location.reload();
-      }, 1500);
-      setDebugCount(0);
-    }
-  };
-
   return (
     <header className="relative overflow-hidden rounded-lg border bg-card">
       <div className="absolute inset-0 bg-gradient-to-r from-background/60 via-background/40 to-background/60" aria-hidden />
@@ -68,7 +50,6 @@ export const Hero = ({ activeBookId, used }: HeroProps) => {
         <div className="p-6 md:p-10">
           <p
             className="text-sm text-muted-foreground select-none cursor-default active:text-primary transition-colors"
-            onClick={handleSecretDebug}
           >
             Clássicos católicos
           </p>

@@ -53,8 +53,17 @@ O app está funcional, tem um nicho muito bem definido e uma estética moderna. 
 
 ## ✅ Checklist de Preparação para Lançamento
 
-- [ ] Remover gatilhos de debug da UI principal.
-- [ ] Revisão final de todas as strings em Inglês para Português.
-- [ ] Adicionar um pequeno tutorial/onboarding para novos usuários.
+- [x] Remover gatilhos de debug da UI principal.
+- [x] Revisão final de todas as strings em Inglês para Português.
+- [x] Adicionar um pequeno tutorial/onboarding para novos usuários.
 - [ ] Testar o fluxo de "Re-upload" de EPUB em dois dispositivos diferentes para garantir que a mensagem é clara.
 - [ ] Validar a visualização em dispositivos móveis muito pequenos (ex: iPhone SE).
+
+---
+
+## 🛠️ Implementações Realizadas (Pós-Crítica)
+
+1. **Fluxo de Onboarding**: Adicionado carrossel de 4 slides explicando os pilares do app (Boas-vindas, Hábitos, Biblioteca Digital e Widget Android).
+2. **Estado Vazio da Biblioteca**: Criado card receptivo com CTAs claros para usuários que ainda não adicionaram livros pessoais.
+3. **Remoção de Debug**: Removido gatilho de 7 cliques no Hero para maior segurança em produção.
+4. **UX Mobile**: Ajustado modal de onboarding para garantir rolagem e bordas arredondadas em qualquer dispositivo.

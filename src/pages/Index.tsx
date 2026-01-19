@@ -1,4 +1,5 @@
 import Hero from "@/components/app/Hero";
+import { Onboarding } from "@/components/app/Onboarding";
 import { BookCover } from "@/components/book/BookCover";
 
 import { updateDailyProgressWidget } from "@/main";
@@ -1176,10 +1177,11 @@ const Index = () => {
   }, [dailyProgressPercent, dailyTargetWords]);
 
   return (
-    <main className="safe-top">
+    <main className="min-h-screen pb-20">
+      <Onboarding />
       <SEO
         title="Leitura Devota — Clássicos Católicos"
-        description="Crie o hábito de leitura espiritual diária com clássicos católicos em português."
+        description="Leitura devocional diária com clássicos católicos em português. Streak, metas e lembretes."
         canonical="/"
       />
       <Hero activeBookId={activeBookId} used={used} />

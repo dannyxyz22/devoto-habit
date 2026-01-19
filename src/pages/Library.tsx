@@ -577,6 +577,31 @@ const Library = () => {
         onBookAdded={handleBookAdded}
       />
       <section className="container mx-auto grid grid-cols-1 md:grid-cols-2 gap-6 px-4 md:px-0">
+        {!allBooks.some(b => b.isUserUpload || b.isPhysical) && (
+          <Card className="bg-primary/5 border-dashed border-primary/20 col-span-1 md:col-span-2">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-primary">
+                <BookPlus className="h-5 w-5" />
+                Comece sua Biblioteca Pessoal
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground mb-4">
+                Sua biblioteca pessoal está vazia. Você pode adicionar seus próprios arquivos EPUB ou rastrear o progresso de livros físicos da sua estante.
+              </p>
+              <div className="flex gap-3 flex-wrap">
+                <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Subir EPUB
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setShowBookSearch(true)}>
+                  <BookPlus className="h-4 w-4 mr-2" />
+                  Livro Físico
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
         {sortedBooks.map((book) => (
           <Card key={book.id} className="hover:shadow-lg transition-shadow">
             <div
