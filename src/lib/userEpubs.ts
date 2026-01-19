@@ -17,13 +17,42 @@ const DB_NAME = 'devoto-habit-db';
 const STORE_NAME = 'user-epubs';
 const DB_VERSION = 1;
 
-// Calculate SHA-256 hash of a blob
+// Simple hash function fallback for environments where crypto.subtle is not available
+// Uses a fast non-cryptographic hash (djb2 variant) - sufficient for file deduplication
+const simpleHash = (buffer: ArrayBuffer): string => {
+    const bytes = new Uint8Array(buffer);
+    let hash1 = 5381;
+    let hash2 = 52711;
+    
+    for (let i = 0; i < bytes.length; i++) {
+        hash1 = (hash1 * 33) ^ bytes[i];
+        hash2 = (hash2 * 33) ^ bytes[bytes.length - 1 - i];
+    }
+    
+    // Combine with file size for better uniqueness
+    const combined = ((hash1 >>> 0) * 4096 + (hash2 >>> 0)).toString(16);
+    return `fallback-${buffer.byteLength.toString(16)}-${combined}`;
+};
+
+// Calculate SHA-256 hash of a blob (with fallback for unsupported environments)
 export const calculateFileHash = async (blob: Blob): Promise<string> => {
     const arrayBuffer = await blob.arrayBuffer();
-    const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    return hashHex;
+    
+    // Check if crypto.subtle is available (requires HTTPS or localhost)
+    if (typeof crypto !== 'undefined' && crypto.subtle && typeof crypto.subtle.digest === 'function') {
+        try {
+            const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            return hashHex;
+        } catch (e) {
+            console.warn('[calculateFileHash] crypto.subtle.digest failed, using fallback:', e);
+        }
+    }
+    
+    // Fallback for environments without crypto.subtle (e.g., HTTP, some mobile WebViews)
+    console.warn('[calculateFileHash] crypto.subtle not available, using fallback hash');
+    return simpleHash(arrayBuffer);
 };
 
 // Open IndexedDB connection
