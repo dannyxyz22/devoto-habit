@@ -31,6 +31,14 @@ const readerStyles = {
   tocButtonExpanded: {
     ...ReactReaderStyle.tocButtonExpanded,
     top: 'calc(10px + var(--safe-area-inset-top, 0px))'
+  },
+  tocArea: {
+    ...ReactReaderStyle.tocArea,
+    background: '#f8f8f8'
+  },
+  tocAreaButton: {
+    ...ReactReaderStyle.tocAreaButton,
+    color: '#333'
   }
 };
 
@@ -185,6 +193,16 @@ const EpubReaderV3 = () => {
   // Callback quando a localização muda
   const handleLocationChanged = useCallback((newLocation: string) => {
     setLocation(newLocation);
+
+    // If it's an href (from TOC click), not a CFI, let ReactReader handle navigation
+    // and skip progress calculation until we get the actual CFI
+    const isCfi = typeof newLocation === 'string' && newLocation.startsWith('epubcfi(');
+    
+    if (!isCfi) {
+      console.log("[EpubReaderV3] TOC navigation detected (href):", newLocation);
+      // Don't save href to localStorage, wait for the CFI update
+      return;
+    }
 
     // Salvar sincrono no LocalStorage (Hot Cache) com Timestamp
     try {
