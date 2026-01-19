@@ -14,8 +14,13 @@ import EpubReaderV3 from "./pages/EpubReaderV3";
 import BookDetails from "./pages/BookDetails";
 import Stats from "./pages/Stats";
 import NotFound from "./pages/NotFound";
+import AdminLogs from "./pages/AdminLogs";
 import { ThemeProvider } from "next-themes";
 import { Capacitor } from "@capacitor/core";
+// ... (keep usage of other imports if needed, but here we just need to add AdminLogs import)
+
+// Actually, I can just use the tool targeted at the specific blocks.
+// Let's Insert the import at the top and the route in the Routes.
 import { App as CapacitorApp } from "@capacitor/app";
 import { StatusBarManager } from "@/components/app/StatusBarManager";
 
@@ -69,6 +74,7 @@ const App = () => {
             <Route path="/epub/:epubId" element={<EpubReaderV3 />} />
             <Route path="/book/:bookId" element={<BookDetails />} />
             <Route path="/estatisticas" element={<Stats />} />
+            <Route path="/admin/logs" element={<AdminLogs />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
