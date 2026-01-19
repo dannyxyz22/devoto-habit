@@ -39,6 +39,7 @@ import {
 import { Calendar } from "lucide-react";
 
 // Types now shared via lib/reading
+import { logger } from "@/lib/logger";
 
 const Index = () => {
   const [userId, setUserId] = useState<string>('local-user');
@@ -181,7 +182,9 @@ const Index = () => {
 
         console.log('[Index] 📚 loadFromRxDB - no book found for:', activeBookId);
         return false;
+        return false;
       } catch (err) {
+        logger.logError(err, { context: '[Index] loadFromRxDB failed' });
         console.error('[Index] loadFromRxDB failed:', err);
         return false;
       }
@@ -260,6 +263,7 @@ const Index = () => {
           }
         };
       } catch (err) {
+        logger.logError(err, { context: '[Index] Failed to setup RxDB subscription' });
         console.error('[Index] Failed to setup RxDB subscription:', err);
       }
     };
@@ -335,6 +339,7 @@ const Index = () => {
         }
         return false;
       } catch (err) {
+        logger.logError(err, { context: '[Index] Manual RxDB load failed' });
         console.error('[Index] Manual RxDB load failed:', err);
         return false;
       }
@@ -381,6 +386,7 @@ const Index = () => {
         subscription = { unsubscribe: () => sub.unsubscribe() };
         console.log('[Index] ✅ RxDB subscription active');
       } catch (err) {
+        logger.logError(err, { context: '[Index] Failed to setup user_stats subscription' });
         console.error('[Index] ❌ Failed to setup user_stats subscription:', err);
       }
     };
@@ -447,6 +453,7 @@ const Index = () => {
         console.log('[Index] 📅 loadFromRxDB - reading_plan not found for:', { book_id: activeBookId });
         return false;
       } catch (err) {
+        logger.logError(err, { context: '[Index] loadFromRxDB reading_plans failed' });
         console.error('[Index] loadFromRxDB reading_plans failed:', err);
         return false;
       }
@@ -484,6 +491,7 @@ const Index = () => {
         });
         subscription = { unsubscribe: () => sub.unsubscribe() };
       } catch (err) {
+        logger.logError(err, { context: '[Index] Failed to setup reading_plans subscription' });
         console.error('[Index] Failed to setup reading_plans subscription:', err);
       }
     };
@@ -566,6 +574,7 @@ const Index = () => {
         console.log('[Index] 📏 loadFromRxDB - daily_baseline not found:', { baselineId, userId, activeBookId, todayISO });
         return false;
       } catch (err) {
+        logger.logError(err, { context: '[Index] loadFromRxDB daily_baselines failed' });
         console.error('[Index] loadFromRxDB daily_baselines failed:', err);
         return false;
       }
@@ -635,6 +644,7 @@ const Index = () => {
           subscription = { unsubscribe: () => sub.unsubscribe() };
         }
       } catch (err) {
+        logger.logError(err, { context: '[Index] Failed to setup daily_baselines subscription' });
         console.error('[Index] Failed to setup daily_baselines subscription:', err);
       }
     };

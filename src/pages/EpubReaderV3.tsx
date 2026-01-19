@@ -14,6 +14,7 @@ import { calculatePercent } from "@/lib/percentageUtils";
 import { refreshWidget } from "@/lib/widgetService"; // Use centralized widget service
 import { ChevronLeft } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { logger } from "@/lib/logger";
 
 /**
  * EpubReaderV3 - Versão minimalista baseada na documentação oficial do react-reader
@@ -148,6 +149,7 @@ const EpubReaderV3 = () => {
       }
       console.log("[EpubReaderV3] DB Persistence complete");
     } catch (error) {
+      logger.logError(error, { context: '[EpubReaderV3] DB Persistence error' });
       console.error("[EpubReaderV3] DB Persistence error:", error);
     }
 
@@ -197,7 +199,7 @@ const EpubReaderV3 = () => {
     // If it's an href (from TOC click), not a CFI, let ReactReader handle navigation
     // and skip progress calculation until we get the actual CFI
     const isCfi = typeof newLocation === 'string' && newLocation.startsWith('epubcfi(');
-    
+
     if (!isCfi) {
       console.log("[EpubReaderV3] TOC navigation detected (href):", newLocation);
       // Don't save href to localStorage, wait for the CFI update
@@ -208,7 +210,10 @@ const EpubReaderV3 = () => {
     try {
       const state = { cfi: newLocation, timestamp: Date.now() };
       localStorage.setItem(`epubLoc:${epubId}`, JSON.stringify(state));
-    } catch (e) { console.error('LocalStorage write failed', e); }
+    } catch (e) {
+      logger.logError(e, { context: '[EpubReaderV3] LocalStorage write failed' });
+      console.error('LocalStorage write failed', e);
+    }
 
     // Calcular porcentagem de progresso
     const rendition = renditionRef.current;
@@ -400,6 +405,7 @@ const EpubReaderV3 = () => {
           console.log("[EpubReaderV3] Ready. Starting at:", finalCfi);
         }
       } catch (err) {
+        logger.logError(err, { context: '[EpubReaderV3] Load error' });
         console.error("[EpubReaderV3] Load error:", err);
         if (!cancelled) {
           setError("Falha ao carregar o EPUB");

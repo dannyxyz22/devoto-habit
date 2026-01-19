@@ -20,6 +20,7 @@ import { BookSearchDialog } from "@/components/app/BookSearchDialog";
 import { Upload, Trash2, BookPlus, AlertCircle, Bookmark } from "lucide-react";
 import { BookCover } from "@/components/book/BookCover";
 import { calculatePagePercent } from "@/lib/percentageUtils";
+import { logger } from "@/lib/logger";
 
 const Library = () => {
   const Cover = ({ src, alt }: { src: string; alt: string }) => (
@@ -304,10 +305,12 @@ const Library = () => {
             console.log('[Library] Updated books list:', uniqueBooks.length);
 
           } catch (err) {
+            logger.logError(err, { context: '[Library] Error processing book update' });
             console.error('[Library] Error processing book update:', err);
           }
         });
       } catch (err) {
+        logger.logError(err, { context: '[Library] Error setting up subscription' });
         console.error('[Library] Error setting up subscription:', err);
       }
     };
@@ -381,6 +384,7 @@ const Library = () => {
         description: `${userEpub.title} by ${userEpub.author}`,
       });
     } catch (error) {
+      logger.logError(error, { context: '[Library] Upload error' });
       console.error('Upload error:', error);
       toast({
         title: 'Upload failed',
@@ -410,6 +414,7 @@ const Library = () => {
         description: 'The book has been removed from your library',
       });
     } catch (error) {
+      logger.logError(error, { context: '[Library] Delete book error' });
       console.error('Delete error:', error);
       toast({
         title: 'Delete failed',
