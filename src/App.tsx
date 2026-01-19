@@ -10,7 +10,6 @@ import { AuthCallbackHandler } from "@/components/auth/AuthCallbackHandler";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Library from "./pages/Library";
-import Reader from "./pages/Reader";
 import EpubReaderV3 from "./pages/EpubReaderV3";
 import BookDetails from "./pages/BookDetails";
 import Stats from "./pages/Stats";
@@ -67,7 +66,6 @@ const App = () => {
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<Login />} />
             <Route path="/biblioteca" element={<Library />} />
-            <Route path="/leitor/:bookId" element={<Reader />} />
             <Route path="/epub/:epubId" element={<EpubReaderV3 />} />
             <Route path="/book/:bookId" element={<BookDetails />} />
             <Route path="/estatisticas" element={<Stats />} />

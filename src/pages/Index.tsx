@@ -890,25 +890,8 @@ const Index = () => {
       setActiveBookPhysicalInfo(null);
     }
 
-    if (isEpub || isPhysical) {
-      setParts(null);
-      return;
-    } else {
-      const cacheKey = `book:${meta.id}`;
-      const cached = localStorage.getItem(cacheKey);
-      if (cached) {
-        try { setParts(JSON.parse(cached)); return; } catch { }
-      }
-      setLoading(true);
-      fetch(meta.sourceUrl!)
-        .then(r => r.json())
-        .then(json => {
-          localStorage.setItem(cacheKey, JSON.stringify(json));
-          setParts(json as Part[]);
-        })
-        .catch(() => setErr("Falha ao carregar o livro para estatísticas."))
-        .finally(() => setLoading(false));
-    }
+    // All books are now EPUB or physical - no JSON loading needed
+    setParts(null);
   }, [activeBookId, allBooks]);
 
   // Use reactive plan from RxDB subscription
@@ -1235,13 +1218,6 @@ const Index = () => {
               <p className="text-sm text-muted-foreground mt-2">Meta: {planProgressPercent?.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%
                 {daysRemaining ? ` • ${daysRemaining} dia(s) restantes` : ""}
               </p>
-              {!isPercentBased && parts && plan?.targetPartIndex != null && (
-                <p className="text-sm text-muted-foreground mt-1">
-                  {`${targetPartTitle ? `${targetPartTitle}` : ""}`}
-                  <br />
-                  {plan.targetChapterIndex != null ? `${targetChapterTitle ? `${targetChapterTitle}` : ""}` : ""}
-                </p>
-              )}
             </>
           ) : (
             <p className="text-muted-foreground">Defina uma meta e acompanhe seu avanço.</p>
@@ -1278,31 +1254,14 @@ const Index = () => {
         <div className="rounded-lg border p-4">
           <h3 className="text-lg font-semibold">Marcador do livro</h3>
           {used && activeBookId ? (
-            isPercentBased ? (
-              <>
-                <p className="text-sm text-muted-foreground mt-1">{(p.percent || 0).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}% lido</p>
-                <div className="mt-2">
-                  <Button asChild variant="link">
-                    <Link to={activeIsPhysical ? `/book/${activeBookId}` : `/epub/${activeBookId}`} onClick={() => setLastBookId(activeBookId)}>Continuar leitura</Link>
-                  </Button>
-                </div>
-              </>
-            ) : parts ? (
-              <>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {`${currentPartTitle ? `${currentPartTitle}` : ""}`}
-                  <br />
-                  {`${currentChapterTitle ? `${currentChapterTitle}` : ""}`}
-                </p>
-                <div className="mt-2">
-                  <Button asChild variant="link">
-                    <Link to={`/leitor/${activeBookId}`} onClick={() => setLastBookId(activeBookId)}>Continuar leitura</Link>
-                  </Button>
-                </div>
-              </>
-            ) : (
-              <p className="text-muted-foreground text-sm">Carregando marcador…</p>
-            )
+            <>
+              <p className="text-sm text-muted-foreground mt-1">{(p.percent || 0).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}% lido</p>
+              <div className="mt-2">
+                <Button asChild variant="link">
+                  <Link to={activeIsPhysical ? `/book/${activeBookId}` : `/epub/${activeBookId}`} onClick={() => setLastBookId(activeBookId)}>Continuar leitura</Link>
+                </Button>
+              </div>
+            </>
           ) : (
             <Button asChild variant="link">
               <Link to="/biblioteca">Escolha um livro na biblioteca</Link>

@@ -350,11 +350,8 @@ export default function BookDetails() {
     if (!book || !bookId) return;
     await setLastBookId(bookId);
 
-    if (book.type === "epub" || book.isUserUpload) {
-      navigate(`/epub/${bookId}`);
-    } else {
-      navigate(`/leitor/${bookId}`);
-    }
+    // All non-physical books are EPUBs
+    navigate(`/epub/${bookId}`);
   };
 
   // Physical book progress handlers

@@ -2,7 +2,6 @@ import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import hero from "@/assets/hero-devota.jpg";
 import { Button } from "@/components/ui/button";
-import { BOOKS } from "@/lib/books";
 import { UserMenu } from "./UserMenu";
 import { useToast } from "@/components/ui/use-toast";
 import { getLastBookIdAsync } from "@/lib/storage";
@@ -25,11 +24,9 @@ export const Hero = ({ activeBookId, used }: HeroProps) => {
     if (activeBookId) {
       if (activeBookId.startsWith('physical-')) {
         ctaHref = `/book/${activeBookId}`;
-      } else if (activeBookId.startsWith('user-')) {
-        ctaHref = `/epub/${activeBookId}`;
       } else {
-        const meta = BOOKS.find(b => b.id === activeBookId);
-        ctaHref = meta?.type === 'epub' ? `/epub/${activeBookId}` : `/leitor/${activeBookId}`;
+        // All non-physical books are EPUBs
+        ctaHref = `/epub/${activeBookId}`;
       }
     }
   }

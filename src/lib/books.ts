@@ -5,7 +5,7 @@ export type BookMeta = {
   sourceUrl?: string;          // Optional for physical books
   description: string;
   coverImage?: string;
-  type?: 'json' | 'epub' | 'physical';  // Add 'physical' type
+  type?: 'epub' | 'physical';
   isUserUpload?: boolean;      // Flag for user-uploaded books
   isPhysical?: boolean;        // Flag for physical books
   totalPages?: number;         // For physical books
@@ -16,10 +16,6 @@ export type BookMeta = {
   percentage?: number;         // Reading progress percentage
   needsReUpload?: boolean;     // For EPUBs synced from cloud without local blob
 };
-
-// Import asset via Vite so the URL is correctly handled in build
-// Note: keep using JPG that exists in src/assets. If you switch to PNG, ensure the file exists.
-import filoteiaCover from "@/assets/book-cover-filoteia.jpg";
 
 // Validate that no static book IDs start with reserved prefixes
 const validateBookIds = (books: BookMeta[]): BookMeta[] => {
@@ -39,17 +35,6 @@ const validateBookIds = (books: BookMeta[]): BookMeta[] => {
 };
 
 export const BOOKS: BookMeta[] = validateBookIds([
-  {
-    id: "filoteia",
-    title: "Introdução à Vida Devota (Filotéia)",
-    author: "São Francisco de Sales",
-    sourceUrl:
-      "https://raw.githubusercontent.com/dannyxyz22/introduction-devout-life/refs/heads/main/output/livro_pt-BR.json",
-    description:
-      "Clássico atemporal que ensina a viver a devoção no cotidiano, escrito por São Francisco de Sales.",
-    coverImage: filoteiaCover,
-    type: 'json',
-  },
   {
     id: "imitacao-cristo",
     title: "Imitação de Cristo",
