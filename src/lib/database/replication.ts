@@ -109,10 +109,10 @@ export class ReplicationManager {
 
                         console.log('[Replication Books] ⬆️ Manually upserting doc to avoid 409 Conflict', { id: rest.id, title: rest.title });
 
-                        // Perform manual upsert
+                        // Perform manual upsert using compound primary key (id, user_id)
                         const { error } = await supabase
                             .from('books')
-                            .upsert(rest, { onConflict: 'id' });
+                            .upsert(rest, { onConflict: 'id,user_id' });
 
                         if (error) {
                             console.error('[Replication Books] ❌ Manual upsert failed:', error);
