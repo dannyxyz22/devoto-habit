@@ -530,6 +530,24 @@ push: {
 }
 ```
 
+#### Manual Upsert (Resolução de Conflitos)
+
+Para coleções críticas como `user_epubs` e `books`, usamos uma estratégia de **Manual Upsert** para evitar erros 409 (Conflict). Em vez de deixar o RxDB tentar um `INSERT` padrão (que falha se o ID já existe), interceptamos o push e fazemos um `upsert` direto no Supabase:
+
+```typescript
+push: {
+    modifier: async (doc) => {
+        // ... filtros ...
+        
+        // Upsert manual direto no Supabase
+        await supabase.from('table').upsert(doc, { onConflict: 'id' });
+        
+        // Retorna null para impedir insert padrão do RxDB
+        return null;
+    }
+}
+```
+
 ### Realtime (Tempo Real)
 
 O Supabase Realtime notifica mudanças do servidor:
@@ -740,6 +758,12 @@ try {
 1. Verifique se IDs são únicos
 2. Use reconciliação para alinhar IDs baseados em `file_hash` (para EPUBs)
 3. Limpe dados de `local-user` após migração
+
+### Problema: Erros em produção
+**Solução:**
+O sistema possui logs automáticos para erros de replicação na tabela `error_logs` (Supabase).
+- Erros de `upsert` manual são logados no console.
+- Erros críticos de aplicação são capturados pelo `logger.ts` e enviados ao Supabase.
 
 ---
 

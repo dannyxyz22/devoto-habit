@@ -7,17 +7,30 @@ import { Preferences } from '@capacitor/preferences'
 import { dataLayer } from './services/data/RxDBDataLayer'
 import { replicationManager } from './lib/database/replication'
 import { getDatabase } from './lib/database/db'
+import { ErrorBoundary } from './components/ErrorBoundary'
+import { logger } from './lib/logger'
 
 // Expose debug utilities to window for troubleshooting
 if (typeof window !== 'undefined') {
   (window as any).dataLayer = dataLayer;
   (window as any).replicationManager = replicationManager;
   (window as any).getDatabase = getDatabase;
+  (window as any).logger = logger;
 }
+
+// Global error listener for unhandled exceptions
+window.addEventListener('error', (event) => {
+  logger.logError(event.error || event.message, { type: 'uncaught_exception' });
+});
+
+// Flush any queued offline errors
+logger.flushQueue().catch(console.error);
 
 createRoot(document.getElementById("root")!).render(
   <HelmetProvider>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </HelmetProvider>
 );
 
@@ -26,10 +39,10 @@ export async function updateDailyProgressWidget(percent: number, hasGoal: boolea
   try {
     const isNative = Capacitor.isNativePlatform?.() ?? (Capacitor.getPlatform?.() !== 'web')
     if (!isNative) return
-  // Usar data local (não UTC) para evitar avançar para o "dia seguinte" em fusos negativos.
-  const now = new Date()
-  const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
-  const payload = { percent: Math.max(0, Math.min(100, Math.round(percent || 0))), hasGoal: !!hasGoal, ts: Date.now(), day: today }
+    // Usar data local (não UTC) para evitar avançar para o "dia seguinte" em fusos negativos.
+    const now = new Date()
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+    const payload = { percent: Math.max(0, Math.min(100, Math.round(percent || 0))), hasGoal: !!hasGoal, ts: Date.now(), day: today }
     // Prefer native atomic set via plugin if available
     const plugin: any = (window as any).Capacitor?.Plugins?.WidgetUpdater
     if (plugin?.setDailyProgress) {
@@ -43,5 +56,5 @@ export async function updateDailyProgressWidget(percent: number, hasGoal: boolea
       await Preferences.set({ key: 'widget:dailyProgress', value: JSON.stringify(payload) })
     }
     console.log('[widget] wrote progress', payload)
-  } catch {}
+  } catch { }
 }

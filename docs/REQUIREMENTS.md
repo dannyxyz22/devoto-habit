@@ -409,6 +409,12 @@ if (!existingBaseline && userId === 'local-user') {
 - Persistência do estado "visto" no `localStorage` (`hasSeenOnboarding_v1`)
 - Interface responsiva com suporte a scroll em dispositivos pequenos e bordas arredondadas (estilo iOS/Premium)
 
+##### RF-20: Sistema de Logs de Erro
+- Captura de erros não tratados (`window.onerror` e React Error Boundary)
+- Armazenamento em tabela Supabase `error_logs` (apenas UUID do usuário, sem dados sensíveis)
+- Suporte Offline: Erros são enfileirados no `localStorage` e sincronizados quando online
+- Manutenção: Trigger automático remove logs com mais de 60 dias
+
 ---
 
 ### 3. Requisitos Não-Funcionais

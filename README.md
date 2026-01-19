@@ -10,6 +10,7 @@ Leitura Devota é uma aplicação web e mobile focada em leitura e acompanhament
 - **PWA & Mobile**: Otimizado para funcionar como Progressive Web App e aplicativo nativo Android (via Capacitor).
 - **Widget Android**: Widget nativo para acompanhamento de meta diária de leitura diretamente na tela inicial do celular.
 - **Onboarding Interativo**: Fluxo de boas-vindas para novos usuários, explicando as funcionalidades de metas, biblioteca digital e widgets.
+- **Observabilidade**: Sistema de logs de erro robusto (offline-first) para monitoramento de problemas em produção.
 
 ## Tecnologias Utilizadas
 
