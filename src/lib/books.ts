@@ -40,7 +40,8 @@ export const BOOKS: BookMeta[] = validateBookIds([
     title: "Imitação de Cristo",
     author: "Tomás de Kempis",
     sourceUrl: "/epubs/imitacao-cristo.epub",
-    description: "Um dos livros devocionais mais influentes do cristianismo.",
+    description: "Um dos livros devocionais mais influentes do cristianismo. Obtido de https://archive.org/details/tomas-de-kempis-imitacao-de-cristo",
+    
     type: 'epub',
   },
   {
@@ -48,7 +49,7 @@ export const BOOKS: BookMeta[] = validateBookIds([
     title: "Confissões",
     author: "Santo Agostinho",
     sourceUrl: "/epubs/confissoes-agostinho.epub",
-    description: "A jornada espiritual e intelectual de Santo Agostinho.",
+    description: "A jornada espiritual e intelectual de Santo Agostinho. Obtido de https://archive.org/details/santo-agostinho-confissoes",
     type: 'epub',
   },
   {
