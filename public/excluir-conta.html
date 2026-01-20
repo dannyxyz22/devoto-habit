@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excluir Conta - Ignis Verbi</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cardo:wght@400;700&family=Inter:wght@400;600&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --background: #fbf9f4;
+            --foreground: #2d2825;
+            --primary: #832e35;
+            --accent: #d4a74a;
+            --card: #fdfcf9;
+            --border: #e6e0d5;
+            --muted: #6e655e;
+            --danger: #dc2626;
+            --success: #059669;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --background: #15191d;
+                --foreground: #e6e0d5;
+                --primary: #d4a74a;
+                --card: #1c2227;
+                --border: #2d363d;
+                --muted: #a3aab1;
+                --danger: #f87171;
+                --success: #34d399;
+            }
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--background);
+            color: var(--foreground);
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .serif {
+            font-family: 'Cardo', serif;
+        }
+
+        header {
+            padding: 4rem 2rem 2rem;
+            text-align: center;
+            border-bottom: 1px solid var(--border);
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            margin: 0;
+            color: var(--primary);
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        section {
+            margin-bottom: 2rem;
+            background: var(--card);
+            padding: 2rem;
+            border-radius: 1rem;
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+        }
+
+        h2 {
+            font-family: 'Cardo', serif;
+            font-size: 1.5rem;
+            border-bottom: 2px solid var(--accent);
+            display: inline-block;
+            margin-bottom: 1.5rem;
+            color: var(--primary);
+        }
+
+        p, li {
+            font-size: 1.05rem;
+            color: var(--foreground);
+            opacity: 0.9;
+        }
+
+        ul, ol {
+            padding-left: 1.2rem;
+        }
+
+        li {
+            margin-bottom: 0.5rem;
+        }
+
+        .last-updated {
+            font-size: 0.9rem;
+            color: var(--muted);
+            margin-top: 0.5rem;
+        }
+
+        footer {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+
+        footer a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            background: var(--accent);
+            color: var(--background);
+            border-radius: 2rem;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+
+        .data-table th, .data-table td {
+            border: 1px solid var(--border);
+            padding: 0.75rem;
+            text-align: left;
+        }
+
+        .data-table th {
+            background: var(--background);
+            font-weight: 600;
+        }
+
+        .deleted {
+            color: var(--danger);
+            font-weight: 600;
+        }
+
+        .retained {
+            color: var(--success);
+            font-weight: 600;
+        }
+
+        .warning {
+            background: rgba(220, 38, 38, 0.1);
+            border: 1px solid var(--danger);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+
+        .warning strong {
+            color: var(--danger);
+        }
+
+        a {
+            color: var(--primary);
+        }
+
+        @media (max-width: 640px) {
+            header h1 {
+                font-size: 2rem;
+            }
+
+            .container {
+                padding: 1rem;
+            }
+
+            section {
+                padding: 1.5rem;
+            }
+
+            .data-table {
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="badge">Gerenciamento de Conta</div>
+        <h1 class="serif">Exclusão de Conta</h1>
+        <p class="last-updated">Última atualização: 20 de janeiro de 2026</p>
+    </header>
+
+    <div class="container">
+        <section>
+            <h2>Visão Geral</h2>
+            <p>Esta página descreve como você pode solicitar a exclusão da sua conta e dados associados no aplicativo <strong>Ignis Verbi</strong> (também conhecido como <strong>Leitura Devota</strong>).</p>
+        </section>
+
+        <section>
+            <h2>Como Solicitar a Exclusão</h2>
+            <ol>
+                <li><strong>Opção 1 — Pelo app:</strong> Abra o aplicativo → Menu do usuário (canto superior direito) → "Sair" para deslogar. Em seguida, envie um e-mail solicitando a exclusão.</li>
+                <li><strong>Opção 2 — Por e-mail:</strong> Envie um e-mail para <a href="mailto:legatuschristi@gmail.com?subject=Solicitação de Exclusão de Conta - Ignis Verbi">legatuschristi@gmail.com</a> com o assunto "Solicitação de Exclusão de Conta - Ignis Verbi".</li>
+                <li>No e-mail, informe o <strong>endereço de e-mail</strong> usado para criar sua conta no aplicativo.</li>
+                <li>Você receberá uma confirmação em até <strong>7 dias úteis</strong>.</li>
+            </ol>
+        </section>
+
+        <section>
+            <h2>Dados que Serão Excluídos</h2>
+            <p>Ao solicitar a exclusão da conta, os seguintes dados serão <strong>permanentemente removidos</strong> dos nossos servidores:</p>
+    
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Tipo de Dado</th>
+                        <th>Ação</th>
+                        <th>Prazo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Credenciais da conta (e-mail)</td>
+                        <td class="deleted">Excluído</td>
+                        <td>Até 30 dias</td>
+                    </tr>
+                    <tr>
+                        <td>Progresso de leitura</td>
+                        <td class="deleted">Excluído</td>
+                        <td>Até 30 dias</td>
+                    </tr>
+                    <tr>
+                        <td>Metas e planos de leitura</td>
+                        <td class="deleted">Excluído</td>
+                        <td>Até 30 dias</td>
+                    </tr>
+                    <tr>
+                        <td>Estatísticas (streak, minutos lidos)</td>
+                        <td class="deleted">Excluído</td>
+                        <td>Até 30 dias</td>
+                    </tr>
+                    <tr>
+                        <td>Marcadores de livros físicos</td>
+                        <td class="deleted">Excluído</td>
+                        <td>Até 30 dias</td>
+                    </tr>
+                    <tr>
+                        <td>Preferências/configurações</td>
+                        <td class="deleted">Excluído</td>
+                        <td>Até 30 dias</td>
+                    </tr>
+                    <tr>
+                        <td>Logs de erro (anônimos)</td>
+                        <td class="retained">Retido por 90 dias</td>
+                        <td>Excluído após 90 dias</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="warning">
+                <strong>⚠️ Atenção:</strong> A exclusão é <strong>irreversível</strong>. Após a exclusão, não será possível recuperar seu progresso de leitura, streaks ou metas. Os dados armazenados localmente no seu dispositivo (cache, EPUBs baixados) devem ser removidos manualmente desinstalando o aplicativo.
+            </div>
+        </section>
+
+        <section>
+            <h2>Período de Retenção</h2>
+            <p>Após a solicitação de exclusão:</p>
+            <ul>
+                <li>Sua conta será desativada imediatamente.</li>
+                <li>Os dados serão excluídos permanentemente em até <strong>30 dias</strong>.</li>
+                <li>Logs de erro anônimos (sem identificação pessoal) podem ser retidos por até <strong>90 dias</strong> para fins de melhoria do aplicativo.</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>Contato</h2>
+            <p>Para solicitar a exclusão ou tirar dúvidas, entre em contato através do e-mail:</p>
+            <p><strong><a href="mailto:legatuschristi@gmail.com?subject=Solicitação de Exclusão de Conta - Ignis Verbi">legatuschristi@gmail.com</a></strong></p>
+        </section>
+    </div>
+
+    <footer>
+        <p>2026 Ignis Verbi - Leitura Devota.</p>
+        <p><a href="./privacy.html">Política de Privacidade</a></p>
+    </footer>
+
+</body>
+</html>

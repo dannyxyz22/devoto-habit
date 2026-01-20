@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delete Account - Ignis Verbi</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cardo:wght@400;700&family=Inter:wght@400;600&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --background: #fbf9f4;
+            --foreground: #2d2825;
+            --primary: #832e35;
+            --accent: #d4a74a;
+            --card: #fdfcf9;
+            --border: #e6e0d5;
+            --muted: #6e655e;
+            --danger: #dc2626;
+            --success: #059669;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --background: #15191d;
+                --foreground: #e6e0d5;
+                --primary: #d4a74a;
+                --card: #1c2227;
+                --border: #2d363d;
+                --muted: #a3aab1;
+                --danger: #f87171;
+                --success: #34d399;
+            }
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--background);
+            color: var(--foreground);
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .serif {
+            font-family: 'Cardo', serif;
+        }
+
+        header {
+            padding: 4rem 2rem 2rem;
+            text-align: center;
+            border-bottom: 1px solid var(--border);
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            margin: 0;
+            color: var(--primary);
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        section {
+            margin-bottom: 2rem;
+            background: var(--card);
+            padding: 2rem;
+            border-radius: 1rem;
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+        }
+
+        h2 {
+            font-family: 'Cardo', serif;
+            font-size: 1.5rem;
+            border-bottom: 2px solid var(--accent);
+            display: inline-block;
+            margin-bottom: 1.5rem;
+            color: var(--primary);
+        }
+
+        p, li {
+            font-size: 1.05rem;
+            color: var(--foreground);
+            opacity: 0.9;
+        }
+
+        ul, ol {
+            padding-left: 1.2rem;
+        }
+
+        li {
+            margin-bottom: 0.5rem;
+        }
+
+        .last-updated {
+            font-size: 0.9rem;
+            color: var(--muted);
+            margin-top: 0.5rem;
+        }
+
+        footer {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+
+        footer a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            background: var(--accent);
+            color: var(--background);
+            border-radius: 2rem;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+
+        .data-table th, .data-table td {
+            border: 1px solid var(--border);
+            padding: 0.75rem;
+            text-align: left;
+        }
+
+        .data-table th {
+            background: var(--background);
+            font-weight: 600;
+        }
+
+        .deleted {
+            color: var(--danger);
+            font-weight: 600;
+        }
+
+        .retained {
+            color: var(--success);
+            font-weight: 600;
+        }
+
+        .warning {
+            background: rgba(220, 38, 38, 0.1);
+            border: 1px solid var(--danger);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+
+        .warning strong {
+            color: var(--danger);
+        }
+
+        a {
+            color: var(--primary);
+        }
+
+        @media (max-width: 640px) {
+            header h1 {
+                font-size: 2rem;
+            }
+
+            .container {
+                padding: 1rem;
+            }
+
+            section {
+                padding: 1.5rem;
+            }
+
+            .data-table {
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="badge">Account Management</div>
+        <h1 class="serif">Delete Account</h1>
+        <p class="last-updated">Last updated: January 20, 2026</p>
+    </header>
+
+    <div class="container">
+
+            <section>
+            <h2>Overview</h2>
+            <p>This page describes how you can request the deletion of your account and associated data in the <strong>Ignis Verbi</strong> app (also known as <strong>Leitura Devota</strong>).</p>
+        </section>
+
+        <section>
+            <h2>How to Request Account Deletion</h2>
+            <ol>
+                <li><strong>Option 1 — Through the app:</strong> Open the app → User menu (top right corner) → "Sign out" to log out. Then send an email requesting deletion.</li>
+                <li><strong>Option 2 — By email:</strong> Send an email to <a href="mailto:legatuschristi@gmail.com?subject=Account Deletion Request - Ignis Verbi">legatuschristi@gmail.com</a> with the subject "Account Deletion Request - Ignis Verbi".</li>
+                <li>In the email, provide the <strong>email address</strong> used to create your account in the app.</li>
+                <li>You will receive confirmation within <strong>7 business days</strong>.</li>
+            </ol>
+        </section>
+
+        <section>
+            <h2>Data That Will Be Deleted</h2>
+    
+    <p>When you request account deletion, the following data will be <strong>permanently removed</strong> from our servers:</p>
+    
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Data Type</th>
+                        <th>Action</th>
+                        <th>Timeline</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Account credentials (email)</td>
+                        <td class="deleted">Deleted</td>
+                        <td>Within 30 days</td>
+                    </tr>
+                    <tr>
+                        <td>Reading progress</td>
+                        <td class="deleted">Deleted</td>
+                        <td>Within 30 days</td>
+                    </tr>
+                    <tr>
+                        <td>Reading goals and plans</td>
+                        <td class="deleted">Deleted</td>
+                        <td>Within 30 days</td>
+                    </tr>
+                    <tr>
+                        <td>Statistics (streak, minutes read)</td>
+                        <td class="deleted">Deleted</td>
+                        <td>Within 30 days</td>
+                    </tr>
+                    <tr>
+                        <td>Physical book bookmarks</td>
+                        <td class="deleted">Deleted</td>
+                        <td>Within 30 days</td>
+                    </tr>
+                    <tr>
+                        <td>User preferences/settings</td>
+                        <td class="deleted">Deleted</td>
+                        <td>Within 30 days</td>
+                    </tr>
+                    <tr>
+                        <td>Error logs (anonymous)</td>
+                        <td class="retained">Retained for 90 days</td>
+                        <td>Deleted after 90 days</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="warning">
+                <strong>⚠️ Warning:</strong> Deletion is <strong>irreversible</strong>. After deletion, it will not be possible to recover your reading progress, streaks, or goals. Data stored locally on your device (cache, downloaded EPUBs) must be removed manually by uninstalling the app.
+            </div>
+        </section>
+
+        <section>
+            <h2>Retention Period</h2>
+            <p>After requesting deletion:</p>
+            <ul>
+                <li>Your account will be deactivated immediately.</li>
+                <li>Data will be permanently deleted within <strong>30 days</strong>.</li>
+                <li>Anonymous error logs (without personal identification) may be retained for up to <strong>90 days</strong> for app improvement purposes.</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>Contact</h2>
+            <p>To request account deletion or ask questions, contact us via email:</p>
+            <p><strong><a href="mailto:legatuschristi@gmail.com?subject=Account Deletion Request - Ignis Verbi">legatuschristi@gmail.com</a></strong></p>
+        </section>
+    </div>
+
+    <footer>
+        <p>2026 Ignis Verbi - Leitura Devota.</p>
+        <p><a href="./privacy.html">Privacy Policy</a></p>
+    </footer>
+
+</body>
+</html>

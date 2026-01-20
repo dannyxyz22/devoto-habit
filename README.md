@@ -71,6 +71,14 @@ Opcionalmente faça:
    npx cap open android
    ```
 
+
+4. Gerar Signed App Bundle
+
+Use o Android Studio, opção Build -> Generate Signed Bundle/APK
+Gera em  devoto-habit\android\app\release
+Use o Keystore em usuario\IgnisKeyStore
+
+
 ### Ngrok
 
 Para facilitar o desenvolvimento mobile foi adicionado um OAuth com redirect pelo ngrok.
