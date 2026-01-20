@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Política de Privacidade - Ignis Verbi</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cardo:wght@400;700&family=Inter:wght@400;600&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --background: #fbf9f4;
+            /* Warm Parchment */
+            --foreground: #2d2825;
+            /* Deep grey-brown */
+            --primary: #832e35;
+            /* Deep Burgundy */
+            --accent: #d4a74a;
+            /* Soft Gold */
+            --card: #fdfcf9;
+            --border: #e6e0d5;
+            --muted: #6e655e;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --background: #15191d;
+                --foreground: #e6e0d5;
+                --primary: #d4a74a;
+                --card: #1c2227;
+                --border: #2d363d;
+                --muted: #a3aab1;
+            }
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--background);
+            color: var(--foreground);
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .serif {
+            font-family: 'Cardo', serif;
+        }
+
+        header {
+            padding: 4rem 2rem 2rem;
+            text-align: center;
+            border-bottom: 1px solid var(--border);
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            margin: 0;
+            color: var(--primary);
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        section {
+            margin-bottom: 3rem;
+            background: var(--card);
+            padding: 2rem;
+            border-radius: 1rem;
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+        }
+
+        h2 {
+            font-family: 'Cardo', serif;
+            font-size: 1.75rem;
+            border-bottom: 2px solid var(--accent);
+            display: inline-block;
+            margin-bottom: 1.5rem;
+            color: var(--primary);
+        }
+
+        h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-top: 2rem;
+        }
+
+        p,
+        li {
+            font-size: 1.05rem;
+            color: var(--foreground);
+            opacity: 0.9;
+        }
+
+        ul {
+            padding-left: 1.2rem;
+        }
+
+        li {
+            margin-bottom: 0.5rem;
+        }
+
+        .last-updated {
+            font-size: 0.9rem;
+            color: var(--muted);
+            margin-top: 0.5rem;
+        }
+
+        footer {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            background: var(--accent);
+            color: var(--background);
+            border-radius: 2rem;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 640px) {
+            header h1 {
+                font-size: 2rem;
+            }
+
+            .container {
+                padding: 1rem;
+            }
+
+            section {
+                padding: 1.5rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <div class="badge">Privacidade & Transparência</div>
+        <h1 class="serif">Política de Privacidade</h1>
+        <p class="last-updated">Última atualização: 20 de janeiro de 2026</p>
+    </header>
+
+    <div class="container">
+        <section>
+            <h2>1. Visão Geral</h2>
+            <p>
+                O <strong>Ignis Verbi</strong> foi desenvolvido com foco na privacidade e na experiência do usuário.
+                Adotamos o modelo "offline-first", o que significa que a maioria das suas informações de leitura
+                permanece no seu dispositivo até que você opte por sincronizá-las.
+            </p>
+            sections.
+
+            <section>
+                <h2>2. Dados Coletados</h2>
+                <h3>Informações de Conta</h3>
+                <p>Ao criar uma conta ou fazer login, coletamos:</p>
+                <ul>
+                    <li>Endereço de e-mail (fornecido via Magic Link ou Google Auth).</li>
+                    <li>Nome e foto de perfil (apenas se fornecidos pelo provedor de autenticação).</li>
+                </ul>
+
+                <h3>Dados de Leitura e Uso</h3>
+                <p>Para fornecer as funcionalidades de acompanhamento de hábitos, sincronizamos:</p>
+                <ul>
+                    <li>Progresso de leitura (páginas lidas, porcentagem, tempo de leitura).</li>
+                    <li>Metadados de livros (título, autor, capa).</li>
+                    <li>Planos de leitura e metas configuradas.</li>
+                    <li>Estatísticas de uso (streaks e recordes).</li>
+                </ul>
+
+                <h3>Arquivos EPUB</h3>
+                <p>Arquivos EPUB enviados por você são armazenados <strong>localmente</strong> no seu dispositivo
+                    (IndexedDB). Apenas os metadados (título/autor/hash) são sincronizados com nossos servidores para
+                    permitir que você saiba quais livros possui em outros dispositivos.</p>
+
+                <h3>Logs de Erro</h3>
+                <p>Capturamos logs técnicos em caso de falhas no aplicativo para fins de melhoria contínua. Esses logs
+                    contêm apenas o identificador único do usuário (UUID) e a mensagem de erro, sem dados de conteúdo
+                    sensível.</p>
+            </section>
+
+            <section>
+                <h2>3. Uso dos Dados</h2>
+                <p>Utilizamos seus dados exclusivamente para:</p>
+                <ul>
+                    <li>Manter a sincronização entre seus dispositivos (Web, Android, Tablet).</li>
+                    <li>Calcular e exibir suas metas e estatísticas de leitura.</li>
+                    <li>Melhorar a estabilidade do app através da análise de erros.</li>
+                    <li>Não vendemos ou compartilhamos seus dados com terceiros para fins publicitários.</li>
+                </ul>
+            </section>
+
+            <section>
+                <h2>4. Serviços de Terceiros</h2>
+                <p>Para o funcionamento do serviço, utilizamos:</p>
+                <ul>
+                    <li><strong>Supabase:</strong> Infraestrutura de banco de dados e autenticação.</li>
+                    <li><strong>Google Books API:</strong> Para busca automática de capas e informações de livros.</li>
+                    <li><strong>Google Analytics:</strong> Para métricas anônimas de visitação (apenas na versão web).
+                    </li>
+                    <li><strong>Weserv.nl:</strong> Proxy seguro para carregamento de capas de livros externos.</li>
+                </ul>
+            </section>
+
+            <section>
+                <h2>5. Seus Direitos</h2>
+                <p>Você tem total controle sobre seus dados. A qualquer momento, você pode solicitar a exclusão
+                    definitiva de sua conta e todos os dados associados através do e-mail de suporte.</p>
+                <p>Como o app funciona offline, você também pode limpar os dados locais diretamente nas configurações do
+                    seu navegador ou do aplicativo Android.</p>
+            </section>
+
+            <section>
+                <h2>6. Contato</h2>
+                <p>Se tiver qualquer dúvida sobre esta política ou sobre como tratamos seus dados, entre em contato
+                    através do e-mail:</p>
+                <p><strong>contato@ignisverbi.app</strong></p>
+            </section>
+    </div>
+
+    <footer>
+        <p>&copy; 2026 Ignis Verbi - Leitura Devota.</p>
+    </footer>
+
+</body>
+
+</html>
