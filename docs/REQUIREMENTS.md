@@ -1,10 +1,10 @@
 ## Assistant
 
-## Especificação de Requisitos - Leitura Devota
+## Especificação de Requisitos - Ignis Verbi
 
 ### 1. Visão Geral do Produto
 
-**Leitura Devota** é uma aplicação web e mobile (PWA + Android nativo via Capacitor) focada em leitura e acompanhamento de hábitos devocionais, permitindo a leitura de livros digitais (EPUB), livros físicos e livros estruturados (JSON), com sincronização multi-dispositivo.
+**Ignis Verbi** é uma aplicação web e mobile (PWA + Android nativo via Capacitor) focada em leitura e acompanhamento de hábitos devocionais, permitindo a leitura de livros digitais (EPUB), livros físicos e livros estruturados (JSON), com sincronização multi-dispositivo.
 
 ---
 

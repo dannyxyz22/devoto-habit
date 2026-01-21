@@ -37,7 +37,7 @@ O app está funcional, tem um nicho muito bem definido e uma estética moderna. 
 ## 🎨 Layout e Design
 
 -   **Pontos Positivos:** Uso de shadcn/ui dá um ar profissional. O gradiente no card de progresso e o Hero principal são visualmente atraentes.
--   **Sugestão de "Warmth":** O design atual é muito "SaaS moderno". Para o nicho de "Leitura Devota", talvez elementos visuais mais orgânicos, fontes serifadas clássicas (ex: para os títulos) e uma paleta levemente mais voltada para tons de papel/pergaminho ou madeira poderiam criar uma conexão emocional maior com o tema sagrado.
+-   **Sugestão de "Warmth":** O design atual é muito "SaaS moderno". Para o nicho de "Ignis Verbi", talvez elementos visuais mais orgânicos, fontes serifadas clássicas (ex: para os títulos) e uma paleta levemente mais voltada para tons de papel/pergaminho ou madeira poderiam criar uma conexão emocional maior com o tema sagrado.
 -   **Resiliência de Capas:** O loader de capas de EPUB é complexo. Se uma capa falhar, o fallback (ícone de livro) é funcional, mas pode parecer "vazio". Ter uma geração de capas "genéricas" bonitas com o título do livro ficaria mais premium.
 
 ---

@@ -16,7 +16,7 @@ export const InstallPWA = () => {
       <div className="flex items-start gap-3">
         <Download className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-sm">Instalar Leitura Devota</h3>
+          <h3 className="font-semibold text-sm">Instalar Ignis Verbi</h3>
           <p className="text-xs text-muted-foreground mt-1">
             Instale o app para ter acesso rápido e funcionar offline
           </p>

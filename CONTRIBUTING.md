@@ -1,6 +1,6 @@
-# Guia de Contribuição - Leitura Devota
+# Guia de Contribuição - Ignis Verbi
 
-Bem-vindo ao projeto **Leitura Devota**! Este guia tem como objetivo ajudar novos desenvolvedores a configurar o ambiente, entender a estrutura do projeto e contribuir de forma eficaz.
+Bem-vindo ao projeto **Ignis Verbi**! Este guia tem como objetivo ajudar novos desenvolvedores a configurar o ambiente, entender a estrutura do projeto e contribuir de forma eficaz.
 
 ## 🚀 Começando
 

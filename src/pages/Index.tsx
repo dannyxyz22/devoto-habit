@@ -1173,8 +1173,8 @@ const Index = () => {
     <main className="min-h-screen pb-20">
       <Onboarding />
       <SEO
-        title="Leitura Devota — Clássicos Católicos"
-        description="Leitura devocional diária com clássicos católicos em português. Streak, metas e lembretes."
+        title="Ignis Verbi — Leitura Católica"
+        description="Transforme seu hábito de leitura espiritual com metas e clássicos católicos."
         canonical="/"
       />
       <Hero activeBookId={activeBookId} used={used} />

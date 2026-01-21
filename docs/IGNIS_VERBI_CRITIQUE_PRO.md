@@ -1,4 +1,4 @@
-# Review Ignis Verbi (Leitura Devota)
+# Review Ignis Verbi
 
 ## 🚀 Veredito: Pronto para lançamento?
 **Ainda não.** O app tem uma base técnica sólida (PWA, RxDB, Supabase), mas faltam itens críticos de **observabilidade** e **resiliência** que são obrigatórios para um lançamento profissional.

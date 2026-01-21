@@ -1,7 +1,6 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">devoto-habit</string>
-    <string name="title_activity_main">devoto-habit</string>
-    <string name="package_name">com.devotohabit.app</string>
-    <string name="custom_url_scheme">com.devotohabit.app</string>
+    <string name="app_name">Ignis Verbi</string>
+    <string name="title_activity_main">Ignis Verbi</string>
+    <string name="package_name">app.ignisverbi</string>
 </resources>

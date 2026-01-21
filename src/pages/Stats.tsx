@@ -12,7 +12,7 @@ const Stats = () => {
   return (
     <main className="container mx-auto py-10">
       <SEO
-        title="Estatísticas — Leitura Devota"
+        title="Estatísticas — Ignis Verbi"
         description="Acompanhe seu streak e o tempo total de leitura."
         canonical="/estatisticas"
       />

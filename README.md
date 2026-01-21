@@ -1,6 +1,6 @@
-# Leitura Devota
+# Ignis Verbi
 
-Leitura Devota é uma aplicação web e mobile focada em leitura e acompanhamento de hábitos devocionais. O projeto permite a leitura de livros digitais (EPUB), gerenciamento de biblioteca pessoal e visualização de estatísticas de leitura.
+Ignis Verbi é uma aplicação web e mobile focada em leitura e acompanhamento de hábitos devocionais. O projeto permite a leitura de livros digitais (EPUB), gerenciamento de biblioteca pessoal e visualização de estatísticas de leitura.
 
 ## Funcionalidades
 
@@ -70,6 +70,16 @@ Opcionalmente faça:
    ```bash
    npx cap open android
    ```
+   
+### Gerar Ícones e Splash Screen
+
+Para gerar automaticamente todos os tamanhos de ícones e telas de abertura (splash screens) necessários para o Android a partir dos arquivos fonte em `resources/`:
+
+```bash
+npm run generate:icons
+```
+
+O projeto utiliza `@capacitor/assets` para realizar essa geração e o plugin `@capacitor/splash-screen` para gerenciar a exibição no dispositivo.
 
 
 4. Gerar Signed App Bundle
@@ -107,8 +117,8 @@ O nome do aplicativo é centralizado em `src/config/appMeta.ts`. Para alterar:
 
 1. Edite o arquivo `src/config/appMeta.ts`:
    ```typescript
-   export const APP_NAME = 'Leitura Devota';
-   export const APP_SHORT_NAME = 'Devota';
+   export const APP_NAME = 'Ignis Verbi';
+   export const APP_SHORT_NAME = 'Ignis Verbi';
    ```
 
 2. Propague as alterações para os arquivos de configuração (Manifest, Capacitor, package.json):

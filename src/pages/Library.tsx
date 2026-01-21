@@ -487,7 +487,7 @@ const Library = () => {
   return (
     <main className="min-h-screen bg-background py-10">
       <SEO
-        title="Biblioteca Católica — Leitura Devota"
+        title="Biblioteca Católica — Ignis Verbi"
         description="Escolha um clássico católico em português e comece sua leitura devocional."
         canonical="/biblioteca"
       />

@@ -9,16 +9,19 @@
     "build:native": "cross-env CAP_NATIVE=1 vite build",
     "build:dev": "vite build --mode development",
     "sync:app-name": "node scripts/sync-app-name.mjs",
+    "generate:icons": "capacitor-assets generate --android",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "assets:pwa": "npx capacitor-assets generate --pwa && xcopy /E /Y icons public\\icons"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.3",
     "@capacitor/app": "^7.1.0",
     "@capacitor/core": "^7.4.3",
     "@capacitor/preferences": "^7.0.2",
+    "@capacitor/splash-screen": "^7.0.4",
     "@capacitor/status-bar": "^7.0.4",
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-accordion": "^1.2.11",
@@ -77,6 +80,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^7.4.3",
     "@eslint/js": "^9.32.0",
     "@tailwindcss/typography": "^0.5.16",
