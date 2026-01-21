@@ -21,8 +21,19 @@ const config: CapacitorConfig = {
       forceCodeForRefreshToken: true,
     },
     StatusBar: {
-      overlay: true,
-    }
+      overlaysWebView: true,
+    },
+    SplashScreen: {
+      launchShowDuration: 2000,
+      launchAutoHide: true,
+      launchFadeOutDuration: 300,
+      backgroundColor: "#0E5A73",
+      androidSplashResourceName: "splash",
+      androidScaleType: "CENTER_CROP",
+      showSpinner: false,
+      splashFullScreen: true,
+      splashImmersive: true,
+    },
   }
 };
 

@@ -6,15 +6,20 @@ import android.content.IntentFilter;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.util.Log;
+import androidx.core.splashscreen.SplashScreen;
 import androidx.core.view.WindowCompat;
 import com.getcapacitor.BridgeActivity;
 import app.ignisverbi.WidgetUpdater;
 import app.ignisverbi.RefreshScheduler;
+
 public class MainActivity extends BridgeActivity {
 	private BroadcastReceiver userPresentReceiver;
 
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
+		// Install the splash screen before content is set
+		SplashScreen.installSplashScreen(this);
+
 		// Register plugin before bridge initialization to ensure availability
 		registerPlugin(WidgetUpdater.class);
 		super.onCreate(savedInstanceState);
@@ -32,7 +37,8 @@ public class MainActivity extends BridgeActivity {
 			getWindow().getDecorView().postDelayed(() -> {
 				try {
 					Log.d("MainActivity", "Executando devotaDailyRefresh via JavaScript");
-					this.getBridge().getWebView().evaluateJavascript("window.devotaDailyRefresh && window.devotaDailyRefresh()", null);
+					this.getBridge().getWebView()
+							.evaluateJavascript("window.devotaDailyRefresh && window.devotaDailyRefresh()", null);
 					// Fecha a Activity após um delay para dar tempo do JavaScript executar
 					getWindow().getDecorView().postDelayed(() -> {
 						Log.d("MainActivity", "Fechando Activity após refresh silencioso");
@@ -51,17 +57,25 @@ public class MainActivity extends BridgeActivity {
 		super.onResume();
 		if (userPresentReceiver == null) {
 			userPresentReceiver = new BroadcastReceiver() {
-				@Override public void onReceive(Context context, Intent intent) {
+				@Override
+				public void onReceive(Context context, Intent intent) {
 					if (Intent.ACTION_USER_PRESENT.equals(intent.getAction())) {
-						Log.d("MainActivity","Dynamic USER_PRESENT recebido");
-						try { RefreshScheduler.performDailyRefresh(getApplicationContext(), "user_present_dynamic"); } catch (Throwable ignored) {}
+						Log.d("MainActivity", "Dynamic USER_PRESENT recebido");
+						try {
+							RefreshScheduler.performDailyRefresh(getApplicationContext(), "user_present_dynamic");
+						} catch (Throwable ignored) {
+						}
 					}
 				}
 			};
 			IntentFilter f = new IntentFilter(Intent.ACTION_USER_PRESENT);
-			try { registerReceiver(userPresentReceiver, f); Log.d("MainActivity","USER_PRESENT dynamic receiver registrado"); } catch (Throwable t) { Log.e("MainActivity","Falha registrar USER_PRESENT dynamic", t);} 
+			try {
+				registerReceiver(userPresentReceiver, f);
+				Log.d("MainActivity", "USER_PRESENT dynamic receiver registrado");
+			} catch (Throwable t) {
+				Log.e("MainActivity", "Falha registrar USER_PRESENT dynamic", t);
+			}
 		}
 	}
-
 
 }
