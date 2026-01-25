@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { UserMenu } from "./UserMenu";
 import { useToast } from "@/components/ui/use-toast";
 import { getLastBookIdAsync } from "@/lib/storage";
+import { ExternalLink } from "lucide-react";
 
 
 export interface HeroProps {
@@ -57,13 +58,25 @@ export const Hero = ({ activeBookId, used }: HeroProps) => {
             Acompanhe seu progresso, mantenha seu streak, receba lembretes e conclua
             os grandes clássicos da espiritualidade católica.
           </p>
-          <div className="mt-6 flex gap-3">
-            <Button asChild variant="hero" size="lg">
-              <Link to={ctaHref}>{ctaLabel}</Link>
-            </Button>
-            <Button asChild variant="outline" size="lg">
-              <Link to="/biblioteca">Ver biblioteca</Link>
-            </Button>
+          <div className="mt-6 flex flex-col gap-4">
+            <div className="flex gap-3">
+              <Button asChild variant="hero" size="lg">
+                <Link to={ctaHref}>{ctaLabel}</Link>
+              </Button>
+              <Button asChild variant="outline" size="lg">
+                <Link to="/biblioteca">Ver biblioteca</Link>
+              </Button>
+            </div>
+
+            <a
+              href="https://landing-ignisverbi.lovable.app/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-muted-foreground/80 hover:text-primary transition-all flex items-center gap-1.5 w-fit group"
+            >
+              Conheça o Ignis Verbi
+              <ExternalLink className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+            </a>
           </div>
         </div>
       </div>

@@ -41,6 +41,8 @@ import { Calendar } from "lucide-react";
 // Types now shared via lib/reading
 import { logger } from "@/lib/logger";
 
+import { Footer } from "@/components/app/Footer";
+
 const Index = () => {
   const [userId, setUserId] = useState<string>('local-user');
   const [isAuthLoading, setIsAuthLoading] = useState(true);
@@ -1311,7 +1313,7 @@ const Index = () => {
           <p className="text-muted-foreground text-sm">{err}</p>
         </div>
       )}
-
+      <Footer />
     </main>
   );
 };
